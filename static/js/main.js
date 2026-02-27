@@ -226,8 +226,11 @@ function showFundDetails(fund) {
         
         <!-- 买入设置 -->
         <div style="margin-bottom: 20px;">
-            <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">买入设置</h3>
-            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="color: #e0e0e0; margin: 0; font-size: 14px;">买入设置</h3>
+                <button class="buy-settings-btn" style="background-color: #007bff; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">展开</button>
+            </div>
+            <div id="buy-settings-section" style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333; display: none;">
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
                     <div>
                         <label style="display: block; margin-bottom: 5px;">买入日期:</label>
@@ -344,6 +347,20 @@ function showFundDetails(fund) {
         }
     });
     
+    // 买入设置展开/收起
+    const buySettingsBtn = modal.querySelector('.buy-settings-btn');
+    const buySettingsSection = modal.querySelector('#buy-settings-section');
+    
+    buySettingsBtn.addEventListener('click', function() {
+        if (buySettingsSection.style.display === 'none') {
+            buySettingsSection.style.display = 'block';
+            this.textContent = '收起';
+        } else {
+            buySettingsSection.style.display = 'none';
+            this.textContent = '展开';
+        }
+    });
+    
     // 保存买入设置
     modal.querySelector('#save-buy-settings').addEventListener('click', function() {
         const buyDate = document.getElementById('buy-date').value;
@@ -362,33 +379,51 @@ function showFundDetails(fund) {
     
     // 时间范围按钮
     const timeBtns = modal.querySelectorAll('.time-btn');
+    
+    // 更新按钮样式的函数
+    function updateTimeBtnStyles() {
+        timeBtns.forEach(btn => {
+            if (btn.classList.contains('active')) {
+                btn.style.cssText = `
+                    background-color: #007bff;
+                    color: white;
+                    border: 1px solid #333;
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 12px;
+                `;
+            } else {
+                btn.style.cssText = `
+                    background-color: #2a2a2a;
+                    color: #e0e0e0;
+                    border: 1px solid #333;
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 12px;
+                `;
+            }
+        });
+    }
+    
+    // 初始化按钮样式
+    updateTimeBtnStyles();
+    
+    // 添加点击事件
     timeBtns.forEach(btn => {
-        btn.style.cssText = `
-            background-color: #2a2a2a;
-            color: #e0e0e0;
-            border: 1px solid #333;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-        `;
-        
         btn.addEventListener('click', function() {
             // 移除所有按钮的active类
             timeBtns.forEach(b => b.classList.remove('active'));
             // 添加当前按钮的active类
             this.classList.add('active');
+            // 更新按钮样式
+            updateTimeBtnStyles();
             // 更新图表
             const days = parseInt(this.getAttribute('data-days'));
             updateChart(fund, chartId, days);
         });
     });
-    
-    // 设置active按钮样式
-    modal.querySelector('.time-btn.active').style.cssText += `
-        background-color: #007bff;
-        color: white;
-    `;
     
     // 添加涨跌颜色样式
     const style = document.createElement('style');
@@ -468,9 +503,7 @@ function updateChart(fund, chartId, days) {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    labels: {
-                        color: '#e0e0e0'
-                    }
+                    display: false
                 }
             },
             scales: {
