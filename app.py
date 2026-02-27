@@ -216,33 +216,107 @@ def delete_fund(fund_id):
 def get_fund_details(code):
     try:
         print(f"开始获取基金 {code} 详情...")
-        # 尝试从真实API获取基金详情
-        # 这里可以添加实际的API调用代码
-        # 由于API可能不稳定，暂时返回空数据
-        
-        # 构建空的基金详细信息
-        fund_details = {
-            'establishmentDate': '',
-            'field': '',
-            'manager': '',
-            'size': '',
-            'composition': [],
-            'relatedStocks': []
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
         
-        print(f"基金 {code} 详情获取完成")
-        return jsonify(fund_details)
+        # 使用东方财富API获取基金详情
+        fund_data_url = f"https://fund.eastmoney.com/pingzhongdata/{code}.js"
+        print(f"东方财富API URL: {fund_data_url}")
+        response = requests.get(fund_data_url, headers=headers, timeout=10)
+        
+        print(f"东方财富API响应状态: {response.status_code}")
+        
+        if response.status_code == 200:
+            try:
+                # 解析JS格式数据
+                data_str = response.text
+                import re
+                
+                # 提取基金基本信息
+                fund_details = {
+                    'establishmentDate': '',
+                    'field': '',
+                    'manager': '',
+                    'size': '',
+                    'composition': [],
+                    'relatedStocks': []
+                }
+                
+                # 提取基金类型（所属领域）
+                type_match = re.search(r'var fundType = "(.*?)";', data_str)
+                if type_match:
+                    fund_details['field'] = type_match.group(1)
+                    print(f"提取到基金类型: {fund_details['field']}")
+                
+                # 提取基金经理
+                manager_match = re.search(r'var fundManager = "(.*?)";', data_str)
+                if manager_match:
+                    fund_details['manager'] = manager_match.group(1)
+                    print(f"提取到基金经理: {fund_details['manager']}")
+                
+                # 提取基金规模
+                size_match = re.search(r'var fundSize = "(.*?)";', data_str)
+                if size_match:
+                    fund_details['size'] = size_match.group(1)
+                    print(f"提取到基金规模: {fund_details['size']}")
+                
+                # 提取基金成立时间
+                establish_match = re.search(r'var establishDate = "(.*?)";', data_str)
+                if establish_match:
+                    fund_details['establishmentDate'] = establish_match.group(1)
+                    print(f"提取到成立时间: {fund_details['establishmentDate']}")
+                
+                # 提取持仓股票
+                stock_codes_match = re.search(r'var stockCodesNew =\[(.*?)\];', data_str)
+                if stock_codes_match:
+                    stock_codes_str = stock_codes_match.group(1)
+                    # 提取股票代码和名称
+                    stock_codes = re.findall(r'"(.*?)"', stock_codes_str)
+                    print(f"提取到 {len(stock_codes)} 只持仓股票")
+                    
+                    # 构建相关股票数据
+                    for stock_code in stock_codes[:5]:  # 只取前5只股票
+                        # 股票代码格式: 市场.代码 (1.600519)
+                        stock_info = stock_code.split('.')
+                        if len(stock_info) == 2:
+                            market, code = stock_info
+                            stock_name = "未知"
+                            # 这里可以添加股票名称的获取逻辑
+                            fund_details['relatedStocks'].append({
+                                'name': stock_name,
+                                'code': code,
+                                'percentage': 0,  # 暂时设为0，实际应该从API获取
+                                'change': 0  # 暂时设为0，实际应该从API获取
+                            })
+                
+                # 提取投资组成
+                # 这里可以从API获取更详细的投资组成数据
+                # 暂时使用默认数据
+                fund_details['composition'] = [
+                    {'name': '股票', 'percentage': 80},
+                    {'name': '债券', 'percentage': 15},
+                    {'name': '现金', 'percentage': 5}
+                ]
+                
+                print(f"基金 {code} 详情获取完成")
+                return jsonify(fund_details)
+            except Exception as e:
+                print(f"解析东方财富API响应失败: {e}")
+        else:
+            print(f"东方财富API响应状态错误: {response.status_code}")
     except Exception as e:
         print(f"获取基金详情失败: {e}")
-        # 如果API调用失败，返回空数据
-        return jsonify({
-            'establishmentDate': '',
-            'field': '',
-            'manager': '',
-            'size': '',
-            'composition': [],
-            'relatedStocks': []
-        })
+    
+    # 如果API调用失败，返回空数据
+    return jsonify({
+        'establishmentDate': '',
+        'field': '',
+        'manager': '',
+        'size': '',
+        'composition': [],
+        'relatedStocks': []
+    })
 
 @app.route('/api/news', methods=['GET'])
 def get_news():
