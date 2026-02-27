@@ -76,29 +76,51 @@ function loadFunds() {
                     estimatedReturn = fund.predicted_return * fund.prices[fund.prices.length - 1] * buySettings.shares;
                 }
                 
+                // 获取RSI状态和emoji
+                function getRSIStatus(rsi) {
+                    if (rsi > 70) {
+                        return { status: '过热', emoji: '🔥' };
+                    } else if (rsi < 30) {
+                        return { status: '过冷', emoji: '❄️' };
+                    } else if (rsi > 60 || rsi < 40) {
+                        return { status: '波动', emoji: '🌪️' };
+                    } else {
+                        return { status: '正常', emoji: '📊' };
+                    }
+                }
+                
+                const rsiStatus = getRSIStatus(fund.rsi);
+                
                 fundItem.innerHTML = `
                     <div class="fund-info">
                         <div class="fund-name">${fund.name}</div>
                         <div class="fund-details">
                             <div class="fund-detail">
                                 <span>${fund.code}</span>
-                                <span style="color: #007bff;">场外</span>
+                                <span class="fund-type-tag">场外</span>
                             </div>
-                            <div class="fund-detail">
+                            <div class="fund-detail-box">
                                 <span>距高点 ${distanceFromHigh}%</span>
                             </div>
-                            <div class="fund-detail">
+                            <div class="fund-detail-box">
                                 <span>RSI ${fund.rsi.toFixed(1)}</span>
+                                <span class="rsi-emoji">${rsiStatus.emoji}</span>
                             </div>
                         </div>
                     </div>
                     <div class="fund-performance">
-                        <div class="fund-return ${fund.predicted_return < 0 ? 'negative' : ''}">
-                            ${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%
+                        <div class="fund-return-container">
+                            <div class="fund-return ${fund.predicted_return < 0 ? 'negative' : ''}">
+                                ${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%
+                            </div>
+                            <div class="fund-return-label">Real-time Return</div>
                         </div>
                         ${buySettings.shares > 0 ? `
-                            <div class="fund-return ${estimatedReturn >= 0 ? '' : 'negative'}">
-                                ${estimatedReturn >= 0 ? '+' : ''}${estimatedReturn.toFixed(2)}元
+                            <div class="fund-return-container">
+                                <div class="fund-return ${estimatedReturn >= 0 ? '' : 'negative'}">
+                                    ${estimatedReturn >= 0 ? '+' : ''}${estimatedReturn.toFixed(2)}元
+                                </div>
+                                <div class="fund-return-label">Live Profit/Loss</div>
                             </div>
                         ` : ''}
                         <button class="real-time-btn">

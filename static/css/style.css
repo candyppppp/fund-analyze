@@ -166,22 +166,53 @@ body {
     gap: 12px;
     font-size: 12px;
     color: #aaa;
+    align-items: center;
 }
 
 .fund-detail {
     display: flex;
     align-items: center;
+    gap: 8px;
+}
+
+.fund-type-tag {
+    background-color: #007bff;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.fund-detail-box {
+    background-color: #2a2a2a;
+    border: 1px solid #333;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
     gap: 4px;
+}
+
+.rsi-emoji {
+    font-size: 12px;
 }
 
 .fund-performance {
     display: flex;
-    align-items: center;
-    gap: 12px;
+    align-items: flex-end;
+    gap: 16px;
+}
+
+.fund-return-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
 }
 
 .fund-return {
-    font-size: 14px;
+    font-size: 16px;
     font-weight: bold;
     color: #dc3545;
 }
@@ -190,11 +221,16 @@ body {
     color: #28a745;
 }
 
+.fund-return-label {
+    font-size: 10px;
+    color: #aaa;
+}
+
 .real-time-btn {
     background-color: #2a2a2a;
     color: #e0e0e0;
     border: 1px solid #333;
-    padding: 4px 8px;
+    padding: 6px 10px;
     border-radius: 4px;
     font-size: 10px;
     cursor: pointer;
@@ -211,9 +247,9 @@ body {
     background-color: #dc3545;
     color: white;
     border: none;
-    padding: 4px 8px;
+    padding: 6px 10px;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 10px;
     cursor: pointer;
 }
 
