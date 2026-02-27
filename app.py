@@ -72,19 +72,13 @@ def get_fund_data(code):
         # 数据源1: 东方财富API
         try:
             print("尝试使用东方财富API获取历史净值数据...")
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=60)
-            start_date_str = start_date.strftime('%Y-%m-%d')
-            end_date_str = end_date.strftime('%Y-%m-%d')
-            
-            # 简化的东方财富API URL
+            # 东方财富API URL
             fund_data_url = f"https://fund.eastmoney.com/pingzhongdata/{code}.js"
             print(f"东方财富API URL: {fund_data_url}")
-            response = requests.get(fund_data_url, headers=headers, timeout=5)
+            response = requests.get(fund_data_url, headers=headers, timeout=10)
             
             # 检查响应状态
             print(f"东方财富API响应状态: {response.status_code}")
-            print(f"东方财富API响应内容: {response.text[:1000]}...")
             
             if response.status_code == 200:
                 try:
@@ -100,7 +94,11 @@ def get_fund_data(code):
                         net_value_list = json.loads(net_value_json)
                         print(f"东方财富API获取到 {len(net_value_list)} 条净值数据")
                         
-                        for item in net_value_list:
+                        # 只取最近60天的数据
+                        recent_data = net_value_list[-60:]
+                        print(f"取最近 {len(recent_data)} 条数据")
+                        
+                        for item in recent_data:
                             try:
                                 nav = item['y']
                                 date_str = time.strftime('%Y-%m-%d', time.localtime(item['x'] / 1000))
@@ -128,10 +126,9 @@ def get_fund_data(code):
                 # 新浪财经基金净值API
                 fund_data_url = f"http://fundgz.1234567.com.cn/js/{code}.js"
                 print(f"新浪财经API URL: {fund_data_url}")
-                response = requests.get(fund_data_url, headers=headers, timeout=5)
+                response = requests.get(fund_data_url, headers=headers, timeout=10)
                 
                 print(f"新浪财经API响应状态: {response.status_code}")
-                print(f"新浪财经API响应内容: {response.text}")
                 
                 if response.status_code == 200:
                     try:
@@ -155,42 +152,6 @@ def get_fund_data(code):
                     print(f"新浪财经API响应状态错误: {response.status_code}")
             except Exception as e:
                 print(f"新浪财经API失败: {e}")
-                # 数据源3: 天天基金网API
-                try:
-                    print("尝试使用天天基金网API获取历史净值数据...")
-                    # 天天基金网基金净值API
-                    fund_data_url = f"https://fund.eastmoney.com/{code}.html"
-                    print(f"天天基金网API URL: {fund_data_url}")
-                    response = requests.get(fund_data_url, headers=headers, timeout=5)
-                    
-                    print(f"天天基金网API响应状态: {response.status_code}")
-                    print(f"天天基金网API响应内容: {response.text[:1000]}...")
-                    
-                    if response.status_code == 200:
-                        try:
-                            # 解析HTML内容获取净值数据
-                            import re
-                            # 查找净值数据
-                            nav_match = re.search(r'<span class="ui-num">(.*?)</span>', response.text)
-                            date_match = re.search(r'<span class="ui-date">(.*?)</span>', response.text)
-                            if nav_match and date_match:
-                                nav_str = nav_match.group(1)
-                                date_str = date_match.group(1)
-                                try:
-                                    nav = float(nav_str)
-                                    prices.append(nav)
-                                    dates.append(date_str)
-                                    print(f"天天基金网API获取到净值数据: {date_str} - {nav}")
-                                except ValueError as e:
-                                    print(f"解析天天基金网净值数据失败: {e}")
-                            else:
-                                print("天天基金网API没有找到净值数据")
-                        except Exception as e:
-                            print(f"解析天天基金网API响应失败: {e}")
-                    else:
-                        print(f"天天基金网API响应状态错误: {response.status_code}")
-                except Exception as e:
-                    print(f"天天基金网API失败: {e}")
         
         # 计算收益率数据
         if len(prices) > 1:
