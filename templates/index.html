@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>基金分析</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
@@ -13,9 +14,7 @@
         <div class="add-fund">
             <h2>添加基金</h2>
             <form id="add-fund-form">
-                <input type="text" id="fund-name" placeholder="基金名称" required>
                 <input type="text" id="fund-code" placeholder="基金代码" required>
-                <textarea id="fund-prices" placeholder="价格数据（逗号分隔）" required></textarea>
                 <button type="submit">添加</button>
             </form>
         </div>
