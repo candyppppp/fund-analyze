@@ -66,6 +66,14 @@ function loadFunds() {
                 const priceChartId = `price-chart-${fund.id}`;
                 const returnChartId = `return-chart-${fund.id}`;
                 
+                // 获取买入设置
+                const buySettings = getBuySettings(fund.id);
+                // 计算预估今日收益
+                let estimatedReturn = 0;
+                if (buySettings.shares > 0) {
+                    estimatedReturn = fund.predicted_return * fund.prices[fund.prices.length - 1] * buySettings.shares;
+                }
+                
                 fundItem.innerHTML = `
                     <div class="fund-info">
                         <div class="fund-name">${fund.name}</div>
@@ -86,6 +94,11 @@ function loadFunds() {
                         <div class="fund-return ${fund.predicted_return < 0 ? 'negative' : ''}">
                             ${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%
                         </div>
+                        ${buySettings.shares > 0 ? `
+                            <div class="fund-return ${estimatedReturn >= 0 ? '' : 'negative'}">
+                                ${estimatedReturn >= 0 ? '+' : ''}${estimatedReturn.toFixed(2)}元
+                            </div>
+                        ` : ''}
                         <button class="real-time-btn">
                             <span>Real-time</span>
                             <span>🔄</span>
@@ -135,6 +148,11 @@ function deleteFund(id) {
 }
 
 function showFundDetails(fund) {
+    // 获取基金详细信息
+    const fundDetails = getFundDetails(fund.code);
+    // 获取买入设置
+    const buySettings = getBuySettings(fund.id);
+    
     // 创建弹框
     const modal = document.createElement('div');
     modal.className = 'modal';
@@ -156,7 +174,7 @@ function showFundDetails(fund) {
     modalContent.className = 'modal-content';
     modalContent.style.cssText = `
         background-color: #1e1e1e;
-        padding: 16px;
+        padding: 20px;
         border-radius: 6px;
         width: 90%;
         max-width: 900px;
@@ -171,14 +189,76 @@ function showFundDetails(fund) {
     
     // 弹框HTML
     modalContent.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h2 style="color: white; margin: 0; font-size: 14px;">${fund.name} (${fund.code})</h2>
-            <button class="close-btn" style="background-color: #2a2a2a; color: #e0e0e0; border: 1px solid #333; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">关闭</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <h2 style="color: white; margin: 0; font-size: 16px;">${fund.name} (${fund.code})</h2>
+                <button class="detail-btn" style="background-color: #007bff; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">详情</button>
+            </div>
+            <button class="close-btn" style="background-color: #2a2a2a; color: #e0e0e0; border: 1px solid #333; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">关闭</button>
         </div>
         
-        <div style="margin-bottom: 16px;">
-            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">时间范围</h3>
-            <div style="display: flex; gap: 8px;">
+        <!-- 基金详细信息 -->
+        <div id="fund-details-section" style="margin-bottom: 20px; display: none;">
+            <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">基金信息</h3>
+            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
+                    <div><strong>成立时间:</strong> ${fundDetails.establishmentDate}</div>
+                    <div><strong>所属领域:</strong> ${fundDetails.field}</div>
+                    <div><strong>基金经理:</strong> ${fundDetails.manager}</div>
+                    <div><strong>基金规模:</strong> ${fundDetails.size}</div>
+                </div>
+            </div>
+            
+            <h3 style="color: #e0e0e0; margin-top: 16px; margin-bottom: 10px; font-size: 14px;">投资组成</h3>
+            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
+                <div style="font-size: 12px;">
+                    ${fundDetails.composition.map(item => `
+                        <div style="margin-bottom: 5px;">
+                            <strong>${item.name}:</strong> ${item.percentage}%
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <h3 style="color: #e0e0e0; margin-top: 16px; margin-bottom: 10px; font-size: 14px;">投资关联</h3>
+            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
+                <div style="font-size: 12px;">
+                    ${fundDetails.relatedStocks.map(stock => `
+                        <div style="margin-bottom: 5px; display: flex; justify-content: space-between;">
+                            <div>
+                                <strong>${stock.name}</strong> (${stock.code})
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <span>占比: ${stock.percentage}%</span>
+                                <span class="stock-change ${stock.change >= 0 ? 'positive' : 'negative'}">${stock.change >= 0 ? '+' : ''}${stock.change}%</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 买入设置 -->
+        <div style="margin-bottom: 20px;">
+            <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">买入设置</h3>
+            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px;">买入日期:</label>
+                        <input type="date" id="buy-date" value="${buySettings.date}" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 5px; border-radius: 4px; font-size: 12px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px;">买入份数:</label>
+                        <input type="number" id="buy-shares" value="${buySettings.shares}" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 5px; border-radius: 4px; font-size: 12px;">
+                    </div>
+                </div>
+                <button id="save-buy-settings" style="margin-top: 10px; background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">保存设置</button>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">时间范围</h3>
+            <div style="display: flex; gap: 10px;">
                 <button class="time-btn active" data-days="7">7天</button>
                 <button class="time-btn" data-days="14">14天</button>
                 <button class="time-btn" data-days="30">1个月</button>
@@ -187,27 +267,30 @@ function showFundDetails(fund) {
             </div>
         </div>
         
-        <div style="margin-bottom: 16px;">
-            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">增长趋势</h3>
-            <div style="height: 350px; background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
+        <div style="margin-bottom: 20px;">
+            <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">增长趋势</h3>
+            <div style="height: 350px; background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
                 <canvas id="${chartId}"></canvas>
             </div>
         </div>
         
-        <div style="margin-bottom: 16px;">
-            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">基金分析</h3>
-            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
-                <p style="margin: 4px 0; font-size: 11px;"><strong>当前净值:</strong> ${fund.prices[fund.prices.length - 1]}</p>
-                <p style="margin: 4px 0; font-size: 11px;"><strong>RSI指标:</strong> ${fund.rsi.toFixed(2)} ${getRSIMessage(fund.rsi)}</p>
-                <p style="margin: 4px 0; font-size: 11px;"><strong>波动率:</strong> ${(fund.volatility * 100).toFixed(2)}%</p>
-                <p style="margin: 4px 0; font-size: 11px;"><strong>预测收益率:</strong> ${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%</p>
+        <div style="margin-bottom: 20px;">
+            <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">基金分析</h3>
+            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
+                <p style="margin: 5px 0; font-size: 12px;"><strong>当前净值:</strong> ${fund.prices[fund.prices.length - 1]}</p>
+                <p style="margin: 5px 0; font-size: 12px;"><strong>RSI指标:</strong> ${fund.rsi.toFixed(2)} ${getRSIMessage(fund.rsi)}</p>
+                <p style="margin: 5px 0; font-size: 12px;"><strong>波动率:</strong> ${(fund.volatility * 100).toFixed(2)}%</p>
+                <p style="margin: 5px 0; font-size: 12px;"><strong>预测收益率:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%</span></p>
+                ${buySettings.shares > 0 ? `
+                    <p style="margin: 5px 0; font-size: 12px;"><strong>预估今日收益:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * fund.prices[fund.prices.length - 1] * buySettings.shares).toFixed(2)}元</span></p>
+                ` : ''}
             </div>
         </div>
         
         <div>
-            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">投资建议</h3>
-            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
-                <p style="font-size: 11px; line-height: 1.4;">${getInvestmentAdvice(fund)}</p>
+            <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">投资建议</h3>
+            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
+                <p style="font-size: 12px; line-height: 1.4;">${getInvestmentAdvice(fund)}</p>
             </div>
         </div>
     `;
@@ -221,6 +304,34 @@ function showFundDetails(fund) {
         document.body.removeChild(modal);
     });
     
+    // 详情按钮
+    modal.querySelector('.detail-btn').addEventListener('click', function() {
+        const detailsSection = modal.querySelector('#fund-details-section');
+        if (detailsSection.style.display === 'none') {
+            detailsSection.style.display = 'block';
+            this.textContent = '收起';
+        } else {
+            detailsSection.style.display = 'none';
+            this.textContent = '详情';
+        }
+    });
+    
+    // 保存买入设置
+    modal.querySelector('#save-buy-settings').addEventListener('click', function() {
+        const buyDate = document.getElementById('buy-date').value;
+        const buyShares = parseInt(document.getElementById('buy-shares').value) || 0;
+        
+        const buySettings = {
+            date: buyDate,
+            shares: buyShares
+        };
+        
+        localStorage.setItem(`fundBuySettings_${fund.id}`, JSON.stringify(buySettings));
+        alert('买入设置已保存');
+        // 重新加载页面以更新预估收益
+        loadFunds();
+    });
+    
     // 时间范围按钮
     const timeBtns = modal.querySelectorAll('.time-btn');
     timeBtns.forEach(btn => {
@@ -228,10 +339,10 @@ function showFundDetails(fund) {
             background-color: #2a2a2a;
             color: #e0e0e0;
             border: 1px solid #333;
-            padding: 5px 10px;
+            padding: 6px 12px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 10px;
+            font-size: 12px;
         `;
         
         btn.addEventListener('click', function() {
@@ -251,8 +362,49 @@ function showFundDetails(fund) {
         color: white;
     `;
     
+    // 添加涨跌颜色样式
+    const style = document.createElement('style');
+    style.textContent = `
+        .positive { color: #ff4444; }
+        .negative { color: #4CAF50; }
+        .return-value { font-weight: bold; }
+    `;
+    modalContent.appendChild(style);
+    
     // 初始化图表
     updateChart(fund, chartId, 7);
+}
+
+function getFundDetails(code) {
+    // 模拟基金详细信息
+    return {
+        establishmentDate: '2020-01-01',
+        field: '股票型',
+        manager: '张三',
+        size: '10.5亿',
+        composition: [
+            { name: '股票', percentage: 85 },
+            { name: '债券', percentage: 10 },
+            { name: '现金', percentage: 5 }
+        ],
+        relatedStocks: [
+            { name: '贵州茅台', code: '600519', percentage: 8.5, change: 1.2 },
+            { name: '腾讯控股', code: '00700', percentage: 7.2, change: -0.5 },
+            { name: '苹果', code: 'AAPL', percentage: 6.8, change: 0.8 },
+            { name: '宁德时代', code: '300750', percentage: 5.9, change: 2.1 },
+            { name: '阿里巴巴', code: '09988', percentage: 4.7, change: -1.3 }
+        ]
+    };
+}
+
+function getBuySettings(fundId) {
+    const defaultSettings = {
+        date: new Date().toISOString().split('T')[0],
+        shares: 0
+    };
+    
+    const savedSettings = localStorage.getItem(`fundBuySettings_${fundId}`);
+    return savedSettings ? JSON.parse(savedSettings) : defaultSettings;
 }
 
 function updateChart(fund, chartId, days) {
