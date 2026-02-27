@@ -1,5 +1,4 @@
 from utils.indicators import calculate_rsi, calculate_volatility
-import random
 
 class Fund:
     id_counter = 1
@@ -28,10 +27,7 @@ class Fund:
             recent_returns.append(return_rate)
         
         avg_return = sum(recent_returns) / len(recent_returns)
-        
-        # 添加一些随机波动
-        predicted = avg_return + random.uniform(-0.01, 0.01)
-        return predicted
+        return avg_return
     
     def to_dict(self):
         return {
