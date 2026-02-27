@@ -1,0 +1,119 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    text-align: center;
+    color: #333;
+}
+
+.add-fund {
+    margin-bottom: 30px;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+}
+
+.add-fund h2 {
+    margin-top: 0;
+    color: #555;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+input, textarea, button {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+.fund-list h2 {
+    margin-top: 0;
+    color: #555;
+}
+
+.fund-item {
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background-color: #f9f9f9;
+}
+
+.fund-item h3 {
+    margin-top: 0;
+    color: #333;
+}
+
+.fund-metrics {
+    display: flex;
+    gap: 20px;
+    margin: 10px 0;
+}
+
+.metric {
+    padding: 10px;
+    border-radius: 4px;
+    color: white;
+}
+
+.rsi-hot {
+    background-color: #ff4444;
+}
+
+.rsi-cold {
+    background-color: #33b5e5;
+}
+
+.rsi-normal {
+    background-color: #999999;
+}
+
+.volatility-high {
+    background-color: #ff9900;
+}
+
+.volatility-normal {
+    background-color: #999999;
+}
+
+.delete-btn {
+    background-color: #ff4444;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.delete-btn:hover {
+    background-color: #cc0000;
+}

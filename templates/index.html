@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基金分析</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>基金分析</h1>
+        
+        <div class="add-fund">
+            <h2>添加基金</h2>
+            <form id="add-fund-form">
+                <input type="text" id="fund-name" placeholder="基金名称" required>
+                <input type="text" id="fund-code" placeholder="基金代码" required>
+                <textarea id="fund-prices" placeholder="价格数据（逗号分隔）" required></textarea>
+                <button type="submit">添加</button>
+            </form>
+        </div>
+        
+        <div class="fund-list">
+            <h2>基金列表</h2>
+            <div id="funds-container"></div>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
