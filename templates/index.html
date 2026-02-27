@@ -3,24 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>基金分析</title>
+    <title>FundTracker</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>基金分析</h1>
+        <div class="header">
+            <h1>FundTracker</h1>
+            <div class="header-buttons">
+                <button>清除缓存</button>
+                <button>Settings</button>
+            </div>
+        </div>
         
-        <div class="add-fund">
-            <h2>添加基金</h2>
+        <div class="tabs">
+            <button class="tab active">支付宝</button>
+            <button class="tab">京东</button>
+            <button class="tab">实时快讯</button>
+        </div>
+        
+        <div class="search-container">
             <form id="add-fund-form">
-                <input type="text" id="fund-code" placeholder="基金代码" required>
-                <button type="submit">添加</button>
+                <input type="text" id="fund-code" class="search-input" placeholder="Enter Fund Code (e.g. 001632)" required>
+                <button type="submit" class="add-button">+ Add</button>
             </form>
         </div>
         
+        <div class="group-info">
+            <h2>Group Count</h2>
+            <span class="group-count" id="group-count">0</span>
+        </div>
+        
         <div class="fund-list">
-            <h2>基金列表</h2>
             <div id="funds-container"></div>
         </div>
     </div>
