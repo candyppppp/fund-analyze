@@ -40,109 +40,125 @@ function loadRealTimeNews() {
 }
 
 function loadFunds() {
-    fetch('/api/funds')
-        .then(response => response.json())
-        .then(funds => {
-            const container = document.getElementById('funds-container');
-            container.innerHTML = '';
-            
-            // 更新组计数
-            document.getElementById('group-count').textContent = funds.length;
-            
-            if (funds.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: #888; padding: 20px;">No funds in this group. Add one to track.</p>';
-                return;
-            }
-            
-            funds.forEach(fund => {
-                const fundItem = document.createElement('div');
-                fundItem.className = 'fund-item';
-                fundItem.style.cursor = 'pointer';
-                
-                // 计算距高点
-                const maxPrice = Math.max(...fund.prices);
-                const currentPrice = fund.prices[fund.prices.length - 1];
-                const distanceFromHigh = ((currentPrice - maxPrice) / maxPrice * 100).toFixed(2);
-                
-                // 生成唯一的图表ID
-                const priceChartId = `price-chart-${fund.id}`;
-                const returnChartId = `return-chart-${fund.id}`;
-                
-                // 获取买入设置
-                const buySettings = getBuySettings(fund.id);
-                // 计算预估今日收益
-                let estimatedReturn = 0;
-                if (buySettings.shares > 0) {
-                    estimatedReturn = fund.predicted_return * fund.prices[fund.prices.length - 1] * buySettings.shares;
-                }
-                
-                // 获取RSI状态和emoji
-                function getRSIStatus(rsi) {
-                    if (rsi > 70) {
-                        return { status: '过热', emoji: '🔥' };
-                    } else if (rsi < 30) {
-                        return { status: '过冷', emoji: '❄️' };
-                    } else if (rsi > 60 || rsi < 40) {
-                        return { status: '波动', emoji: '🌪️' };
-                    } else {
-                        return { status: '正常', emoji: '📊' };
-                    }
-                }
-                
-                const rsiStatus = getRSIStatus(fund.rsi);
-                
-                fundItem.innerHTML = `
-                    <div class="fund-info">
-                        <div class="fund-name">${fund.name}</div>
-                        <div class="fund-details">
-                            <div class="fund-detail">
-                                <span>${fund.code}</span>
-                                <span class="fund-type-tag">场外</span>
-                            </div>
-                            <div class="fund-detail-box">
-                                <span>距高点 ${distanceFromHigh}%</span>
-                            </div>
-                            <div class="fund-detail-box">
-                                <span>RSI ${fund.rsi.toFixed(1)}</span>
-                                <span class="rsi-emoji">${rsiStatus.emoji}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="fund-performance">
-                        <div class="fund-return-container">
-                            <div class="fund-return ${fund.predicted_return < 0 ? 'negative' : ''}">
-                                ${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%
-                            </div>
-                            <div class="fund-return-label">Real-time Return</div>
-                        </div>
-                        ${buySettings.shares > 0 ? `
-                            <div class="fund-return-container">
-                                <div class="fund-return ${estimatedReturn >= 0 ? '' : 'negative'}">
-                                    ${estimatedReturn >= 0 ? '+' : ''}${estimatedReturn.toFixed(2)}元
-                                </div>
-                                <div class="fund-return-label">Live Profit/Loss</div>
-                            </div>
-                        ` : ''}
-                        <button class="real-time-btn">
-                            <span>Real-time</span>
-                            <span>🔄</span>
-                        </button>
-                        <button class="delete-btn" onclick="deleteFund(${fund.id})">删除</button>
-                    </div>
-                `;
-                
-                // 添加点击事件
-                fundItem.addEventListener('click', function(e) {
-                    // 防止点击删除按钮时触发弹框
-                    if (!e.target.classList.contains('delete-btn') && !e.target.closest('.delete-btn')) {
-                        showFundDetails(fund);
-                    }
-                });
-                
-                // 添加到容器
-                container.appendChild(fundItem);
+    // 从本地存储加载基金数据
+    const savedFunds = localStorage.getItem('funds');
+    if (savedFunds) {
+        const funds = JSON.parse(savedFunds);
+        renderFunds(funds);
+    } else {
+        // 如果本地存储没有数据，从API获取
+        fetch('/api/funds')
+            .then(response => response.json())
+            .then(funds => {
+                // 保存到本地存储
+                localStorage.setItem('funds', JSON.stringify(funds));
+                renderFunds(funds);
             });
+    }
+}
+
+function renderFunds(funds) {
+    const container = document.getElementById('funds-container');
+    container.innerHTML = '';
+    
+    // 更新组计数
+    document.getElementById('group-count').textContent = funds.length;
+    
+    if (funds.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #888; padding: 20px;">No funds in this group. Add one to track.</p>';
+        return;
+    }
+    
+    funds.forEach(fund => {
+        const fundItem = document.createElement('div');
+        fundItem.className = 'fund-item';
+        fundItem.style.cursor = 'pointer';
+        
+        // 计算距高点
+        const maxPrice = Math.max(...fund.prices);
+        const currentPrice = fund.prices[fund.prices.length - 1];
+        const distanceFromHigh = ((currentPrice - maxPrice) / maxPrice * 100).toFixed(2);
+        
+        // 生成唯一的图表ID
+        const priceChartId = `price-chart-${fund.id}`;
+        const returnChartId = `return-chart-${fund.id}`;
+        
+        // 获取买入设置
+        const buySettings = getBuySettings(fund.id);
+        // 计算预估今日收益
+        let estimatedReturn = 0;
+        if (buySettings.shares > 0) {
+            estimatedReturn = fund.predicted_return * fund.prices[fund.prices.length - 1] * buySettings.shares;
+        }
+        
+        // 获取RSI状态和emoji
+        function getRSIStatus(rsi) {
+            if (rsi > 70) {
+                return { status: '过热', emoji: '🔥' };
+            } else if (rsi < 30) {
+                return { status: '过冷', emoji: '❄️' };
+            } else if (rsi > 60 || rsi < 40) {
+                return { status: '波动', emoji: '🌪️' };
+            } else {
+                return { status: '正常', emoji: '📊' };
+            }
+        }
+        
+        const rsiStatus = getRSIStatus(fund.rsi);
+        
+        fundItem.innerHTML = `
+            <div class="fund-info">
+                <div class="fund-name">${fund.name}</div>
+                <div class="fund-details">
+                    <div class="fund-detail">
+                        <span class="fund-code">${fund.code}</span>
+                        <span class="fund-type-tag">场外</span>
+                    </div>
+                    <div class="fund-detail-box">
+                        <span>距高点 ${distanceFromHigh}%</span>
+                    </div>
+                    <div class="fund-detail-box">
+                        <span>RSI ${fund.rsi.toFixed(1)}</span>
+                        <span class="rsi-emoji">${rsiStatus.emoji}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="fund-performance">
+                <div class="fund-return-container">
+                    <div class="fund-return ${fund.predicted_return < 0 ? 'negative' : ''}">
+                        ${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%
+                    </div>
+                    <div class="fund-return-label">Real-time Return</div>
+                </div>
+                ${buySettings.shares > 0 ? `
+                    <div class="fund-return-container">
+                        <div class="fund-return ${estimatedReturn >= 0 ? '' : 'negative'}">
+                            ${estimatedReturn >= 0 ? '+' : ''}${estimatedReturn.toFixed(2)}元
+                        </div>
+                        <div class="fund-return-label">Live Profit/Loss</div>
+                    </div>
+                ` : ''}
+                <div class="fund-actions">
+                    <button class="real-time-btn">
+                        <span>Real-time</span>
+                        <span>🔄</span>
+                    </button>
+                    <button class="delete-btn" onclick="deleteFund(${fund.id})">删除</button>
+                </div>
+            </div>
+        `;
+        
+        // 添加点击事件
+        fundItem.addEventListener('click', function(e) {
+            // 防止点击删除按钮时触发弹框
+            if (!e.target.classList.contains('delete-btn') && !e.target.closest('.delete-btn')) {
+                showFundDetails(fund);
+            }
         });
+        
+        // 添加到容器
+        container.appendChild(fundItem);
+    });
 }
 
 function addFund() {
@@ -157,8 +173,14 @@ function addFund() {
     })
     .then(response => response.json())
     .then(() => {
-        loadFunds();
-        document.getElementById('add-fund-form').reset();
+        // 重新从API获取所有基金数据并保存到本地存储
+        fetch('/api/funds')
+            .then(response => response.json())
+            .then(funds => {
+                localStorage.setItem('funds', JSON.stringify(funds));
+                renderFunds(funds);
+                document.getElementById('add-fund-form').reset();
+            });
     });
 }
 
@@ -167,7 +189,13 @@ function deleteFund(id) {
         method: 'DELETE'
     })
     .then(() => {
-        loadFunds();
+        // 重新从API获取所有基金数据并保存到本地存储
+        fetch('/api/funds')
+            .then(response => response.json())
+            .then(funds => {
+                localStorage.setItem('funds', JSON.stringify(funds));
+                renderFunds(funds);
+            });
     });
 }
 
