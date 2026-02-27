@@ -1,11 +1,41 @@
 document.addEventListener('DOMContentLoaded', function() {
     loadFunds();
+    loadRealTimeNews();
     
     document.getElementById('add-fund-form').addEventListener('submit', function(e) {
         e.preventDefault();
         addFund();
     });
+    
+    // 清除缓存按钮
+    document.querySelector('.header-buttons button:first-child').addEventListener('click', function() {
+        localStorage.clear();
+        alert('缓存已清除');
+    });
+    
+    // 设置按钮
+    document.querySelector('.header-buttons button:last-child').addEventListener('click', function() {
+        showSettings();
+    });
+    
+    // 实时快讯标签
+    document.querySelector('.tab').addEventListener('click', function() {
+        loadRealTimeNews();
+    });
 });
+
+function loadRealTimeNews() {
+    // 模拟实时快讯数据
+    const news = [
+        { time: '14:30', content: '市场快讯：A股三大指数今日集体收涨，沪指涨0.5%' },
+        { time: '14:15', content: '基金动态：易方达蓝筹精选混合型基金净值上涨1.2%' },
+        { time: '14:00', content: '行业资讯：半导体板块持续走强，相关基金表现活跃' },
+        { time: '13:45', content: '政策解读：央行降准0.5个百分点，释放流动性约1万亿元' }
+    ];
+    
+    // 这里可以添加真实的快讯数据获取逻辑
+    console.log('加载实时快讯:', news);
+}
 
 function loadFunds() {
     fetch('/api/funds')
@@ -25,6 +55,7 @@ function loadFunds() {
             funds.forEach(fund => {
                 const fundItem = document.createElement('div');
                 fundItem.className = 'fund-item';
+                fundItem.style.cursor = 'pointer';
                 
                 // 计算距高点
                 const maxPrice = Math.max(...fund.prices);
@@ -63,6 +94,14 @@ function loadFunds() {
                     </div>
                 `;
                 
+                // 添加点击事件
+                fundItem.addEventListener('click', function(e) {
+                    // 防止点击删除按钮时触发弹框
+                    if (!e.target.classList.contains('delete-btn') && !e.target.closest('.delete-btn')) {
+                        showFundDetails(fund);
+                    }
+                });
+                
                 // 添加到容器
                 container.appendChild(fundItem);
             });
@@ -94,3 +133,425 @@ function deleteFund(id) {
         loadFunds();
     });
 }
+
+function showFundDetails(fund) {
+    // 创建弹框
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    `;
+    
+    // 弹框内容
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+    modalContent.style.cssText = `
+        background-color: #1e1e1e;
+        padding: 16px;
+        border-radius: 6px;
+        width: 90%;
+        max-width: 900px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6);
+        border: 1px solid #333;
+    `;
+    
+    // 生成唯一的图表ID
+    const chartId = `detail-chart-${fund.id}`;
+    
+    // 弹框HTML
+    modalContent.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h2 style="color: white; margin: 0; font-size: 14px;">${fund.name} (${fund.code})</h2>
+            <button class="close-btn" style="background-color: #2a2a2a; color: #e0e0e0; border: 1px solid #333; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">关闭</button>
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">时间范围</h3>
+            <div style="display: flex; gap: 8px;">
+                <button class="time-btn active" data-days="7">7天</button>
+                <button class="time-btn" data-days="14">14天</button>
+                <button class="time-btn" data-days="30">1个月</button>
+                <button class="time-btn" data-days="90">3个月</button>
+                <button class="time-btn" data-days="180">6个月</button>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">增长趋势</h3>
+            <div style="height: 350px; background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
+                <canvas id="${chartId}"></canvas>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">基金分析</h3>
+            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
+                <p style="margin: 4px 0; font-size: 11px;"><strong>当前净值:</strong> ${fund.prices[fund.prices.length - 1]}</p>
+                <p style="margin: 4px 0; font-size: 11px;"><strong>RSI指标:</strong> ${fund.rsi.toFixed(2)} ${getRSIMessage(fund.rsi)}</p>
+                <p style="margin: 4px 0; font-size: 11px;"><strong>波动率:</strong> ${(fund.volatility * 100).toFixed(2)}%</p>
+                <p style="margin: 4px 0; font-size: 11px;"><strong>预测收益率:</strong> ${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%</p>
+            </div>
+        </div>
+        
+        <div>
+            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">投资建议</h3>
+            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
+                <p style="font-size: 11px; line-height: 1.4;">${getInvestmentAdvice(fund)}</p>
+            </div>
+        </div>
+    `;
+    
+    // 添加到页面
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    
+    // 关闭按钮
+    modal.querySelector('.close-btn').addEventListener('click', function() {
+        document.body.removeChild(modal);
+    });
+    
+    // 时间范围按钮
+    const timeBtns = modal.querySelectorAll('.time-btn');
+    timeBtns.forEach(btn => {
+        btn.style.cssText = `
+            background-color: #2a2a2a;
+            color: #e0e0e0;
+            border: 1px solid #333;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+        `;
+        
+        btn.addEventListener('click', function() {
+            // 移除所有按钮的active类
+            timeBtns.forEach(b => b.classList.remove('active'));
+            // 添加当前按钮的active类
+            this.classList.add('active');
+            // 更新图表
+            const days = parseInt(this.getAttribute('data-days'));
+            updateChart(fund, chartId, days);
+        });
+    });
+    
+    // 设置active按钮样式
+    modal.querySelector('.time-btn.active').style.cssText += `
+        background-color: #007bff;
+        color: white;
+    `;
+    
+    // 初始化图表
+    updateChart(fund, chartId, 7);
+}
+
+function updateChart(fund, chartId, days) {
+    // 计算需要显示的数据点数量
+    const dataPoints = Math.min(days, fund.prices.length);
+    const startIndex = Math.max(0, fund.prices.length - dataPoints);
+    const prices = fund.prices.slice(startIndex);
+    const dates = fund.dates.slice(startIndex);
+    
+    // 获取图表上下文
+    const ctx = document.getElementById(chartId).getContext('2d');
+    
+    // 销毁现有图表
+    if (window.fundChart) {
+        window.fundChart.destroy();
+    }
+    
+    // 创建新图表
+    window.fundChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: '净值',
+                data: prices,
+                borderColor: '#33b5e5',
+                backgroundColor: 'rgba(51, 181, 229, 0.1)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true,
+                pointRadius: 3,
+                pointHoverRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#e0e0e0'
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        color: '#aaa',
+                        font: {
+                            size: 11
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    }
+                },
+                y: {
+                    ticks: {
+                        color: '#aaa',
+                        font: {
+                            size: 11
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function getRSIMessage(rsi) {
+    if (rsi > 70) {
+        return '(过热: 追高风险)';
+    } else if (rsi < 30) {
+        return '(冰点: 反弹机会)';
+    } else {
+        return '(正常)';
+    }
+}
+
+function getInvestmentAdvice(fund) {
+    let advice = '';
+    
+    if (fund.rsi > 70) {
+        advice += 'RSI指标过高，当前基金处于超买状态，建议谨慎追高，可考虑减仓或观望。';
+    } else if (fund.rsi < 30) {
+        advice += 'RSI指标过低，当前基金处于超卖状态，可能存在反弹机会，可考虑适当加仓。';
+    } else {
+        advice += 'RSI指标处于正常范围，基金走势相对稳定。';
+    }
+    
+    if (fund.volatility > 0.2) {
+        advice += ' 波动率较高，风险较大，建议控制仓位。';
+    } else {
+        advice += ' 波动率较低，风险相对较小。';
+    }
+    
+    if (fund.predicted_return > 0) {
+        advice += ' 预测收益率为正，短期可能有上涨空间。';
+    } else {
+        advice += ' 预测收益率为负，短期可能面临调整。';
+    }
+    
+    return advice;
+}
+
+function showSettings() {
+    // 获取当前设置
+    const settings = getSettings();
+    
+    // 创建弹框
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    `;
+    
+    // 弹框内容
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+    modalContent.style.cssText = `
+        background-color: #1e1e1e;
+        padding: 16px;
+        border-radius: 6px;
+        width: 90%;
+        max-width: 600px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6);
+        border: 1px solid #333;
+    `;
+    
+    // 弹框HTML
+    modalContent.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h2 style="color: white; margin: 0; font-size: 14px;">设置</h2>
+            <button class="close-btn" style="background-color: #2a2a2a; color: #e0e0e0; border: 1px solid #333; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">关闭</button>
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">显示设置</h3>
+            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
+                <div style="margin-bottom: 8px;">
+                    <label style="font-size: 11px; margin-right: 10px;">字体大小:</label>
+                    <select id="font-size" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 3px 6px; border-radius: 4px; font-size: 10px;">
+                        <option value="small" ${settings.fontSize === 'small' ? 'selected' : ''}>小</option>
+                        <option value="medium" ${settings.fontSize === 'medium' ? 'selected' : ''}>中</option>
+                        <option value="large" ${settings.fontSize === 'large' ? 'selected' : ''}>大</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <label style="font-size: 11px; margin-right: 10px;">更新频率:</label>
+                    <select id="update-frequency" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 3px 6px; border-radius: 4px; font-size: 10px;">
+                        <option value="1" ${settings.updateFrequency === '1' ? 'selected' : ''}>1分钟</option>
+                        <option value="5" ${settings.updateFrequency === '5' ? 'selected' : ''}>5分钟</option>
+                        <option value="15" ${settings.updateFrequency === '15' ? 'selected' : ''}>15分钟</option>
+                        <option value="30" ${settings.updateFrequency === '30' ? 'selected' : ''}>30分钟</option>
+                        <option value="60" ${settings.updateFrequency === '60' ? 'selected' : ''}>1小时</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 4px;">
+                    <input type="checkbox" id="show-distance" ${settings.showDistance ? 'checked' : ''} style="margin-right: 8px;">
+                    <label for="show-distance" style="font-size: 11px;">显示距高点</label>
+                </div>
+                <div style="margin-bottom: 4px;">
+                    <input type="checkbox" id="show-rsi" ${settings.showRSI ? 'checked' : ''} style="margin-right: 8px;">
+                    <label for="show-rsi" style="font-size: 11px;">显示RSI</label>
+                </div>
+                <div style="margin-bottom: 4px;">
+                    <input type="checkbox" id="show-alerts" ${settings.showAlerts ? 'checked' : ''} style="margin-right: 8px;">
+                    <label for="show-alerts" style="font-size: 11px;">显示风险提示</label>
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">基金管理</h3>
+            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
+                <div id="fund-management" style="max-height: 200px; overflow-y: auto;">
+                    <!-- 基金列表将通过JavaScript动态添加 -->
+                </div>
+            </div>
+        </div>
+        
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+            <button id="save-settings" style="background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px;">保存设置</button>
+        </div>
+    `;
+    
+    // 添加到页面
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    
+    // 关闭按钮
+    modal.querySelector('.close-btn').addEventListener('click', function() {
+        document.body.removeChild(modal);
+    });
+    
+    // 加载基金列表
+    loadFundManagement(modal.querySelector('#fund-management'));
+    
+    // 保存设置按钮
+    modal.querySelector('#save-settings').addEventListener('click', function() {
+        const newSettings = {
+            fontSize: document.getElementById('font-size').value,
+            updateFrequency: document.getElementById('update-frequency').value,
+            showDistance: document.getElementById('show-distance').checked,
+            showRSI: document.getElementById('show-rsi').checked,
+            showAlerts: document.getElementById('show-alerts').checked
+        };
+        
+        localStorage.setItem('fundTrackerSettings', JSON.stringify(newSettings));
+        alert('设置已保存');
+        document.body.removeChild(modal);
+        // 应用设置
+        applySettings(newSettings);
+    });
+}
+
+function getSettings() {
+    const defaultSettings = {
+        fontSize: 'medium',
+        updateFrequency: '5',
+        showDistance: true,
+        showRSI: true,
+        showAlerts: true
+    };
+    
+    const savedSettings = localStorage.getItem('fundTrackerSettings');
+    return savedSettings ? JSON.parse(savedSettings) : defaultSettings;
+}
+
+function applySettings(settings) {
+    // 应用字体大小
+    document.body.style.fontSize = settings.fontSize === 'small' ? '13px' : settings.fontSize === 'large' ? '15px' : '14px';
+    
+    // 应用其他设置（这里可以添加更多设置的应用逻辑）
+    console.log('应用设置:', settings);
+}
+
+function loadFundManagement(container) {
+    fetch('/api/funds')
+        .then(response => response.json())
+        .then(funds => {
+            container.innerHTML = '';
+            
+            if (funds.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #888; font-size: 11px; margin: 10px 0;">暂无基金</p>';
+                return;
+            }
+            
+            funds.forEach(fund => {
+                const fundItem = document.createElement('div');
+                fundItem.style.cssText = `
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 6px;
+                    border-bottom: 1px solid #333;
+                `;
+                
+                fundItem.innerHTML = `
+                    <div>
+                        <div style="font-size: 11px; font-weight: bold; color: white;">${fund.name}</div>
+                        <div style="font-size: 10px; color: #aaa;">${fund.code}</div>
+                    </div>
+                    <button class="delete-fund-btn" data-id="${fund.id}" style="background-color: #dc3545; color: white; border: none; padding: 3px 6px; border-radius: 4px; cursor: pointer; font-size: 10px;">删除</button>
+                `;
+                
+                container.appendChild(fundItem);
+            });
+            
+            // 添加删除基金事件
+            container.querySelectorAll('.delete-fund-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const fundId = parseInt(this.getAttribute('data-id'));
+                    if (confirm('确定要删除该基金吗？')) {
+                        deleteFund(fundId);
+                        // 重新加载基金列表
+                        loadFundManagement(container);
+                    }
+                });
+            });
+        });
+}
+
+// 页面加载时应用设置
+window.addEventListener('load', function() {
+    const settings = getSettings();
+    applySettings(settings);
+});

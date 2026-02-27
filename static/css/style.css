@@ -1,6 +1,6 @@
 body {
     font-family: Arial, sans-serif;
-    background-color: #1a1a2e;
+    background-color: #121212;
     margin: 0;
     padding: 0;
     color: #e0e0e0;
@@ -10,13 +10,13 @@ body {
 .container {
     width: 100%;
     min-height: 100vh;
-    max-width: 1200px;
+    max-width: 1000px;
     margin: 0 auto;
 }
 
 .header {
-    background-color: #16213e;
-    padding: 12px 20px;
+    background-color: #1e1e1e;
+    padding: 10px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -25,23 +25,23 @@ body {
 
 .header h1 {
     color: white;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: bold;
     margin: 0;
 }
 
 .header-buttons {
     display: flex;
-    gap: 8px;
+    gap: 10px;
 }
 
 .header-buttons button {
-    background-color: #1a1a2e;
+    background-color: #2a2a2a;
     color: #e0e0e0;
     border: 1px solid #333;
-    padding: 6px 10px;
+    padding: 6px 12px;
     border-radius: 4px;
-    font-size: 11px;
+    font-size: 10px;
     cursor: pointer;
 }
 
@@ -50,43 +50,48 @@ body {
 }
 
 .tabs {
-    background-color: #16213e;
+    background-color: #1e1e1e;
     padding: 8px 20px;
     display: flex;
-    gap: 10px;
+    gap: 12px;
     border-bottom: 1px solid #333;
 }
 
 .tab {
-    background-color: #2a2a4a;
+    background-color: #2a2a2a;
     color: #e0e0e0;
     border: none;
-    padding: 6px 10px;
+    padding: 6px 12px;
     border-radius: 4px;
-    font-size: 11px;
+    font-size: 10px;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .tab.active {
-    background-color: #3a3a5a;
+    background-color: #007bff;
+    color: white;
 }
 
 .search-container {
-    background-color: #16213e;
-    padding: 15px 20px;
+    background-color: #1e1e1e;
+    padding: 12px 20px;
     display: flex;
-    gap: 8px;
+    gap: 10px;
     align-items: center;
+    border-bottom: 1px solid #333;
 }
 
 .search-input {
     flex: 1;
-    background-color: #2a2a4a;
+    background-color: #2a2a2a;
     color: #e0e0e0;
     border: 1px solid #333;
-    padding: 10px 12px;
+    padding: 8px 12px;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 12px;
 }
 
 .search-input::placeholder {
@@ -97,9 +102,9 @@ body {
     background-color: #007bff;
     color: white;
     border: none;
-    padding: 10px 16px;
+    padding: 8px 16px;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: bold;
     cursor: pointer;
 }
@@ -109,17 +114,16 @@ body {
 }
 
 .group-info {
-    background-color: #16213e;
-    padding: 12px 20px;
+    background-color: #1e1e1e;
+    padding: 10px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-top: 1px solid #333;
     border-bottom: 1px solid #333;
 }
 
 .group-info h2 {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: normal;
     margin: 0;
 }
@@ -130,18 +134,19 @@ body {
 }
 
 .fund-list {
-    padding: 15px 20px;
+    padding: 10px 20px;
 }
 
 .fund-item {
-    background-color: #16213e;
-    padding: 12px;
-    border-radius: 6px;
-    margin-bottom: 8px;
+    background-color: #1e1e1e;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 6px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border: 1px solid #333;
 }
 
 .fund-info {
@@ -149,33 +154,33 @@ body {
 }
 
 .fund-name {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: bold;
     color: white;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
 }
 
 .fund-details {
     display: flex;
-    gap: 12px;
-    font-size: 11px;
+    gap: 10px;
+    font-size: 10px;
     color: #aaa;
 }
 
 .fund-detail {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
 }
 
 .fund-performance {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
 .fund-return {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: bold;
     color: #28a745;
 }
@@ -185,16 +190,16 @@ body {
 }
 
 .real-time-btn {
-    background-color: #2a2a4a;
+    background-color: #2a2a2a;
     color: #e0e0e0;
     border: 1px solid #333;
-    padding: 4px 8px;
+    padding: 3px 6px;
     border-radius: 4px;
-    font-size: 9px;
+    font-size: 8px;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
 }
 
 .real-time-btn:hover {
@@ -205,9 +210,9 @@ body {
     background-color: #dc3545;
     color: white;
     border: none;
-    padding: 4px 8px;
+    padding: 3px 6px;
     border-radius: 4px;
-    font-size: 11px;
+    font-size: 10px;
     cursor: pointer;
 }
 
