@@ -25,16 +25,18 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadRealTimeNews() {
-    // 模拟实时快讯数据
-    const news = [
-        { time: '14:30', content: '市场快讯：A股三大指数今日集体收涨，沪指涨0.5%' },
-        { time: '14:15', content: '基金动态：易方达蓝筹精选混合型基金净值上涨1.2%' },
-        { time: '14:00', content: '行业资讯：半导体板块持续走强，相关基金表现活跃' },
-        { time: '13:45', content: '政策解读：央行降准0.5个百分点，释放流动性约1万亿元' }
-    ];
-    
-    // 这里可以添加真实的快讯数据获取逻辑
-    console.log('加载实时快讯:', news);
+    // 从后端API获取真实的实时快讯数据
+    fetch('/api/news')
+        .then(response => response.json())
+        .then(news => {
+            console.log('加载实时快讯:', news);
+            // 这里可以添加显示快讯的逻辑
+        })
+        .catch(error => {
+            console.error('获取实时快讯失败:', error);
+            // 如果API调用失败，不显示任何数据
+            console.log('获取实时快讯失败，不显示数据');
+        });
 }
 
 function loadFunds() {
@@ -148,8 +150,6 @@ function deleteFund(id) {
 }
 
 function showFundDetails(fund) {
-    // 获取基金详细信息
-    const fundDetails = getFundDetails(fund.code);
     // 获取买入设置
     const buySettings = getBuySettings(fund.id);
     
@@ -201,39 +201,25 @@ function showFundDetails(fund) {
         <div id="fund-details-section" style="margin-bottom: 20px; display: none;">
             <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">基金信息</h3>
             <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
-                    <div><strong>成立时间:</strong> ${fundDetails.establishmentDate}</div>
-                    <div><strong>所属领域:</strong> ${fundDetails.field}</div>
-                    <div><strong>基金经理:</strong> ${fundDetails.manager}</div>
-                    <div><strong>基金规模:</strong> ${fundDetails.size}</div>
+                <div id="fund-info-content" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
+                    <div><strong>成立时间:</strong> 加载中...</div>
+                    <div><strong>所属领域:</strong> 加载中...</div>
+                    <div><strong>基金经理:</strong> 加载中...</div>
+                    <div><strong>基金规模:</strong> 加载中...</div>
                 </div>
             </div>
             
             <h3 style="color: #e0e0e0; margin-top: 16px; margin-bottom: 10px; font-size: 14px;">投资组成</h3>
             <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
-                <div style="font-size: 12px;">
-                    ${fundDetails.composition.map(item => `
-                        <div style="margin-bottom: 5px;">
-                            <strong>${item.name}:</strong> ${item.percentage}%
-                        </div>
-                    `).join('')}
+                <div id="fund-composition-content" style="font-size: 12px;">
+                    加载中...
                 </div>
             </div>
             
             <h3 style="color: #e0e0e0; margin-top: 16px; margin-bottom: 10px; font-size: 14px;">投资关联</h3>
             <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
-                <div style="font-size: 12px;">
-                    ${fundDetails.relatedStocks.map(stock => `
-                        <div style="margin-bottom: 5px; display: flex; justify-content: space-between;">
-                            <div>
-                                <strong>${stock.name}</strong> (${stock.code})
-                            </div>
-                            <div style="display: flex; gap: 10px;">
-                                <span>占比: ${stock.percentage}%</span>
-                                <span class="stock-change ${stock.change >= 0 ? 'positive' : 'negative'}">${stock.change >= 0 ? '+' : ''}${stock.change}%</span>
-                            </div>
-                        </div>
-                    `).join('')}
+                <div id="fund-related-stocks-content" style="font-size: 12px;">
+                    加载中...
                 </div>
             </div>
         </div>
@@ -310,6 +296,48 @@ function showFundDetails(fund) {
         if (detailsSection.style.display === 'none') {
             detailsSection.style.display = 'block';
             this.textContent = '收起';
+            
+            // 加载基金详情
+            getFundDetails(fund.code).then(fundDetails => {
+                // 更新基金信息
+                const fundInfoContent = modal.querySelector('#fund-info-content');
+                fundInfoContent.innerHTML = `
+                    <div><strong>成立时间:</strong> ${fundDetails.establishmentDate || '未知'}</div>
+                    <div><strong>所属领域:</strong> ${fundDetails.field || '未知'}</div>
+                    <div><strong>基金经理:</strong> ${fundDetails.manager || '未知'}</div>
+                    <div><strong>基金规模:</strong> ${fundDetails.size || '未知'}</div>
+                `;
+                
+                // 更新投资组成
+                const compositionContent = modal.querySelector('#fund-composition-content');
+                if (fundDetails.composition && fundDetails.composition.length > 0) {
+                    compositionContent.innerHTML = fundDetails.composition.map(item => `
+                        <div style="margin-bottom: 5px;">
+                            <strong>${item.name}:</strong> ${item.percentage}%
+                        </div>
+                    `).join('');
+                } else {
+                    compositionContent.textContent = '暂无数据';
+                }
+                
+                // 更新投资关联
+                const relatedStocksContent = modal.querySelector('#fund-related-stocks-content');
+                if (fundDetails.relatedStocks && fundDetails.relatedStocks.length > 0) {
+                    relatedStocksContent.innerHTML = fundDetails.relatedStocks.map(stock => `
+                        <div style="margin-bottom: 5px; display: flex; justify-content: space-between;">
+                            <div>
+                                <strong>${stock.name}</strong> (${stock.code})
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <span>占比: ${stock.percentage}%</span>
+                                <span class="stock-change ${stock.change >= 0 ? 'positive' : 'negative'}">${stock.change >= 0 ? '+' : ''}${stock.change}%</span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    relatedStocksContent.textContent = '暂无数据';
+                }
+            });
         } else {
             detailsSection.style.display = 'none';
             this.textContent = '详情';
@@ -376,25 +404,21 @@ function showFundDetails(fund) {
 }
 
 function getFundDetails(code) {
-    // 模拟基金详细信息
-    return {
-        establishmentDate: '2020-01-01',
-        field: '股票型',
-        manager: '张三',
-        size: '10.5亿',
-        composition: [
-            { name: '股票', percentage: 85 },
-            { name: '债券', percentage: 10 },
-            { name: '现金', percentage: 5 }
-        ],
-        relatedStocks: [
-            { name: '贵州茅台', code: '600519', percentage: 8.5, change: 1.2 },
-            { name: '腾讯控股', code: '00700', percentage: 7.2, change: -0.5 },
-            { name: '苹果', code: 'AAPL', percentage: 6.8, change: 0.8 },
-            { name: '宁德时代', code: '300750', percentage: 5.9, change: 2.1 },
-            { name: '阿里巴巴', code: '09988', percentage: 4.7, change: -1.3 }
-        ]
-    };
+    // 从后端API获取真实的基金详细信息
+    return fetch(`/api/funds/${code}/details`)
+        .then(response => response.json())
+        .catch(error => {
+            console.error('获取基金详情失败:', error);
+            // 如果API调用失败，返回空对象
+            return {
+                establishmentDate: '',
+                field: '',
+                manager: '',
+                size: '',
+                composition: [],
+                relatedStocks: []
+            };
+        });
 }
 
 function getBuySettings(fundId) {
