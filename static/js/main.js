@@ -163,6 +163,7 @@ function renderFunds(funds) {
 
 function addFund() {
     const code = document.getElementById('fund-code').value;
+    console.log('开始添加基金:', code);
     
     fetch('/api/funds', {
         method: 'POST',
@@ -171,16 +172,30 @@ function addFund() {
         },
         body: JSON.stringify({ code })
     })
-    .then(response => response.json())
-    .then(() => {
+    .then(response => {
+        console.log('添加基金API响应状态:', response.status);
+        return response.json();
+    })
+    .then(data => {
+        console.log('添加基金API返回数据:', data);
         // 重新从API获取所有基金数据并保存到本地存储
         fetch('/api/funds')
-            .then(response => response.json())
+            .then(response => {
+                console.log('获取基金列表API响应状态:', response.status);
+                return response.json();
+            })
             .then(funds => {
+                console.log('获取到的基金列表:', funds);
                 localStorage.setItem('funds', JSON.stringify(funds));
                 renderFunds(funds);
                 document.getElementById('add-fund-form').reset();
+            })
+            .catch(error => {
+                console.error('获取基金列表失败:', error);
             });
+    })
+    .catch(error => {
+        console.error('添加基金失败:', error);
     });
 }
 
@@ -518,10 +533,12 @@ function getBuySettings(fundId) {
 
 function updateChart(fund, chartId, days) {
     // 计算需要显示的数据点数量
-    const dataPoints = Math.min(days, fund.prices.length);
-    const startIndex = Math.max(0, fund.prices.length - dataPoints);
-    const prices = fund.prices.slice(startIndex);
-    const dates = fund.dates.slice(startIndex);
+    const prices = fund.prices && fund.prices.length > 0 ? fund.prices : [];
+    const dates = fund.dates && fund.dates.length > 0 ? fund.dates : [];
+    const dataPoints = Math.min(days, prices.length);
+    const startIndex = Math.max(0, prices.length - dataPoints);
+    const displayPrices = prices.slice(startIndex);
+    const displayDates = dates.slice(startIndex);
     
     // 获取图表上下文
     const ctx = document.getElementById(chartId).getContext('2d');
@@ -535,10 +552,10 @@ function updateChart(fund, chartId, days) {
     window.fundChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: dates,
+            labels: displayDates,
             datasets: [{
                 label: '净值',
-                data: prices,
+                data: displayPrices,
                 borderColor: '#33b5e5',
                 backgroundColor: 'rgba(51, 181, 229, 0.1)',
                 borderWidth: 2,
