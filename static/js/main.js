@@ -95,25 +95,58 @@ function loadFunds() {
                             backgroundColor: 'rgba(51, 181, 229, 0.1)',
                             borderWidth: 2,
                             tension: 0.3,
-                            fill: true
+                            fill: true,
+                            pointRadius: 3,
+                            pointHoverRadius: 5
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: {
+                                    font: {
+                                        size: 12
+                                    }
+                                }
+                            }
+                        },
                         scales: {
                             x: {
                                 display: true,
                                 title: {
                                     display: true,
-                                    text: '日期'
+                                    text: '日期',
+                                    font: {
+                                        size: 14,
+                                        weight: 'bold'
+                                    }
+                                },
+                                ticks: {
+                                    font: {
+                                        size: 10
+                                    },
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                },
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
                                 }
                             },
                             y: {
                                 display: true,
                                 title: {
                                     display: true,
-                                    text: '净值'
+                                    text: '净值',
+                                    font: {
+                                        size: 14,
+                                        weight: 'bold'
+                                    }
+                                },
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
                                 }
                             }
                         }
@@ -130,25 +163,57 @@ function loadFunds() {
                             label: '日收益率(%)',
                             data: fund.returns,
                             backgroundColor: fund.returns.map(ret => ret >= 0 ? '#4CAF50' : '#ff4444'),
-                            borderWidth: 1
+                            borderWidth: 1,
+                            borderRadius: 2
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: {
+                                    font: {
+                                        size: 12
+                                    }
+                                }
+                            }
+                        },
                         scales: {
                             x: {
                                 display: true,
                                 title: {
                                     display: true,
-                                    text: '日期'
+                                    text: '日期',
+                                    font: {
+                                        size: 14,
+                                        weight: 'bold'
+                                    }
+                                },
+                                ticks: {
+                                    font: {
+                                        size: 10
+                                    },
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                },
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
                                 }
                             },
                             y: {
                                 display: true,
                                 title: {
                                     display: true,
-                                    text: '收益率(%)'
+                                    text: '收益率(%)',
+                                    font: {
+                                        size: 14,
+                                        weight: 'bold'
+                                    }
+                                },
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
                                 }
                             }
                         }
