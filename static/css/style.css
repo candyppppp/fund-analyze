@@ -4,16 +4,19 @@ body {
     margin: 0;
     padding: 0;
     color: #e0e0e0;
+    font-size: 14px;
 }
 
 .container {
     width: 100%;
     min-height: 100vh;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
 .header {
     background-color: #16213e;
-    padding: 15px 20px;
+    padding: 12px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -22,23 +25,23 @@ body {
 
 .header h1 {
     color: white;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: bold;
     margin: 0;
 }
 
 .header-buttons {
     display: flex;
-    gap: 10px;
+    gap: 8px;
 }
 
 .header-buttons button {
     background-color: #1a1a2e;
     color: #e0e0e0;
     border: 1px solid #333;
-    padding: 8px 12px;
+    padding: 6px 10px;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
 }
 
@@ -48,9 +51,9 @@ body {
 
 .tabs {
     background-color: #16213e;
-    padding: 10px 20px;
+    padding: 8px 20px;
     display: flex;
-    gap: 15px;
+    gap: 10px;
     border-bottom: 1px solid #333;
 }
 
@@ -58,9 +61,9 @@ body {
     background-color: #2a2a4a;
     color: #e0e0e0;
     border: none;
-    padding: 8px 12px;
+    padding: 6px 10px;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
 }
 
@@ -70,9 +73,9 @@ body {
 
 .search-container {
     background-color: #16213e;
-    padding: 20px;
+    padding: 15px 20px;
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
 }
 
@@ -81,9 +84,9 @@ body {
     background-color: #2a2a4a;
     color: #e0e0e0;
     border: 1px solid #333;
-    padding: 12px 15px;
+    padding: 10px 12px;
     border-radius: 4px;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .search-input::placeholder {
@@ -94,9 +97,9 @@ body {
     background-color: #007bff;
     color: white;
     border: none;
-    padding: 12px 20px;
+    padding: 10px 16px;
     border-radius: 4px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: bold;
     cursor: pointer;
 }
@@ -107,7 +110,7 @@ body {
 
 .group-info {
     background-color: #16213e;
-    padding: 15px 20px;
+    padding: 12px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -116,7 +119,7 @@ body {
 }
 
 .group-info h2 {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: normal;
     margin: 0;
 }
@@ -127,14 +130,14 @@ body {
 }
 
 .fund-list {
-    padding: 20px;
+    padding: 15px 20px;
 }
 
 .fund-item {
     background-color: #16213e;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 10px;
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 8px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
     display: flex;
     justify-content: space-between;
@@ -146,33 +149,33 @@ body {
 }
 
 .fund-name {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: bold;
     color: white;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
 }
 
 .fund-details {
     display: flex;
-    gap: 15px;
-    font-size: 12px;
+    gap: 12px;
+    font-size: 11px;
     color: #aaa;
 }
 
 .fund-detail {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
 }
 
 .fund-performance {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 12px;
 }
 
 .fund-return {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: bold;
     color: #28a745;
 }
@@ -185,13 +188,13 @@ body {
     background-color: #2a2a4a;
     color: #e0e0e0;
     border: 1px solid #333;
-    padding: 5px 10px;
+    padding: 4px 8px;
     border-radius: 4px;
-    font-size: 10px;
+    font-size: 9px;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
 }
 
 .real-time-btn:hover {
@@ -202,14 +205,10 @@ body {
     background-color: #dc3545;
     color: white;
     border: none;
-    padding: 5px 10px;
+    padding: 4px 8px;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
-}
-
-.delete-btn:hover {
-    background-color: #c82333;
 }
 
 .fund-charts {
