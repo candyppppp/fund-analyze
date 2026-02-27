@@ -78,31 +78,98 @@ def get_fund_data(code):
             end_date_str = end_date.strftime('%Y-%m-%d')
             
             fund_data_url = f"https://fundapi.eastmoney.com/f10/lsjz?fundCode={code}&pageIndex=1&pageSize=100&startDate={start_date_str}&endDate={end_date_str}"
+            print(f"东方财富API URL: {fund_data_url}")
             response = requests.get(fund_data_url, headers=headers, timeout=5)
             
             # 检查响应状态
+            print(f"东方财富API响应状态: {response.status_code}")
+            print(f"东方财富API响应内容: {response.text[:500]}...")
+            
             if response.status_code == 200:
-                data = response.json()
-                
-                if data.get('Data') and data['Data'].get('LSJZList'):
-                    for item in data['Data']['LSJZList']:
-                        # 从新到旧排序，所以需要反转
-                        try:
-                            nav = float(item['NAV'])
-                            prices.append(nav)
-                            dates.append(item['FSRQ'])
-                        except (ValueError, KeyError) as e:
-                            print(f"解析历史数据失败: {e}")
-                    # 反转数据，使时间从早到晚
-                    prices.reverse()
-                    dates.reverse()
-                    print(f"东方财富API成功提取 {len(prices)} 条净值数据")
-                else:
-                    print("东方财富API没有获取到历史净值数据")
+                try:
+                    data = response.json()
+                    print(f"东方财富API响应数据结构: {list(data.keys())}")
+                    
+                    if data.get('Data'):
+                        print(f"Data字段存在: {list(data['Data'].keys())}")
+                        if data['Data'].get('LSJZList'):
+                            print(f"LSJZList长度: {len(data['Data']['LSJZList'])}")
+                            if len(data['Data']['LSJZList']) > 0:
+                                print(f"第一条数据: {data['Data']['LSJZList'][0]}")
+                                
+                                for item in data['Data']['LSJZList']:
+                                    # 从新到旧排序，所以需要反转
+                                    try:
+                                        nav = float(item['NAV'])
+                                        prices.append(nav)
+                                        dates.append(item['FSRQ'])
+                                    except (ValueError, KeyError) as e:
+                                        print(f"解析历史数据失败: {e}")
+                                        print(f"失败的数据项: {item}")
+                                # 反转数据，使时间从早到晚
+                                prices.reverse()
+                                dates.reverse()
+                                print(f"东方财富API成功提取 {len(prices)} 条净值数据")
+                            else:
+                                print("东方财富API LSJZList为空")
+                        else:
+                            print("东方财富API没有LSJZList字段")
+                    else:
+                        print("东方财富API没有Data字段")
+                except json.JSONDecodeError as e:
+                    print(f"解析东方财富API响应失败: {e}")
             else:
                 print(f"东方财富API响应状态错误: {response.status_code}")
         except Exception as e:
             print(f"东方财富API失败: {e}")
+            # 数据源2: 新浪财经历史数据API
+            try:
+                print("尝试使用新浪财经历史数据API获取历史净值数据...")
+                # 新浪财经历史净值API
+                fund_data_url = f"http://fundf10.eastmoney.com/F10DataApi.aspx?type=lsjz&code={code}&page=1&per=100"
+                print(f"新浪财经历史数据API URL: {fund_data_url}")
+                response = requests.get(fund_data_url, headers=headers, timeout=5)
+                
+                print(f"新浪财经历史数据API响应状态: {response.status_code}")
+                print(f"新浪财经历史数据API响应内容: {response.text[:500]}...")
+                
+                if response.status_code == 200:
+                    # 解析HTML内容获取历史净值数据
+                    import re
+                    # 查找净值数据表格
+                    table_match = re.search(r'<table[^>]*id="tbLfjs"[^>]*>([\s\S]*?)</table>', response.text)
+                    if table_match:
+                        table_content = table_match.group(1)
+                        # 查找表格行
+                        rows = re.findall(r'<tr[^>]*>([\s\S]*?)</tr>', table_content)
+                        print(f"找到 {len(rows)} 行数据")
+                        
+                        for row in rows[1:]:  # 跳过表头
+                            # 查找日期和净值
+                            cells = re.findall(r'<td[^>]*>([\s\S]*?)</td>', row)
+                            if len(cells) >= 2:
+                                try:
+                                    date_str = cells[0].strip()
+                                    nav_str = cells[1].strip()
+                                    nav = float(nav_str)
+                                    prices.append(nav)
+                                    dates.append(date_str)
+                                except (ValueError, IndexError) as e:
+                                    print(f"解析新浪财经历史数据失败: {e}")
+                        
+                        if prices:
+                            # 反转数据，使时间从早到晚
+                            prices.reverse()
+                            dates.reverse()
+                            print(f"新浪财经历史数据API成功提取 {len(prices)} 条净值数据")
+                        else:
+                            print("新浪财经历史数据API没有获取到数据")
+                    else:
+                        print("新浪财经历史数据API没有找到数据表格")
+                else:
+                    print(f"新浪财经历史数据API响应状态错误: {response.status_code}")
+            except Exception as e:
+                print(f"新浪财经历史数据API失败: {e}")
         
         # 计算收益率数据
         if len(prices) > 1:
