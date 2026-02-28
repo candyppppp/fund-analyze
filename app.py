@@ -281,73 +281,9 @@ def get_fund_details(code):
                 else:
                     print("未提取到成立时间")
                 
-                # 提取持仓股票
-                stock_codes_match = re.search(r'var stockCodesNew =\[(.*?)\];', data_str)
-                if stock_codes_match:
-                    stock_codes_str = stock_codes_match.group(1)
-                    # 提取股票代码和名称
-                    stock_codes = re.findall(r'"(.*?)"', stock_codes_str)
-                    print(f"提取到 {len(stock_codes)} 只持仓股票")
-                    
-                    # 构建相关股票数据
-                    for stock_code in stock_codes[:5]:  # 只取前5只股票
-                        # 股票代码格式: 市场.代码 (1.600519)
-                        stock_info = stock_code.split('.')
-                        if len(stock_info) == 2:
-                            market, code = stock_info
-                            # 尝试从API响应中提取股票名称
-                            # 注意：实际API响应中可能没有直接的股票名称映射
-                            # 这里使用代码作为名称的一部分，使其更有意义
-                            stock_name = f"股票 {code}"
-                            # 暂时使用0作为占比和涨跌幅
-                            # 实际应用中可以通过额外的API调用获取这些数据
-                            fund_details['relatedStocks'].append({
-                                'name': stock_name,
-                                'code': code,
-                                'percentage': 0,  # 暂时设为0，实际应该从API获取
-                                'change': 0  # 暂时设为0，实际应该从API获取
-                            })
-                            print(f"添加股票: {stock_name} ({code})")
-                else:
-                    print("未提取到持仓股票")
-                
-                # 提取投资组成
-                # 从API响应中提取真实的资产配置数据
-                composition_match = re.search(r'var Data_assetAllocation = \{(.*?)\};', data_str, re.DOTALL)
-                if composition_match:
-                    composition_data = composition_match.group(1)
-                    # 提取股票占比
-                    stock_match = re.search(r'"股票占净比".*?"data":\[(.*?)\]', composition_data, re.DOTALL)
-                    # 提取债券占比
-                    bond_match = re.search(r'"债券占净比".*?"data":\[(.*?)\]', composition_data, re.DOTALL)
-                    # 提取现金占比
-                    cash_match = re.search(r'"现金占净比".*?"data":\[(.*?)\]', composition_data, re.DOTALL)
-                    
-                    if stock_match and bond_match and cash_match:
-                        # 获取最新的占比数据（最后一个元素）
-                        stock_data = stock_match.group(1).split(',')
-                        bond_data = bond_match.group(1).split(',')
-                        cash_data = cash_match.group(1).split(',')
-                        
-                        if stock_data and bond_data and cash_data:
-                            stock_percentage = float(stock_data[-1].strip())
-                            bond_percentage = float(bond_data[-1].strip())
-                            cash_percentage = float(cash_data[-1].strip())
-                            
-                            fund_details['composition'] = [
-                                {'name': '股票', 'percentage': stock_percentage},
-                                {'name': '债券', 'percentage': bond_percentage},
-                                {'name': '现金', 'percentage': cash_percentage}
-                            ]
-                            print(f"提取到投资组成数据: 股票 {stock_percentage}%, 债券 {bond_percentage}%, 现金 {cash_percentage}%")
-                        else:
-                            print("未提取到完整的投资组成数据")
-                    else:
-                        print("未提取到投资组成数据")
-                else:
-                    print("未提取到资产配置数据")
-                    # 如果没有提取到数据，使用空数组
-                    fund_details['composition'] = []
+                # 清空composition和relatedStocks数组，因为我们不再使用这些数据
+                fund_details['composition'] = []
+                fund_details['relatedStocks'] = []
                 
                 print(f"基金 {code} 详情获取完成")
                 print(f"获取到的详情数据: {fund_details}")
@@ -384,5 +320,5 @@ def get_news():
 
 if __name__ == '__main__':
     print('Starting Flask server...')
-    print('Server will run on http://localhost:8000')
-    app.run(debug=True, port=8000, host='0.0.0.0')
+    print('Server will run on http://localhost:8081')
+    app.run(debug=True, port=8081, host='0.0.0.0')

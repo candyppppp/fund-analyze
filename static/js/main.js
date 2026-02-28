@@ -451,6 +451,13 @@ function showFundDetails(fund) {
                                     let overallRisk = '数据不足';
                                     let overallRiskColor = '#aaa';
                                     
+                                    // 计算布林带数据
+                                    const bollingerBands = calculateBollingerBands(fund.prices);
+                                    const latestPrice = fund.prices[fund.prices.length - 1];
+                                    const latestUpperBand = bollingerBands.upper[bollingerBands.upper.length - 1];
+                                    const latestLowerBand = bollingerBands.lower[bollingerBands.lower.length - 1];
+                                    const latestMiddleBand = bollingerBands.middle[bollingerBands.middle.length - 1];
+                                    
                                     if (fund.rsi && fund.volatility) {
                                         let riskScore = 0;
                                         
@@ -464,11 +471,17 @@ function showFundDetails(fund) {
                                         else if (fund.volatility > 0.1) riskScore += 2;
                                         else riskScore += 1;
                                         
+                                        // 布林带风险评分
+                                        if (latestPrice && latestUpperBand && latestLowerBand) {
+                                            if (latestPrice > latestUpperBand) riskScore += 2; // 突破上轨，风险增加
+                                            else if (latestPrice < latestLowerBand) riskScore += 1; // 突破下轨，风险降低
+                                        }
+                                        
                                         // 综合判断
-                                        if (riskScore >= 5) {
+                                        if (riskScore >= 6) {
                                             overallRisk = '高';
                                             overallRiskColor = '#ff4444';
-                                        } else if (riskScore >= 3) {
+                                        } else if (riskScore >= 4) {
                                             overallRisk = '中';
                                             overallRiskColor = '#ff9800';
                                         } else {
@@ -489,15 +502,47 @@ function showFundDetails(fund) {
                     <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; white-space: nowrap;">智能决策</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 18px; border: 1px solid #333;">
                         <div style="font-size: 12px; line-height: 1.5; color: #e0e0e0; white-space: nowrap;">
-                            <p>根据技术分析，该基金目前处于${fund.rsi > 70 ? '超买' : fund.rsi < 30 ? '超卖' : '正常'}状态，${fund.predicted_return > 0 ? '预测收益率为正' : '预测收益率为负'}。</p>
+                            ${(() => {
+                                // 计算布林带数据
+                                const bollingerBands = calculateBollingerBands(fund.prices);
+                                const latestPrice = fund.prices[fund.prices.length - 1];
+                                const latestUpperBand = bollingerBands.upper[bollingerBands.upper.length - 1];
+                                const latestLowerBand = bollingerBands.lower[bollingerBands.lower.length - 1];
+                                const latestMiddleBand = bollingerBands.middle[bollingerBands.middle.length - 1];
+                                
+                                let bollingerStatus = '';
+                                if (latestPrice && latestUpperBand && latestLowerBand) {
+                                    if (latestPrice > latestUpperBand) {
+                                        bollingerStatus = '突破布林带上轨，可能处于超买状态';
+                                    } else if (latestPrice < latestLowerBand) {
+                                        bollingerStatus = '突破布林带下轨，可能处于超卖状态';
+                                    } else if (latestPrice > latestMiddleBand) {
+                                        bollingerStatus = '价格在布林带中轨上方，处于上升趋势';
+                                    } else {
+                                        bollingerStatus = '价格在布林带中轨下方，处于下降趋势';
+                                    }
+                                }
+                                
+                                let rsiStatus = fund.rsi > 70 ? '超买' : fund.rsi < 30 ? '超卖' : '正常';
+                                let returnStatus = fund.predicted_return > 0 ? '预测收益率为正' : '预测收益率为负';
+                                
+                                return `<p>根据技术分析，该基金目前处于${rsiStatus}状态，${returnStatus}。${bollingerStatus ? '此外，' + bollingerStatus + '。' : ''}</p>`;
+                            })()}
                             <p style="margin-top: 10px;">${(() => {
                                 if (!fund.rsi || !fund.volatility || !fund.predicted_return) {
                                     return '数据不足，无法提供具体操作建议。';
                                 }
                                 
-                                if (fund.rsi > 70) {
+                                // 计算布林带数据
+                                const bollingerBands = calculateBollingerBands(fund.prices);
+                                const latestPrice = fund.prices[fund.prices.length - 1];
+                                const latestUpperBand = bollingerBands.upper[bollingerBands.upper.length - 1];
+                                const latestLowerBand = bollingerBands.lower[bollingerBands.lower.length - 1];
+                                
+                                // 综合考虑RSI、预测收益率和布林带状态
+                                if (fund.rsi > 70 || (latestPrice && latestUpperBand && latestPrice > latestUpperBand)) {
                                     return '建议您考虑部分止盈或减仓，以锁定收益并控制风险。同时，关注市场整体趋势变化，如出现明显回调信号，可考虑进一步调整仓位。';
-                                } else if (fund.rsi < 30) {
+                                } else if (fund.rsi < 30 || (latestPrice && latestLowerBand && latestPrice < latestLowerBand)) {
                                     return '建议您考虑适当买入，可能存在反弹机会。可采取分批建仓策略，降低入场风险。';
                                 } else if (fund.predicted_return > 0.01) {
                                     return '建议您继续持有，短期可能有上涨空间。可考虑适当加仓，扩大收益。';
@@ -653,6 +698,8 @@ function showFundDetails(fund) {
             localStorage.setItem(`fundBuyRecords_${fundId}`, JSON.stringify(records));
         }
     }
+    
+
     
     // 初始加载买入记录
     loadBuyRecords();
@@ -837,43 +884,27 @@ function saveBuyRecord(fundId, record) {
     localStorage.setItem(`fundBuyRecords_${fundId}`, JSON.stringify(records));
 }
 
-function calculateMA(data, period) {
-    const result = [];
-    for (let i = 0; i < data.length; i++) {
-        if (i < period - 1) {
-            result.push(null);
-        } else {
-            let sum = 0;
-            for (let j = 0; j < period; j++) {
-                sum += data[i - j];
-            }
-            result.push(sum / period);
-        }
-    }
-    return result;
-}
+// 导入技术分析模块
+import { calculateMA, calculateSupportResistance, calculateBollingerBands } from './technical-analysis.js';
 
 function updateChart(fund, chartId, days) {
     // 计算需要显示的数据点数量
     const prices = fund.prices && fund.prices.length > 0 ? fund.prices : [];
     const dates = fund.dates && fund.dates.length > 0 ? fund.dates : [];
-    let displayPrices, displayDates;
     
-    if (days === 0) {
-        // 显示所有数据
-        displayPrices = prices;
-        displayDates = dates;
-    } else {
-        const dataPoints = Math.min(days, prices.length);
-        const startIndex = Math.max(0, prices.length - dataPoints);
+    let displayPrices = prices;
+    let displayDates = dates;
+    
+    if (days > 0) {
+        const startIndex = Math.max(0, prices.length - days);
         displayPrices = prices.slice(startIndex);
         displayDates = dates.slice(startIndex);
     }
     
-    // 计算支撑位和压力位
-    const latestPrice = prices[prices.length - 1] || 0;
-    const supportLevel = latestPrice * 0.9;
-    const resistanceLevel = latestPrice * 1.1;
+    // 使用专业方法计算支撑位和阻力位
+    const sr = calculateSupportResistance(prices);
+    const supportLevel = sr.support;
+    const resistanceLevel = sr.resistance;
     
     // 创建支撑位和压力位数据
     const supportData = Array(displayPrices.length).fill(supportLevel);
@@ -882,6 +913,9 @@ function updateChart(fund, chartId, days) {
     // 计算移动平均线
     const ma20 = calculateMA(displayPrices, 20);
     const ma60 = calculateMA(displayPrices, 60);
+    
+    // 计算布林带
+    const bollingerBands = calculateBollingerBands(displayPrices);
     
     // 获取图表上下文
     const ctx = document.getElementById(chartId).getContext('2d');
@@ -947,6 +981,36 @@ function updateChart(fund, chartId, days) {
                     borderColor: '#ff4444',
                     borderWidth: 1,
                     borderDash: [5, 5],
+                    fill: false,
+                    pointRadius: 0,
+                    pointHoverRadius: 0
+                },
+                {
+                    label: '布林带上轨',
+                    data: bollingerBands.upper,
+                    borderColor: '#4caf50',
+                    borderWidth: 1,
+                    borderDash: [3, 3],
+                    fill: false,
+                    pointRadius: 0,
+                    pointHoverRadius: 0
+                },
+                {
+                    label: '布林带中轨',
+                    data: bollingerBands.middle,
+                    borderColor: '#ff9800',
+                    borderWidth: 1,
+                    borderDash: [3, 3],
+                    fill: false,
+                    pointRadius: 0,
+                    pointHoverRadius: 0
+                },
+                {
+                    label: '布林带下轨',
+                    data: bollingerBands.lower,
+                    borderColor: '#f44336',
+                    borderWidth: 1,
+                    borderDash: [3, 3],
                     fill: false,
                     pointRadius: 0,
                     pointHoverRadius: 0
