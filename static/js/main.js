@@ -296,35 +296,100 @@ function showFundDetails(fund) {
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 15px;">
                         <div style="flex: 1;">
                             <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px;"><strong>趋势信号</strong></div>
-                            <div style="font-size: 12px; color: #4caf50; display: flex; align-items: center; margin-bottom: 8px;">
-                                <span style="margin-right: 8px;">✓</span> 多头排列 (金叉向上)
-                            </div>
-                            <div style="font-size: 11px; color: #aaa; line-height: 1.4;">
-                                短期均线位于长期均线上方，
-                                价格呈上升趋势，市场情绪积极。
-                            </div>
+                            ${(() => {
+                                // 计算趋势信号
+                                let trendSignal = '';
+                                let trendColor = '';
+                                let trendDesc = '';
+                                let priceChange = 0;
+                                let trendIcon = '●';
+                                
+                                if (fund.prices && fund.prices.length >= 2) {
+                                    const recentPrice = fund.prices[fund.prices.length - 1];
+                                    const previousPrice = fund.prices[fund.prices.length - 2];
+                                    priceChange = recentPrice - previousPrice;
+                                    
+                                    if (priceChange > 0) {
+                                        trendSignal = '多头排列 (金叉向上)';
+                                        trendColor = '#4caf50';
+                                        trendDesc = '短期均线位于长期均线上方，价格呈上升趋势，市场情绪积极。';
+                                        trendIcon = '✓';
+                                    } else if (priceChange < 0) {
+                                        trendSignal = '空头排列 (死叉向下)';
+                                        trendColor = '#ff4444';
+                                        trendDesc = '短期均线位于长期均线下方，价格呈下降趋势，市场情绪消极。';
+                                        trendIcon = '✗';
+                                    } else {
+                                        trendSignal = '震荡整理';
+                                        trendColor = '#ff9800';
+                                        trendDesc = '价格在一定范围内波动，市场情绪中性。';
+                                        trendIcon = '●';
+                                    }
+                                } else {
+                                    trendSignal = '数据不足';
+                                    trendColor = '#aaa';
+                                    trendDesc = '价格数据不足，无法判断趋势。';
+                                    trendIcon = '●';
+                                }
+                                
+                                return `
+                                    <div style="font-size: 12px; color: ${trendColor}; display: flex; align-items: center; margin-bottom: 8px;">
+                                        <span style="margin-right: 8px;">${trendIcon}</span> ${trendSignal}
+                                    </div>
+                                    <div style="font-size: 11px; color: #aaa; line-height: 1.4;">
+                                        ${trendDesc}
+                                    </div>
+                                `;
+                            })()}
                         </div>
                         <div style="flex: 1; text-align: center;">
                             <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px;"><strong>支撑位 (Low 60d)</strong></div>
                             <div style="font-size: 12px; color: #e0e0e0; margin-bottom: 8px;">
-                                ${(fund.prices[fund.prices.length - 1] * 0.9).toFixed(4)}
+                                ${fund.prices && fund.prices.length > 0 ? (Math.min(...fund.prices)).toFixed(4) : '数据不足'}
                             </div>
                             <div style="font-size: 11px; color: #4caf50;">
-                                支撑率 +10.0%
-                            </div>
-                            <div style="font-size: 11px; color: #aaa; margin-top: 8px;">
-                                60日内最低价格水平
+                                ${fund.prices && fund.prices.length > 0 ? `支撑率 +${((fund.prices[fund.prices.length - 1] / Math.min(...fund.prices) - 1) * 100).toFixed(1)}%` : '-'}
                             </div>
                         </div>
                         <div style="flex: 1; text-align: right;">
                             <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px;"><strong>智能操作建议</strong></div>
-                            <div style="font-size: 12px; color: #ff9800; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 8px;">
-                                <span style="margin-right: 8px;">●</span> 接近压力位, 建议止盈/减仓
-                            </div>
-                            <div style="font-size: 11px; color: #aaa; line-height: 1.4; text-align: right;">
-                                当前价格接近近期高点，
-                                存在回调风险，建议谨慎操作。
-                            </div>
+                            ${(() => {
+                                // 基于RSI和预测收益率生成操作建议
+                                let advice = '';
+                                let adviceColor = '';
+                                let adviceDesc = '';
+                                
+                                if (fund.rsi > 70) {
+                                    advice = 'RSI过热, 建议止盈';
+                                    adviceColor = '#ff4444';
+                                    adviceDesc = 'RSI指标过高，当前基金处于超买状态，建议及时止盈。';
+                                } else if (fund.rsi < 30) {
+                                    advice = 'RSI超卖, 建议买入';
+                                    adviceColor = '#4caf50';
+                                    adviceDesc = 'RSI指标过低，当前基金处于超卖状态，可能存在反弹机会。';
+                                } else if (fund.predicted_return > 0.01) {
+                                    advice = '看涨信号, 建议持有';
+                                    adviceColor = '#4caf50';
+                                    adviceDesc = '预测收益率为正，短期可能有上涨空间。';
+                                } else if (fund.predicted_return < -0.01) {
+                                    advice = '看跌信号, 建议减仓';
+                                    adviceColor = '#ff4444';
+                                    adviceDesc = '预测收益率为负，短期可能面临调整。';
+                                } else {
+                                    advice = '震荡行情, 建议观望';
+                                    adviceColor = '#ff9800';
+                                    adviceDesc = '市场处于震荡状态，建议保持观望。';
+                                }
+                                
+                                return `
+                                    <div style="font-size: 12px; color: ${adviceColor}; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 8px;">
+                                        <span style="margin-right: 8px;">●</span> ${advice}
+                                    </div>
+                                    <div style="font-size: 11px; color: #aaa; line-height: 1.3; text-align: right;">
+                                        ${adviceDesc}
+                                    </div>
+                                `;
+                            })()}
                         </div>
                     </div>
                 </div>
@@ -333,21 +398,76 @@ function showFundDetails(fund) {
                 <div style="background-color: #1e1e1e; padding: 20px 20px; border-bottom: 1px solid #333;">
                     <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px;">基金风险评估</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 18px; border: 1px solid #333;">
-                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 15px;">
-                            <div style="font-size: 12px;"><strong>当前净值:</strong> <span style="color: #e0e0e0;">${fund.prices[fund.prices.length - 1]}</span></div>
-                            <div style="font-size: 12px;"><strong>RSI指标:</strong> <span style="color: #e0e0e0;">${fund.rsi.toFixed(2)} ${getRSIMessage(fund.rsi)}</span></div>
-                            <div style="font-size: 12px;"><strong>波动率:</strong> <span style="color: #e0e0e0;">${(fund.volatility * 100).toFixed(2)}%</span></div>
-                            <div style="font-size: 12px;"><strong>预测收益率:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%</span></div>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 10px;">
+                            <div style="font-size: 12px;"><strong>当前净值:</strong> <span style="color: #e0e0e0;">${fund.prices && fund.prices.length > 0 ? fund.prices[fund.prices.length - 1] : '数据不足'}</span></div>
+                            <div style="font-size: 12px;"><strong>RSI指标:</strong> <span style="color: #e0e0e0;">${fund.rsi ? fund.rsi.toFixed(2) + ' ' + getRSIMessage(fund.rsi) : '数据不足'}</span></div>
+                            <div style="font-size: 12px;"><strong>波动率:</strong> <span style="color: #e0e0e0;">${fund.volatility ? (fund.volatility * 100).toFixed(2) + '%' : '数据不足'}</span></div>
+                            <div style="font-size: 12px;"><strong>预测当日收益率:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return ? (fund.predicted_return >= 0 ? '+' : '') + (fund.predicted_return * 100).toFixed(2) + '%' : '数据不足'}</span></div>
                         </div>
-                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333;">
-                            <h4 style="color: #e0e0e0; margin-bottom: 12px; font-size: 13px;">风险评估</h4>
-                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 12px;">
-                                <div><strong>RSI风险:</strong> <span style="color: ${fund.rsi > 70 ? '#ff4444' : fund.rsi < 30 ? '#4caf50' : '#ff9800'}">${fund.rsi > 70 ? '高' : fund.rsi < 30 ? '低' : '中'}</span></div>
-                                <div><strong>波动率风险:</strong> <span style="color: ${fund.volatility > 0.2 ? '#ff4444' : fund.volatility > 0.1 ? '#ff9800' : '#4caf50'}">${fund.volatility > 0.2 ? '高' : fund.volatility > 0.1 ? '中' : '低'}</span></div>
-                                <div><strong>趋势风险:</strong> <span style="color: #4caf50;">低</span></div>
+                        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333;">
+                            <h4 style="color: #e0e0e0; margin-bottom: 10px; font-size: 13px;">风险评估</h4>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
+                                <div><strong>RSI风险:</strong> <span style="color: ${fund.rsi ? (fund.rsi > 70 ? '#ff4444' : fund.rsi < 30 ? '#4caf50' : '#ff9800') : '#aaa'}">${fund.rsi ? (fund.rsi > 70 ? '高' : fund.rsi < 30 ? '低' : '中') : '数据不足'}</span></div>
+                                <div><strong>波动率风险:</strong> <span style="color: ${fund.volatility ? (fund.volatility > 0.2 ? '#ff4444' : fund.volatility > 0.1 ? '#ff9800' : '#4caf50') : '#aaa'}">${fund.volatility ? (fund.volatility > 0.2 ? '高' : fund.volatility > 0.1 ? '中' : '低') : '数据不足'}</span></div>
+                                ${(() => {
+                                    // 计算趋势风险
+                                    let trendRisk = '数据不足';
+                                    let trendRiskColor = '#aaa';
+                                    
+                                    if (fund.prices && fund.prices.length >= 5) {
+                                        const recentPrices = fund.prices.slice(-5);
+                                        const priceChange = recentPrices[4] - recentPrices[0];
+                                        const priceChangePercent = priceChange / recentPrices[0] * 100;
+                                        
+                                        if (Math.abs(priceChangePercent) > 5) {
+                                            trendRisk = '高';
+                                            trendRiskColor = '#ff4444';
+                                        } else if (Math.abs(priceChangePercent) > 2) {
+                                            trendRisk = '中';
+                                            trendRiskColor = '#ff9800';
+                                        } else {
+                                            trendRisk = '低';
+                                            trendRiskColor = '#4caf50';
+                                        }
+                                    }
+                                    
+                                    return `<div><strong>趋势风险:</strong> <span style="color: ${trendRiskColor};">${trendRisk}</span></div>`;
+                                })()}
                                 <div><strong>流动性风险:</strong> <span style="color: #ff9800;">中</span></div>
-                                <div><strong>市场风险:</strong> <span style="color: #ff9800;">中</span></div>
-                                <div><strong>整体风险:</strong> <span style="color: ${fund.rsi > 70 || fund.volatility > 0.2 ? '#ff9800' : '#4caf50'}">${fund.rsi > 70 || fund.volatility > 0.2 ? '中高' : '中低'}</span></div>
+                                <div><strong>市场风险:</strong> <span style="color: ${fund.volatility && fund.volatility > 0.15 ? '#ff9800' : '#4caf50'}">${fund.volatility && fund.volatility > 0.15 ? '中' : '低'}</span></div>
+                                ${(() => {
+                                    // 计算整体风险
+                                    let overallRisk = '数据不足';
+                                    let overallRiskColor = '#aaa';
+                                    
+                                    if (fund.rsi && fund.volatility) {
+                                        let riskScore = 0;
+                                        
+                                        // RSI风险评分
+                                        if (fund.rsi > 70) riskScore += 3;
+                                        else if (fund.rsi < 30) riskScore += 1;
+                                        else riskScore += 2;
+                                        
+                                        // 波动率风险评分
+                                        if (fund.volatility > 0.2) riskScore += 3;
+                                        else if (fund.volatility > 0.1) riskScore += 2;
+                                        else riskScore += 1;
+                                        
+                                        // 综合判断
+                                        if (riskScore >= 5) {
+                                            overallRisk = '高';
+                                            overallRiskColor = '#ff4444';
+                                        } else if (riskScore >= 3) {
+                                            overallRisk = '中';
+                                            overallRiskColor = '#ff9800';
+                                        } else {
+                                            overallRisk = '低';
+                                            overallRiskColor = '#4caf50';
+                                        }
+                                    }
+                                    
+                                    return `<div><strong>整体风险:</strong> <span style="color: ${overallRiskColor};">${overallRisk}</span></div>`;
+                                })()}
                             </div>
                         </div>
                     </div>
@@ -358,8 +478,33 @@ function showFundDetails(fund) {
                     <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px;">智能决策</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 18px; border: 1px solid #333;">
                         <div style="font-size: 12px; line-height: 1.5; color: #e0e0e0;">
-                            <p>根据技术分析，该基金目前处于多头排列状态，但已经接近压力位。建议您考虑部分止盈或减仓，以锁定收益并控制风险。</p>
-                            <p style="margin-top: 10px;">同时，关注市场整体趋势变化，如出现明显回调信号，可考虑进一步调整仓位。</p>
+                            ${(() => {
+                                // 基于多种指标生成智能决策
+                                let decisionText = '';
+                                
+                                if (!fund.rsi || !fund.volatility || !fund.predicted_return) {
+                                    return '<p>数据不足，无法提供智能决策建议。</p>';
+                                }
+                                
+                                if (fund.rsi > 70) {
+                                    decisionText = '<p>RSI指标过高，当前基金处于超买状态，建议及时止盈，避免追高风险。</p>';
+                                    decisionText += '<p style="margin-top: 10px;">可考虑将部分资金转移至低风险资产，等待回调后再重新入场。</p>';
+                                } else if (fund.rsi < 30) {
+                                    decisionText = '<p>RSI指标过低，当前基金处于超卖状态，可能存在反弹机会，建议适当买入。</p>';
+                                    decisionText += '<p style="margin-top: 10px;">可采取分批建仓策略，降低入场风险。</p>';
+                                } else if (fund.predicted_return > 0.01 && fund.volatility < 0.15) {
+                                    decisionText = '<p>预测收益率为正，波动率较低，建议继续持有。</p>';
+                                    decisionText += '<p style="margin-top: 10px;">可考虑适当加仓，扩大收益。</p>';
+                                } else if (fund.predicted_return < -0.01) {
+                                    decisionText = '<p>预测收益率为负，短期可能面临调整，建议适当减仓。</p>';
+                                    decisionText += '<p style="margin-top: 10px;">可将部分资金暂时转出，等待市场企稳后再重新布局。</p>';
+                                } else {
+                                    decisionText = '<p>市场处于震荡状态，建议保持观望，等待明确信号。</p>';
+                                    decisionText += '<p style="margin-top: 10px;">可维持当前仓位，密切关注市场变化。</p>';
+                                }
+                                
+                                return decisionText;
+                            })()}
                         </div>
                     </div>
                 </div>
