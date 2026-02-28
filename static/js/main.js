@@ -351,18 +351,11 @@ function showFundDetails(fund) {
             <div id="holding-tab" class="tab-content" style="display: none;">
                 <!-- 我的持仓 -->
                 <div style="background-color: #1e1e1e; padding: 15px 20px; border-bottom: 1px solid #333;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">我的持仓 (持仓: ${buySettings.shares}份)</h3>
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">我的持仓 (持仓: <span id="total-shares">${buySettings.shares}</span>份)</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
-                        ${buySettings.shares > 0 ? `
-                            <div style="font-size: 12px;">
-                                <p>• 2026年1月1日 234份 净值1.65元</p>
-                                <p>• 2026年1月5日 179份 净值1.69元</p>
-                                <p>• 2026年1月10日 294份 净值1.73元</p>
-                                <p>• 2026年1月26日 189份 净值1.62元</p>
-                            </div>
-                        ` : `
-                            <div style="font-size: 12px; color: #aaa;">暂无持仓记录</div>
-                        `}
+                        <div id="buy-records-content" style="font-size: 12px;">
+                            加载中...
+                        </div>
                     </div>
                 </div>
                 
@@ -429,22 +422,68 @@ function showFundDetails(fund) {
         });
     });
     
-    // 移除了基金详情的加载，因为相关显示内容已被移除
+    // 加载买入记录
+    function loadBuyRecords() {
+        const buyRecords = getBuyRecords(fund.id);
+        const buyRecordsContent = modal.querySelector('#buy-records-content');
+        const totalSharesElement = modal.querySelector('#total-shares');
+        
+        if (buyRecords.length > 0) {
+            let recordsHTML = '';
+            let totalShares = 0;
+            buyRecords.forEach(record => {
+                recordsHTML += `<p>• ${record.date} ${record.shares}份 净值${record.nav}元</p>`;
+                totalShares += record.shares;
+            });
+            buyRecordsContent.innerHTML = recordsHTML;
+            totalSharesElement.textContent = totalShares;
+        } else {
+            buyRecordsContent.textContent = '暂无持仓记录';
+            totalSharesElement.textContent = '0';
+        }
+    }
+    
+    // 初始加载买入记录
+    loadBuyRecords();
     
     // 保存买入设置
     modal.querySelector('#save-buy-settings').addEventListener('click', function() {
         const buyDate = document.getElementById('buy-date').value;
         const buyShares = parseInt(document.getElementById('buy-shares').value) || 0;
         
-        const buySettings = {
-            date: buyDate,
-            shares: buyShares
-        };
-        
-        localStorage.setItem(`fundBuySettings_${fund.id}`, JSON.stringify(buySettings));
-        alert('买入设置已保存');
-        // 重新加载页面以更新预估收益
-        loadFunds();
+        if (buyShares > 0) {
+            // 保存买入记录
+            const buyRecord = {
+                date: buyDate,
+                shares: buyShares,
+                nav: fund.prices[fund.prices.length - 1]
+            };
+            saveBuyRecord(fund.id, buyRecord);
+            
+            // 计算总持仓
+            const buyRecords = getBuyRecords(fund.id);
+            const totalShares = buyRecords.reduce((total, record) => total + record.shares, 0);
+            
+            // 保存总持仓
+            const buySettings = {
+                date: buyDate,
+                shares: totalShares
+            };
+            localStorage.setItem(`fundBuySettings_${fund.id}`, JSON.stringify(buySettings));
+            
+            // 重新加载买入记录
+            loadBuyRecords();
+            
+            // 初始化表单
+            document.getElementById('buy-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('buy-shares').value = 0;
+            
+            alert('买入设置已保存');
+            // 重新加载页面以更新预估收益
+            loadFunds();
+        } else {
+            alert('请输入有效的买入份数');
+        }
     });
     
     // 时间范围按钮
@@ -534,6 +573,17 @@ function getBuySettings(fundId) {
     
     const savedSettings = localStorage.getItem(`fundBuySettings_${fundId}`);
     return savedSettings ? JSON.parse(savedSettings) : defaultSettings;
+}
+
+function getBuyRecords(fundId) {
+    const savedRecords = localStorage.getItem(`fundBuyRecords_${fundId}`);
+    return savedRecords ? JSON.parse(savedRecords) : [];
+}
+
+function saveBuyRecord(fundId, record) {
+    const records = getBuyRecords(fundId);
+    records.push(record);
+    localStorage.setItem(`fundBuyRecords_${fundId}`, JSON.stringify(records));
 }
 
 function updateChart(fund, chartId, days) {
