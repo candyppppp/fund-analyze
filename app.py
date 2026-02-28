@@ -237,35 +237,49 @@ def get_fund_details(code):
                 fund_details = {
                     'establishmentDate': '',
                     'field': '',
-                    'manager': '',
-                    'size': '',
                     'composition': [],
                     'relatedStocks': []
                 }
                 
                 # 提取基金类型（所属领域）
+                # 尝试从不同的变量中提取基金类型
                 type_match = re.search(r'var fundType = "(.*?)";', data_str)
+                if not type_match:
+                    # 尝试其他可能的变量名
+                    type_match = re.search(r'var syl_fundType = "(.*?)";', data_str)
+                if not type_match:
+                    # 尝试从基金经理信息中提取
+                    manager_match = re.search(r'var Data_currentFundManager = \[(.*?)\];', data_str, re.DOTALL)
+                    if manager_match:
+                        fund_details['field'] = "混合基金"  # 默认类型
+                        print("未提取到基金类型，使用默认值: 混合基金")
                 if type_match:
                     fund_details['field'] = type_match.group(1)
                     print(f"提取到基金类型: {fund_details['field']}")
-                
-                # 提取基金经理
-                manager_match = re.search(r'var fundManager = "(.*?)";', data_str)
-                if manager_match:
-                    fund_details['manager'] = manager_match.group(1)
-                    print(f"提取到基金经理: {fund_details['manager']}")
-                
-                # 提取基金规模
-                size_match = re.search(r'var fundSize = "(.*?)";', data_str)
-                if size_match:
-                    fund_details['size'] = size_match.group(1)
-                    print(f"提取到基金规模: {fund_details['size']}")
+                else:
+                    print("未提取到基金类型")
                 
                 # 提取基金成立时间
+                # 尝试从不同的变量中提取成立时间
                 establish_match = re.search(r'var establishDate = "(.*?)";', data_str)
+                if not establish_match:
+                    # 尝试其他可能的变量名
+                    establish_match = re.search(r'var syl_establishDate = "(.*?)";', data_str)
+                if not establish_match:
+                    # 尝试从规模变动数据中提取
+                    scale_match = re.search(r'var Data_fluctuationScale = \{"categories":\[(.*?)\]', data_str)
+                    if scale_match:
+                        # 使用最早的日期作为成立时间的近似
+                        dates_str = scale_match.group(1)
+                        dates = re.findall(r'"(.*?)"', dates_str)
+                        if dates:
+                            fund_details['establishmentDate'] = dates[0]
+                            print(f"从规模变动数据中提取到成立时间: {fund_details['establishmentDate']}")
                 if establish_match:
                     fund_details['establishmentDate'] = establish_match.group(1)
                     print(f"提取到成立时间: {fund_details['establishmentDate']}")
+                else:
+                    print("未提取到成立时间")
                 
                 # 提取持仓股票
                 stock_codes_match = re.search(r'var stockCodesNew =\[(.*?)\];', data_str)
@@ -281,30 +295,71 @@ def get_fund_details(code):
                         stock_info = stock_code.split('.')
                         if len(stock_info) == 2:
                             market, code = stock_info
-                            stock_name = "未知"
-                            # 这里可以添加股票名称的获取逻辑
+                            # 尝试从API响应中提取股票名称
+                            # 注意：实际API响应中可能没有直接的股票名称映射
+                            # 这里使用代码作为名称的一部分，使其更有意义
+                            stock_name = f"股票 {code}"
+                            # 暂时使用0作为占比和涨跌幅
+                            # 实际应用中可以通过额外的API调用获取这些数据
                             fund_details['relatedStocks'].append({
                                 'name': stock_name,
                                 'code': code,
                                 'percentage': 0,  # 暂时设为0，实际应该从API获取
                                 'change': 0  # 暂时设为0，实际应该从API获取
                             })
+                            print(f"添加股票: {stock_name} ({code})")
+                else:
+                    print("未提取到持仓股票")
                 
                 # 提取投资组成
-                # 这里可以从API获取更详细的投资组成数据
-                # 暂时使用默认数据
-                fund_details['composition'] = [
-                    {'name': '股票', 'percentage': 80},
-                    {'name': '债券', 'percentage': 15},
-                    {'name': '现金', 'percentage': 5}
-                ]
+                # 从API响应中提取真实的资产配置数据
+                composition_match = re.search(r'var Data_assetAllocation = \{(.*?)\};', data_str, re.DOTALL)
+                if composition_match:
+                    composition_data = composition_match.group(1)
+                    # 提取股票占比
+                    stock_match = re.search(r'"股票占净比".*?"data":\[(.*?)\]', composition_data, re.DOTALL)
+                    # 提取债券占比
+                    bond_match = re.search(r'"债券占净比".*?"data":\[(.*?)\]', composition_data, re.DOTALL)
+                    # 提取现金占比
+                    cash_match = re.search(r'"现金占净比".*?"data":\[(.*?)\]', composition_data, re.DOTALL)
+                    
+                    if stock_match and bond_match and cash_match:
+                        # 获取最新的占比数据（最后一个元素）
+                        stock_data = stock_match.group(1).split(',')
+                        bond_data = bond_match.group(1).split(',')
+                        cash_data = cash_match.group(1).split(',')
+                        
+                        if stock_data and bond_data and cash_data:
+                            stock_percentage = float(stock_data[-1].strip())
+                            bond_percentage = float(bond_data[-1].strip())
+                            cash_percentage = float(cash_data[-1].strip())
+                            
+                            fund_details['composition'] = [
+                                {'name': '股票', 'percentage': stock_percentage},
+                                {'name': '债券', 'percentage': bond_percentage},
+                                {'name': '现金', 'percentage': cash_percentage}
+                            ]
+                            print(f"提取到投资组成数据: 股票 {stock_percentage}%, 债券 {bond_percentage}%, 现金 {cash_percentage}%")
+                        else:
+                            print("未提取到完整的投资组成数据")
+                    else:
+                        print("未提取到投资组成数据")
+                else:
+                    print("未提取到资产配置数据")
+                    # 如果没有提取到数据，使用空数组
+                    fund_details['composition'] = []
                 
                 print(f"基金 {code} 详情获取完成")
+                print(f"获取到的详情数据: {fund_details}")
                 return jsonify(fund_details)
             except Exception as e:
                 print(f"解析东方财富API响应失败: {e}")
+                # 打印部分响应内容，以便调试
+                print(f"响应内容前500字符: {data_str[:500]}")
         else:
             print(f"东方财富API响应状态错误: {response.status_code}")
+            # 打印响应内容，以便调试
+            print(f"响应内容: {response.text}")
     except Exception as e:
         print(f"获取基金详情失败: {e}")
     
@@ -312,8 +367,6 @@ def get_fund_details(code):
     return jsonify({
         'establishmentDate': '',
         'field': '',
-        'manager': '',
-        'size': '',
         'composition': [],
         'relatedStocks': []
     })

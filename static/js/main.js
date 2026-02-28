@@ -372,8 +372,6 @@ function showFundDetails(fund) {
                 fundInfoContent.innerHTML = `
                     <div><strong>成立时间:</strong> ${fundDetails.establishmentDate || '未知'}</div>
                     <div><strong>所属领域:</strong> ${fundDetails.field || '未知'}</div>
-                    <div><strong>基金经理:</strong> ${fundDetails.manager || '未知'}</div>
-                    <div><strong>基金规模:</strong> ${fundDetails.size || '未知'}</div>
                 `;
                 
                 // 更新投资组成
