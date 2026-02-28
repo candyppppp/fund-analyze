@@ -159,7 +159,7 @@ def get_fund_data(code):
             for i in range(1, len(prices)):
                 try:
                     daily_return = (prices[i] - prices[i-1]) / prices[i-1]
-                    returns.append(round(daily_return * 100, 2))
+                    returns.append(daily_return)
                 except (ZeroDivisionError, TypeError) as e:
                     print(f"计算收益率失败: {e}")
                     returns.append(0)

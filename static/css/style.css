@@ -178,10 +178,11 @@ body {
 .fund-type-tag {
     background-color: #007bff;
     color: white;
-    padding: 2px 6px;
-    border-radius: 10px;
+    padding: 4px 8px;
+    border-radius: 4px;
     font-size: 10px;
     font-weight: bold;
+    border: 1px solid #333;
 }
 
 .fund-detail-box {
@@ -202,6 +203,7 @@ body {
     display: flex;
     align-items: flex-end;
     gap: 16px;
+    flex-wrap: nowrap;
 }
 
 .fund-actions {

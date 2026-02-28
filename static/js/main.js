@@ -7,14 +7,8 @@ document.addEventListener('DOMContentLoaded', function() {
         addFund();
     });
     
-    // 清除缓存按钮
-    document.querySelector('.header-buttons button:first-child').addEventListener('click', function() {
-        localStorage.clear();
-        alert('缓存已清除');
-    });
-    
     // 设置按钮
-    document.querySelector('.header-buttons button:last-child').addEventListener('click', function() {
+    document.querySelector('.header-buttons button').addEventListener('click', function() {
         showSettings();
     });
     
@@ -40,21 +34,23 @@ function loadRealTimeNews() {
 }
 
 function loadFunds() {
-    // 从本地存储加载基金数据
-    const savedFunds = localStorage.getItem('funds');
-    if (savedFunds) {
-        const funds = JSON.parse(savedFunds);
-        renderFunds(funds);
-    } else {
-        // 如果本地存储没有数据，从API获取
-        fetch('/api/funds')
-            .then(response => response.json())
-            .then(funds => {
-                // 保存到本地存储
-                localStorage.setItem('funds', JSON.stringify(funds));
+    // 强制从API获取最新数据，而不是使用本地存储的旧数据
+    fetch('/api/funds')
+        .then(response => response.json())
+        .then(funds => {
+            // 保存到本地存储
+            localStorage.setItem('funds', JSON.stringify(funds));
+            renderFunds(funds);
+        })
+        .catch(error => {
+            console.error('获取基金数据失败:', error);
+            // 如果API调用失败，尝试从本地存储加载
+            const savedFunds = localStorage.getItem('funds');
+            if (savedFunds) {
+                const funds = JSON.parse(savedFunds);
                 renderFunds(funds);
-            });
-    }
+            }
+        });
 }
 
 function renderFunds(funds) {
@@ -106,6 +102,22 @@ function renderFunds(funds) {
         
         const rsiStatus = getRSIStatus(fund.rsi);
         
+        // 计算上一个交易日的净值变化率
+        let previousDayReturn = 0;
+        if (fund.returns && fund.returns.length > 0) {
+            let returnValue = fund.returns[fund.returns.length - 1];
+            // 检查返回值是否已经是百分比形式（大于1或小于-1）
+            if (Math.abs(returnValue) > 1) {
+                // 如果是百分比形式，转换为小数
+                previousDayReturn = returnValue / 100;
+            } else {
+                // 如果已经是小数形式，直接使用
+                previousDayReturn = returnValue;
+            }
+        } else if (fund.prices && fund.prices.length >= 2) {
+            previousDayReturn = (fund.prices[fund.prices.length - 1] - fund.prices[fund.prices.length - 2]) / fund.prices[fund.prices.length - 2];
+        }
+
         fundItem.innerHTML = `
             <div class="fund-info">
                 <div class="fund-name">${fund.name}</div>
@@ -125,6 +137,12 @@ function renderFunds(funds) {
             </div>
             <div class="fund-performance">
                 <div class="fund-return-container">
+                    <div class="fund-return ${previousDayReturn < 0 ? 'negative' : ''}">
+                        ${previousDayReturn >= 0 ? '+' : ''}${(previousDayReturn * 100).toFixed(2)}%
+                    </div>
+                    <div class="fund-return-label">Previous Day</div>
+                </div>
+                <div class="fund-return-container">
                     <div class="fund-return ${fund.predicted_return < 0 ? 'negative' : ''}">
                         ${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%
                     </div>
@@ -135,23 +153,16 @@ function renderFunds(funds) {
                         <div class="fund-return ${estimatedReturn >= 0 ? '' : 'negative'}">
                             ${estimatedReturn >= 0 ? '+' : ''}${estimatedReturn.toFixed(2)}元
                         </div>
-                        <div class="fund-return-label">Live Profit/Loss</div>
+                        <div class="fund-return-label">Live Profit</div>
                     </div>
                 ` : ''}
-                <div class="fund-actions">
-                    <button class="real-time-btn">
-                        <span>Real-time</span>
-                        <span>🔄</span>
-                    </button>
-                    <button class="delete-btn" onclick="deleteFund(${fund.id})">删除</button>
-                </div>
             </div>
         `;
         
         // 添加点击事件
         fundItem.addEventListener('click', function(e) {
-            // 防止点击删除按钮时触发弹框
-            if (!e.target.classList.contains('delete-btn') && !e.target.closest('.delete-btn')) {
+            // 防止点击实时按钮时触发弹框
+            if (!e.target.classList.contains('real-time-btn') && !e.target.closest('.real-time-btn')) {
                 showFundDetails(fund);
             }
         });
@@ -275,16 +286,16 @@ function showFundDetails(fund) {
             <div id="details-tab" class="tab-content" style="display: block;">
                 <!-- 时间范围 -->
                 <div style="display: flex; justify-content: flex-end; gap: 2px; padding: 10px 20px; background-color: #1e1e1e; border-bottom: 1px solid #333;">
-                    <button class="time-btn" data-days="7">7D</button>
+                    <button class="time-btn active" data-days="7">7D</button>
                     <button class="time-btn" data-days="30">1M</button>
-                    <button class="time-btn active" data-days="90">3M</button>
+                    <button class="time-btn" data-days="90">3M</button>
                     <button class="time-btn" data-days="180">6M</button>
                     <button class="time-btn" data-days="365">1Y</button>
                     <button class="time-btn" data-days="0">ALL</button>
                 </div>
                 
                 <!-- 趋势图 -->
-                <div style="height: 350px; background-color: #1e1e1e; border-bottom: 1px solid #333;">
+                <div style="height: 350px; background-color: #000000; border-bottom: 1px solid #333;">
                     <canvas id="${chartId}"></canvas>
                 </div>
             </div>
@@ -292,7 +303,7 @@ function showFundDetails(fund) {
             <!-- 决策标签 -->
             <div id="decision-tab" class="tab-content" style="display: none;">
                 <!-- 趋势信号和智能操作建议 -->
-                <div style="background-color: #1e1e1e; padding: 20px 20px; border-bottom: 1px solid #333;">
+                <div style="padding: 10px 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 15px;">
                         <div style="flex: 1;">
                             <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px;"><strong>趋势信号</strong></div>
@@ -333,26 +344,26 @@ function showFundDetails(fund) {
                                 }
                                 
                                 return `
-                                    <div style="font-size: 12px; color: ${trendColor}; display: flex; align-items: center; margin-bottom: 8px;">
+                                    <div style="font-size: 12px; color: ${trendColor}; display: flex; align-items: center; margin-bottom: 8px; white-space: nowrap;">
                                         <span style="margin-right: 8px;">${trendIcon}</span> ${trendSignal}
                                     </div>
-                                    <div style="font-size: 11px; color: #aaa; line-height: 1.4;">
+                                    <div style="font-size: 11px; color: #aaa; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                         ${trendDesc}
                                     </div>
                                 `;
                             })()}
                         </div>
                         <div style="flex: 1; text-align: center;">
-                            <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px;"><strong>支撑位 (Low 60d)</strong></div>
-                            <div style="font-size: 12px; color: #e0e0e0; margin-bottom: 8px;">
+                            <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px; white-space: nowrap;"><strong>支撑位 (Low 60d)</strong></div>
+                            <div style="font-size: 12px; color: #e0e0e0; margin-bottom: 8px; white-space: nowrap;">
                                 ${fund.prices && fund.prices.length > 0 ? (Math.min(...fund.prices)).toFixed(4) : '数据不足'}
                             </div>
-                            <div style="font-size: 11px; color: #4caf50;">
+                            <div style="font-size: 11px; color: #4caf50; white-space: nowrap;">
                                 ${fund.prices && fund.prices.length > 0 ? `支撑率 +${((fund.prices[fund.prices.length - 1] / Math.min(...fund.prices) - 1) * 100).toFixed(1)}%` : '-'}
                             </div>
                         </div>
                         <div style="flex: 1; text-align: right;">
-                            <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px;"><strong>智能操作建议</strong></div>
+                            <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px; white-space: nowrap;"><strong>智能操作建议</strong></div>
                             ${(() => {
                                 // 基于RSI和预测收益率生成操作建议
                                 let advice = '';
@@ -362,30 +373,30 @@ function showFundDetails(fund) {
                                 if (fund.rsi > 70) {
                                     advice = 'RSI过热, 建议止盈';
                                     adviceColor = '#ff4444';
-                                    adviceDesc = 'RSI指标过高，当前基金处于超买状态，建议及时止盈。';
+                                    adviceDesc = 'RSI指标过高，当前基金处于超买状态，建议及时止盈，避免追高风险。';
                                 } else if (fund.rsi < 30) {
                                     advice = 'RSI超卖, 建议买入';
                                     adviceColor = '#4caf50';
-                                    adviceDesc = 'RSI指标过低，当前基金处于超卖状态，可能存在反弹机会。';
+                                    adviceDesc = 'RSI指标过低，当前基金处于超卖状态，可能存在反弹机会，建议适当买入。';
                                 } else if (fund.predicted_return > 0.01) {
                                     advice = '看涨信号, 建议持有';
                                     adviceColor = '#4caf50';
-                                    adviceDesc = '预测收益率为正，短期可能有上涨空间。';
+                                    adviceDesc = '预测收益率为正，短期可能有上涨空间，建议继续持有。';
                                 } else if (fund.predicted_return < -0.01) {
                                     advice = '看跌信号, 建议减仓';
                                     adviceColor = '#ff4444';
-                                    adviceDesc = '预测收益率为负，短期可能面临调整。';
+                                    adviceDesc = '预测收益率为负，短期可能面临调整，建议适当减仓。';
                                 } else {
                                     advice = '震荡行情, 建议观望';
                                     adviceColor = '#ff9800';
-                                    adviceDesc = '市场处于震荡状态，建议保持观望。';
+                                    adviceDesc = '市场处于震荡状态，建议保持观望，等待明确信号。';
                                 }
                                 
                                 return `
-                                    <div style="font-size: 12px; color: ${adviceColor}; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 8px;">
+                                    <div style="font-size: 12px; color: ${adviceColor}; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 8px; white-space: nowrap;">
                                         <span style="margin-right: 8px;">●</span> ${advice}
                                     </div>
-                                    <div style="font-size: 11px; color: #aaa; line-height: 1.3; text-align: right;">
+                                    <div style="font-size: 11px; color: #aaa; line-height: 1.3; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                         ${adviceDesc}
                                     </div>
                                 `;
@@ -395,20 +406,20 @@ function showFundDetails(fund) {
                 </div>
                 
                 <!-- 基金风险评估 -->
-                <div style="background-color: #1e1e1e; padding: 20px 20px; border-bottom: 1px solid #333;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px;">基金风险评估</h3>
+                <div style="padding: 10px 20px;">
+                    <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; white-space: nowrap;">基金风险评估</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 18px; border: 1px solid #333;">
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 10px;">
-                            <div style="font-size: 12px;"><strong>当前净值:</strong> <span style="color: #e0e0e0;">${fund.prices && fund.prices.length > 0 ? fund.prices[fund.prices.length - 1] : '数据不足'}</span></div>
-                            <div style="font-size: 12px;"><strong>RSI指标:</strong> <span style="color: #e0e0e0;">${fund.rsi ? fund.rsi.toFixed(2) + ' ' + getRSIMessage(fund.rsi) : '数据不足'}</span></div>
-                            <div style="font-size: 12px;"><strong>波动率:</strong> <span style="color: #e0e0e0;">${fund.volatility ? (fund.volatility * 100).toFixed(2) + '%' : '数据不足'}</span></div>
-                            <div style="font-size: 12px;"><strong>预测当日收益率:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return ? (fund.predicted_return >= 0 ? '+' : '') + (fund.predicted_return * 100).toFixed(2) + '%' : '数据不足'}</span></div>
+                            <div style="font-size: 12px; white-space: nowrap;"><strong>当前净值:</strong> <span style="color: #e0e0e0;">${fund.prices && fund.prices.length > 0 ? fund.prices[fund.prices.length - 1] : '数据不足'}</span></div>
+                            <div style="font-size: 12px; white-space: nowrap;"><strong>RSI指标:</strong> <span style="color: #e0e0e0;">${fund.rsi ? fund.rsi.toFixed(2) + ' ' + getRSIMessage(fund.rsi) : '数据不足'}</span></div>
+                            <div style="font-size: 12px; white-space: nowrap;"><strong>波动率:</strong> <span style="color: #e0e0e0;">${fund.volatility ? (fund.volatility * 100).toFixed(2) + '%' : '数据不足'}</span></div>
+                            <div style="font-size: 12px; white-space: nowrap;"><strong>预测当日收益率:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return ? (fund.predicted_return >= 0 ? '+' : '') + (fund.predicted_return * 100).toFixed(2) + '%' : '数据不足'}</span></div>
                         </div>
                         <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333;">
-                            <h4 style="color: #e0e0e0; margin-bottom: 10px; font-size: 13px;">风险评估</h4>
+                            <h4 style="color: #e0e0e0; margin: 0 0 10px 0; font-size: 13px; white-space: nowrap;">风险评估</h4>
                             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
-                                <div><strong>RSI风险:</strong> <span style="color: ${fund.rsi ? (fund.rsi > 70 ? '#ff4444' : fund.rsi < 30 ? '#4caf50' : '#ff9800') : '#aaa'}">${fund.rsi ? (fund.rsi > 70 ? '高' : fund.rsi < 30 ? '低' : '中') : '数据不足'}</span></div>
-                                <div><strong>波动率风险:</strong> <span style="color: ${fund.volatility ? (fund.volatility > 0.2 ? '#ff4444' : fund.volatility > 0.1 ? '#ff9800' : '#4caf50') : '#aaa'}">${fund.volatility ? (fund.volatility > 0.2 ? '高' : fund.volatility > 0.1 ? '中' : '低') : '数据不足'}</span></div>
+                                <div style="white-space: nowrap;"><strong>RSI风险:</strong> <span style="color: ${fund.rsi ? (fund.rsi > 70 ? '#ff4444' : fund.rsi < 30 ? '#4caf50' : '#ff9800') : '#aaa'}">${fund.rsi ? (fund.rsi > 70 ? '高' : fund.rsi < 30 ? '低' : '中') : '数据不足'}</span></div>
+                                <div style="white-space: nowrap;"><strong>波动率风险:</strong> <span style="color: ${fund.volatility ? (fund.volatility > 0.2 ? '#ff4444' : fund.volatility > 0.1 ? '#ff9800' : '#4caf50') : '#aaa'}">${fund.volatility ? (fund.volatility > 0.2 ? '高' : fund.volatility > 0.1 ? '中' : '低') : '数据不足'}</span></div>
                                 ${(() => {
                                     // 计算趋势风险
                                     let trendRisk = '数据不足';
@@ -431,10 +442,10 @@ function showFundDetails(fund) {
                                         }
                                     }
                                     
-                                    return `<div><strong>趋势风险:</strong> <span style="color: ${trendRiskColor};">${trendRisk}</span></div>`;
+                                    return `<div style="white-space: nowrap;"><strong>趋势风险:</strong> <span style="color: ${trendRiskColor};">${trendRisk}</span></div>`;
                                 })()}
-                                <div><strong>流动性风险:</strong> <span style="color: #ff9800;">中</span></div>
-                                <div><strong>市场风险:</strong> <span style="color: ${fund.volatility && fund.volatility > 0.15 ? '#ff9800' : '#4caf50'}">${fund.volatility && fund.volatility > 0.15 ? '中' : '低'}</span></div>
+                                <div style="white-space: nowrap;"><strong>流动性风险:</strong> <span style="color: #ff9800;">中</span></div>
+                                <div style="white-space: nowrap;"><strong>市场风险:</strong> <span style="color: ${fund.volatility && fund.volatility > 0.15 ? '#ff9800' : '#4caf50'}">${fund.volatility && fund.volatility > 0.15 ? '中' : '低'}</span></div>
                                 ${(() => {
                                     // 计算整体风险
                                     let overallRisk = '数据不足';
@@ -466,7 +477,7 @@ function showFundDetails(fund) {
                                         }
                                     }
                                     
-                                    return `<div><strong>整体风险:</strong> <span style="color: ${overallRiskColor};">${overallRisk}</span></div>`;
+                                    return `<div style="white-space: nowrap;"><strong>整体风险:</strong> <span style="color: ${overallRiskColor};">${overallRisk}</span></div>`;
                                 })()}
                             </div>
                         </div>
@@ -474,37 +485,28 @@ function showFundDetails(fund) {
                 </div>
                 
                 <!-- 智能决策 -->
-                <div style="background-color: #1e1e1e; padding: 20px 20px;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px;">智能决策</h3>
+                <div style="padding: 10px 20px;">
+                    <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; white-space: nowrap;">智能决策</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 18px; border: 1px solid #333;">
-                        <div style="font-size: 12px; line-height: 1.5; color: #e0e0e0;">
-                            ${(() => {
-                                // 基于多种指标生成智能决策
-                                let decisionText = '';
-                                
+                        <div style="font-size: 12px; line-height: 1.5; color: #e0e0e0; white-space: nowrap;">
+                            <p>根据技术分析，该基金目前处于${fund.rsi > 70 ? '超买' : fund.rsi < 30 ? '超卖' : '正常'}状态，${fund.predicted_return > 0 ? '预测收益率为正' : '预测收益率为负'}。</p>
+                            <p style="margin-top: 10px;">${(() => {
                                 if (!fund.rsi || !fund.volatility || !fund.predicted_return) {
-                                    return '<p>数据不足，无法提供智能决策建议。</p>';
+                                    return '数据不足，无法提供具体操作建议。';
                                 }
                                 
                                 if (fund.rsi > 70) {
-                                    decisionText = '<p>RSI指标过高，当前基金处于超买状态，建议及时止盈，避免追高风险。</p>';
-                                    decisionText += '<p style="margin-top: 10px;">可考虑将部分资金转移至低风险资产，等待回调后再重新入场。</p>';
+                                    return '建议您考虑部分止盈或减仓，以锁定收益并控制风险。同时，关注市场整体趋势变化，如出现明显回调信号，可考虑进一步调整仓位。';
                                 } else if (fund.rsi < 30) {
-                                    decisionText = '<p>RSI指标过低，当前基金处于超卖状态，可能存在反弹机会，建议适当买入。</p>';
-                                    decisionText += '<p style="margin-top: 10px;">可采取分批建仓策略，降低入场风险。</p>';
-                                } else if (fund.predicted_return > 0.01 && fund.volatility < 0.15) {
-                                    decisionText = '<p>预测收益率为正，波动率较低，建议继续持有。</p>';
-                                    decisionText += '<p style="margin-top: 10px;">可考虑适当加仓，扩大收益。</p>';
+                                    return '建议您考虑适当买入，可能存在反弹机会。可采取分批建仓策略，降低入场风险。';
+                                } else if (fund.predicted_return > 0.01) {
+                                    return '建议您继续持有，短期可能有上涨空间。可考虑适当加仓，扩大收益。';
                                 } else if (fund.predicted_return < -0.01) {
-                                    decisionText = '<p>预测收益率为负，短期可能面临调整，建议适当减仓。</p>';
-                                    decisionText += '<p style="margin-top: 10px;">可将部分资金暂时转出，等待市场企稳后再重新布局。</p>';
+                                    return '建议您适当减仓，短期可能面临调整。可将部分资金暂时转出，等待市场企稳后再重新布局。';
                                 } else {
-                                    decisionText = '<p>市场处于震荡状态，建议保持观望，等待明确信号。</p>';
-                                    decisionText += '<p style="margin-top: 10px;">可维持当前仓位，密切关注市场变化。</p>';
+                                    return '建议您保持观望，等待明确信号。可维持当前仓位，密切关注市场变化。';
                                 }
-                                
-                                return decisionText;
-                            })()}
+                            })()}</p>
                         </div>
                     </div>
                 </div>
@@ -513,30 +515,30 @@ function showFundDetails(fund) {
             <!-- 持仓标签 -->
             <div id="holding-tab" class="tab-content" style="display: none;">
                 <!-- 我的持仓 -->
-                <div style="background-color: #1e1e1e; padding: 15px 20px; border-bottom: 1px solid #333;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">我的持仓 (持仓: <span id="total-shares">${buySettings.shares}</span>份，平均净值: <span id="avg-nav">0.0000</span>元)</h3>
+                <div style="padding: 10px 20px; border-bottom: 1px solid #333;">
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px; white-space: nowrap;">我的持仓 (持仓: <span id="total-shares">${buySettings.shares}</span>份，平均净值: <span id="avg-nav">0.0000</span>元)</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
-                        <div id="buy-records-content" style="font-size: 12px;">
+                        <div id="buy-records-content" style="font-size: 12px; white-space: nowrap;">
                             加载中...
                         </div>
                     </div>
                 </div>
                 
                 <!-- 买入设置 -->
-                <div style="background-color: #1e1e1e; padding: 15px 20px;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">买入设置</h3>
+                <div style="padding: 10px 20px;">
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px; white-space: nowrap;">买入设置</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
                             <div>
-                                <label style="display: block; margin-bottom: 5px;">买入日期:</label>
+                                <label style="display: block; margin-bottom: 5px; white-space: nowrap;">买入日期:</label>
                                 <input type="date" id="buy-date" value="${new Date().toISOString().split('T')[0]}" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 5px; border-radius: 4px; font-size: 12px;">
                             </div>
                             <div>
-                                <label style="display: block; margin-bottom: 5px;">买入份数:</label>
+                                <label style="display: block; margin-bottom: 5px; white-space: nowrap;">买入份数:</label>
                                 <input type="number" id="buy-shares" value="0" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 5px; border-radius: 4px; font-size: 12px;">
                             </div>
                         </div>
-                        <button id="save-buy-settings" style="margin-top: 10px; background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">保存设置</button>
+                        <button id="save-buy-settings" style="margin-top: 10px; background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap;">保存设置</button>
                     </div>
                 </div>
             </div>
@@ -797,6 +799,33 @@ function getBuySettings(fundId) {
     return savedSettings ? JSON.parse(savedSettings) : defaultSettings;
 }
 
+// 判断一个日期是否是交易日（简单实现，实际应用中可能需要更复杂的逻辑或API）
+function isTradingDay(date) {
+    const dayOfWeek = date.getDay();
+    // 周末不是交易日
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+        return false;
+    }
+    
+    // 这里可以添加节假日判断逻辑
+    // 例如：检查是否是法定节假日
+    
+    return true;
+}
+
+// 获取上一个交易日的日期
+function getPreviousTradingDay() {
+    const today = new Date();
+    let previousDay = new Date(today);
+    
+    // 向前查找，直到找到一个交易日
+    do {
+        previousDay.setDate(previousDay.getDate() - 1);
+    } while (!isTradingDay(previousDay));
+    
+    return previousDay;
+}
+
 function getBuyRecords(fundId) {
     const savedRecords = localStorage.getItem(`fundBuyRecords_${fundId}`);
     return savedRecords ? JSON.parse(savedRecords) : [];
@@ -806,6 +835,22 @@ function saveBuyRecord(fundId, record) {
     const records = getBuyRecords(fundId);
     records.push(record);
     localStorage.setItem(`fundBuyRecords_${fundId}`, JSON.stringify(records));
+}
+
+function calculateMA(data, period) {
+    const result = [];
+    for (let i = 0; i < data.length; i++) {
+        if (i < period - 1) {
+            result.push(null);
+        } else {
+            let sum = 0;
+            for (let j = 0; j < period; j++) {
+                sum += data[i - j];
+            }
+            result.push(sum / period);
+        }
+    }
+    return result;
 }
 
 function updateChart(fund, chartId, days) {
@@ -834,6 +879,10 @@ function updateChart(fund, chartId, days) {
     const supportData = Array(displayPrices.length).fill(supportLevel);
     const resistanceData = Array(displayPrices.length).fill(resistanceLevel);
     
+    // 计算移动平均线
+    const ma20 = calculateMA(displayPrices, 20);
+    const ma60 = calculateMA(displayPrices, 60);
+    
     // 获取图表上下文
     const ctx = document.getElementById(chartId).getContext('2d');
     
@@ -857,7 +906,30 @@ function updateChart(fund, chartId, days) {
                     tension: 0.3,
                     fill: true,
                     pointRadius: 3,
-                    pointHoverRadius: 5
+                    pointHoverRadius: 5,
+                    pointBackgroundColor: '#33b5e5',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2
+                },
+                {
+                    label: 'MA20',
+                    data: ma20,
+                    borderColor: '#ff9800',
+                    borderWidth: 1.5,
+                    tension: 0.3,
+                    fill: false,
+                    pointRadius: 0,
+                    pointHoverRadius: 0
+                },
+                {
+                    label: 'MA60',
+                    data: ma60,
+                    borderColor: '#9c27b0',
+                    borderWidth: 1.5,
+                    tension: 0.3,
+                    fill: false,
+                    pointRadius: 0,
+                    pointHoverRadius: 0
                 },
                 {
                     label: '支撑位',
@@ -872,7 +944,7 @@ function updateChart(fund, chartId, days) {
                 {
                     label: '压力位',
                     data: resistanceData,
-                    borderColor: '#ff9800',
+                    borderColor: '#ff4444',
                     borderWidth: 1,
                     borderDash: [5, 5],
                     fill: false,
@@ -912,6 +984,7 @@ function updateChart(fund, chartId, days) {
                     }
                 }
             },
+            backgroundColor: '#000000',
             scales: {
                 x: {
                     position: 'bottom',
@@ -935,7 +1008,7 @@ function updateChart(fund, chartId, days) {
                             size: 11
                         },
                         callback: function(value) {
-                            return value.toFixed(2);
+                            return value.toFixed(4);
                         }
                     },
                     grid: {
@@ -956,7 +1029,7 @@ function updateChart(fund, chartId, days) {
                 padding: {
                     left: 10,
                     right: 10,
-                    top: 10,
+                    top: 20,
                     bottom: 10
                 }
             }
@@ -1088,6 +1161,7 @@ function showSettings() {
         </div>
         
         <div style="display: flex; justify-content: flex-end; gap: 8px;">
+            <button id="clear-cache" style="background-color: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px;">清除缓存</button>
             <button id="save-settings" style="background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px;">保存设置</button>
         </div>
     `;
@@ -1119,6 +1193,17 @@ function showSettings() {
         document.body.removeChild(modal);
         // 应用设置
         applySettings(newSettings);
+    });
+    
+    // 清除缓存按钮
+    modal.querySelector('#clear-cache').addEventListener('click', function() {
+        if (confirm('确定要清除所有缓存数据吗？这将删除所有基金数据和设置。')) {
+            localStorage.clear();
+            alert('缓存已清除');
+            document.body.removeChild(modal);
+            // 重新加载页面
+            location.reload();
+        }
     });
 }
 
