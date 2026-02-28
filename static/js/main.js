@@ -498,11 +498,24 @@ function showFundDetails(fund) {
         const buyShares = parseInt(document.getElementById('buy-shares').value) || 0;
         
         if (buyShares > 0) {
-            // 保存买入记录 - 这里暂时使用当前净值，后续可以通过API获取历史净值
+            // 尝试获取购买当天的净值
+            let buyNav = fund.prices[fund.prices.length - 1]; // 默认使用当前净值
+            
+            // 尝试从历史数据中查找对应日期的净值
+            if (fund.dates && fund.prices) {
+                for (let i = 0; i < fund.dates.length; i++) {
+                    if (fund.dates[i] === buyDate) {
+                        buyNav = fund.prices[i];
+                        break;
+                    }
+                }
+            }
+            
+            // 保存买入记录
             const buyRecord = {
                 date: buyDate,
                 shares: buyShares,
-                nav: fund.prices[fund.prices.length - 1]
+                nav: buyNav
             };
             saveBuyRecord(fund.id, buyRecord);
             
