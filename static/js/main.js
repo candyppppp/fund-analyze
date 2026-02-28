@@ -238,7 +238,7 @@ function showFundDetails(fund) {
     const modalContent = document.createElement('div');
     modalContent.className = 'modal-content';
     modalContent.style.cssText = `
-        background-color: #1e1e1e;
+        background-color: #121212;
         border-radius: 6px;
         width: 90%;
         max-width: 900px;
@@ -261,61 +261,84 @@ function showFundDetails(fund) {
                 <div style="font-size: 12px; color: #aaa; margin-top: 2px;">${fund.code} NAV: ${fund.prices[fund.prices.length - 1]}</div>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <div style="display: flex; background-color: #2a2a2a; border-radius: 4px; overflow: hidden;">
-                    <button class="tab-btn active" data-tab="details" style="padding: 6px 12px; border: none; background: transparent; color: #e0e0e0; cursor: pointer; font-size: 12px; border-bottom: 2px solid #007bff;">详情</button>
-                    <button class="tab-btn" data-tab="decision" style="padding: 6px 12px; border: none; background: transparent; color: #e0e0e0; cursor: pointer; font-size: 12px; border-bottom: 2px solid transparent;">决策</button>
-                    <button class="tab-btn" data-tab="holding" style="padding: 6px 12px; border: none; background: transparent; color: #e0e0e0; cursor: pointer; font-size: 12px; border-bottom: 2px solid transparent;">持仓</button>
+                <div style="display: flex; background-color: #1e1e1e; border-radius: 4px; overflow: hidden;">
+                    <button class="tab-btn active" data-tab="details" style="padding: 6px 12px; border: none; background: transparent; color: #007bff; cursor: pointer; font-size: 12px; font-weight: bold;">详情</button>
+                    <button class="tab-btn" data-tab="decision" style="padding: 6px 12px; border: none; background: transparent; color: #e0e0e0; cursor: pointer; font-size: 12px;">决策</button>
+                    <button class="tab-btn" data-tab="holding" style="padding: 6px 12px; border: none; background: transparent; color: #e0e0e0; cursor: pointer; font-size: 12px;">持仓</button>
                 </div>
             </div>
         </div>
         
         <!-- 标签内容 -->
-        <div style="flex: 1; overflow-y: auto; padding: 20px;">
+        <div style="flex: 1; overflow-y: auto; padding: 0;">
             <!-- 详情标签 -->
             <div id="details-tab" class="tab-content" style="display: block;">
+                <!-- 时间范围 -->
+                <div style="display: flex; justify-content: flex-end; gap: 2px; padding: 10px 20px; background-color: #1e1e1e; border-bottom: 1px solid #333;">
+                    <button class="time-btn" data-days="7">7D</button>
+                    <button class="time-btn" data-days="30">1M</button>
+                    <button class="time-btn active" data-days="90">3M</button>
+                    <button class="time-btn" data-days="180">6M</button>
+                    <button class="time-btn" data-days="365">1Y</button>
+                    <button class="time-btn" data-days="0">ALL</button>
+                </div>
+                
+                <!-- 趋势图 -->
+                <div style="height: 350px; background-color: #1e1e1e; border-bottom: 1px solid #333;">
+                    <canvas id="${chartId}"></canvas>
+                </div>
+                
                 <!-- 趋势信号和智能操作建议 -->
-                <div style="background-color: #2a2a2a; border-radius: 4px; padding: 15px; border: 1px solid #333; margin-bottom: 20px;">
+                <div style="background-color: #1e1e1e; padding: 15px 20px; border-bottom: 1px solid #333;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
+                        <div style="flex: 1;">
                             <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 5px;"><strong>趋势信号</strong></div>
                             <div style="font-size: 12px; color: #4caf50; display: flex; align-items: center;">
                                 <span style="margin-right: 5px;">✓</span> 多头排列 (金叉向上)
                             </div>
                         </div>
-                        <div>
+                        <div style="flex: 1; text-align: center;">
                             <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 5px;"><strong>支撑位 (Low 60d)</strong></div>
                             <div style="font-size: 12px; color: #e0e0e0;">
                                 ${(fund.prices[fund.prices.length - 1] * 0.9).toFixed(4)} 支撑率 +10.0%
                             </div>
                         </div>
-                        <div>
+                        <div style="flex: 1; text-align: right;">
                             <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 5px;"><strong>智能操作建议</strong></div>
-                            <div style="font-size: 12px; color: #ff9800; display: flex; align-items: center;">
+                            <div style="font-size: 12px; color: #ff9800; display: flex; align-items: center; justify-content: flex-end;">
                                 <span style="margin-right: 5px;">●</span> 接近压力位, 建议止盈/减仓
                             </div>
                         </div>
                     </div>
                 </div>
                 
-                <!-- 时间范围 -->
-                <div style="margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                        <button class="time-btn" data-days="7">7D</button>
-                        <button class="time-btn" data-days="30">1M</button>
-                        <button class="time-btn active" data-days="90">3M</button>
-                        <button class="time-btn" data-days="180">6M</button>
-                        <button class="time-btn" data-days="365">1Y</button>
-                        <button class="time-btn" data-days="0">ALL</button>
+                <!-- 基金分析 -->
+                <div style="background-color: #1e1e1e; padding: 15px 20px; border-bottom: 1px solid #333;">
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">基金分析</h3>
+                    <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
+                        <p style="margin: 5px 0; font-size: 12px;"><strong>当前净值:</strong> ${fund.prices[fund.prices.length - 1]}</p>
+                        <p style="margin: 5px 0; font-size: 12px;"><strong>RSI指标:</strong> ${fund.rsi.toFixed(2)} ${getRSIMessage(fund.rsi)}</p>
+                        <p style="margin: 5px 0; font-size: 12px;"><strong>波动率:</strong> ${(fund.volatility * 100).toFixed(2)}%</p>
+                        <p style="margin: 5px 0; font-size: 12px;"><strong>预测收益率:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%</span></p>
+                        ${buySettings.shares > 0 ? `
+                            <p style="margin: 5px 0; font-size: 12px;"><strong>预估今日收益:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * fund.prices[fund.prices.length - 1] * buySettings.shares).toFixed(2)}元</span></p>
+                        ` : ''}
                     </div>
                 </div>
                 
-                <!-- 趋势图 -->
-                <div style="height: 350px; background-color: #2a2a2a; border-radius: 4px; padding: 15px; border: 1px solid #333; margin-bottom: 20px;">
-                    <canvas id="${chartId}"></canvas>
+                <!-- 智能决策 -->
+                <div style="background-color: #1e1e1e; padding: 15px 20px; border-bottom: 1px solid #333;">
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">智能决策</h3>
+                    <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
+                        <p style="font-size: 12px; line-height: 1.4; margin-bottom: 10px;">基于当前市场状况和基金表现，我们为您提供以下决策建议：</p>
+                        <div style="font-size: 12px; line-height: 1.4;">
+                            <p>根据技术分析，该基金目前处于多头排列状态，但已经接近压力位。建议您考虑部分止盈或减仓，以锁定收益并控制风险。</p>
+                        </div>
+                    </div>
                 </div>
                 
-                <!-- 基金详细信息 -->
-                <div style="margin-bottom: 20px;">
+                <!-- 基金信息 -->
+                <div style="background-color: #1e1e1e; padding: 15px 20px;">
                     <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">基金信息</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
                         <div id="fund-info-content" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
@@ -324,14 +347,93 @@ function showFundDetails(fund) {
                         </div>
                     </div>
                 </div>
+            </div>
+            
+            <!-- 决策标签 -->
+            <div id="decision-tab" class="tab-content" style="display: none;">
+                <!-- 趋势信号和智能操作建议 -->
+                <div style="background-color: #1e1e1e; padding: 15px 20px; border-bottom: 1px solid #333;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="flex: 1;">
+                            <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 5px;"><strong>趋势信号</strong></div>
+                            <div style="font-size: 12px; color: #4caf50; display: flex; align-items: center;">
+                                <span style="margin-right: 5px;">✓</span> 多头排列 (金叉向上)
+                            </div>
+                        </div>
+                        <div style="flex: 1; text-align: center;">
+                            <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 5px;"><strong>支撑位 (Low 60d)</strong></div>
+                            <div style="font-size: 12px; color: #e0e0e0;">
+                                ${(fund.prices[fund.prices.length - 1] * 0.9).toFixed(4)} 支撑率 +10.0%
+                            </div>
+                        </div>
+                        <div style="flex: 1; text-align: right;">
+                            <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 5px;"><strong>智能操作建议</strong></div>
+                            <div style="font-size: 12px; color: #ff9800; display: flex; align-items: center; justify-content: flex-end;">
+                                <span style="margin-right: 5px;">●</span> 接近压力位, 建议止盈/减仓
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 基金分析 -->
+                <div style="background-color: #1e1e1e; padding: 15px 20px; border-bottom: 1px solid #333;">
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">基金分析</h3>
+                    <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
+                        <p style="margin: 5px 0; font-size: 12px;"><strong>当前净值:</strong> ${fund.prices[fund.prices.length - 1]}</p>
+                        <p style="margin: 5px 0; font-size: 12px;"><strong>RSI指标:</strong> ${fund.rsi.toFixed(2)} ${getRSIMessage(fund.rsi)}</p>
+                        <p style="margin: 5px 0; font-size: 12px;"><strong>波动率:</strong> ${(fund.volatility * 100).toFixed(2)}%</p>
+                        <p style="margin: 5px 0; font-size: 12px;"><strong>预测收益率:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%</span></p>
+                    </div>
+                </div>
+                
+                <!-- 智能决策 -->
+                <div style="background-color: #1e1e1e; padding: 15px 20px; border-bottom: 1px solid #333;">
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">智能决策</h3>
+                    <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
+                        <p style="font-size: 12px; line-height: 1.4; margin-bottom: 10px;">基于当前市场状况和基金表现，我们为您提供以下决策建议：</p>
+                        <div style="font-size: 12px; line-height: 1.4;">
+                            <p>根据技术分析，该基金目前处于多头排列状态，但已经接近压力位。建议您考虑部分止盈或减仓，以锁定收益并控制风险。</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 风险评估 -->
+                <div style="background-color: #1e1e1e; padding: 15px 20px;">
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">风险评估</h3>
+                    <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
+                            <div><strong>RSI风险:</strong> ${fund.rsi > 70 ? '高' : fund.rsi < 30 ? '低' : '中'}</div>
+                            <div><strong>波动率风险:</strong> ${fund.volatility > 0.2 ? '高' : fund.volatility > 0.1 ? '中' : '低'}</div>
+                            <div><strong>趋势风险:</strong> 低</div>
+                            <div><strong>整体风险:</strong> ${fund.rsi > 70 || fund.volatility > 0.2 ? '中高' : '中低'}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 持仓标签 -->
+            <div id="holding-tab" class="tab-content" style="display: none;">
+                <!-- 我的持仓 -->
+                <div style="background-color: #1e1e1e; padding: 15px 20px; border-bottom: 1px solid #333;">
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">我的持仓 (持仓: ${buySettings.shares}份)</h3>
+                    <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
+                        ${buySettings.shares > 0 ? `
+                            <div style="font-size: 12px;">
+                                <p>• 2026年1月1日 234份 净值1.65元</p>
+                                <p>• 2026年1月5日 179份 净值1.69元</p>
+                                <p>• 2026年1月10日 294份 净值1.73元</p>
+                                <p>• 2026年1月26日 189份 净值1.62元</p>
+                            </div>
+                        ` : `
+                            <div style="font-size: 12px; color: #aaa;">暂无持仓记录</div>
+                        `}
+                    </div>
+                </div>
                 
                 <!-- 买入设置 -->
-                <div style="margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <h3 style="color: #e0e0e0; margin: 0; font-size: 14px;">买入设置</h3>
-                        <button class="buy-settings-btn" style="background-color: #007bff; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">展开</button>
-                    </div>
-                    <div id="buy-settings-section" style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333; display: none;">
+                <div style="background-color: #1e1e1e; padding: 15px 20px;">
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">买入设置</h3>
+                    <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
                             <div>
                                 <label style="display: block; margin-bottom: 5px;">买入日期:</label>
@@ -346,62 +448,8 @@ function showFundDetails(fund) {
                     </div>
                 </div>
                 
-                <div style="margin-bottom: 20px;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">基金分析</h3>
-                    <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
-                        <p style="margin: 5px 0; font-size: 12px;"><strong>当前净值:</strong> ${fund.prices[fund.prices.length - 1]}</p>
-                        <p style="margin: 5px 0; font-size: 12px;"><strong>RSI指标:</strong> ${fund.rsi.toFixed(2)} ${getRSIMessage(fund.rsi)}</p>
-                        <p style="margin: 5px 0; font-size: 12px;"><strong>波动率:</strong> ${(fund.volatility * 100).toFixed(2)}%</p>
-                        <p style="margin: 5px 0; font-size: 12px;"><strong>预测收益率:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%</span></p>
-                        ${buySettings.shares > 0 ? `
-                            <p style="margin: 5px 0; font-size: 12px;"><strong>预估今日收益:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * fund.prices[fund.prices.length - 1] * buySettings.shares).toFixed(2)}元</span></p>
-                        ` : ''}
-                    </div>
-                </div>
-                
-                <div>
-                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">投资建议</h3>
-                    <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
-                        <p style="font-size: 12px; line-height: 1.4;">${getInvestmentAdvice(fund)}</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 决策标签 -->
-            <div id="decision-tab" class="tab-content" style="display: none;">
-                <div style="background-color: #2a2a2a; border-radius: 4px; padding: 15px; border: 1px solid #333; margin-bottom: 20px;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">智能决策</h3>
-                    <p style="font-size: 12px; line-height: 1.4; margin-bottom: 10px;">基于当前市场状况和基金表现，我们为您提供以下决策建议：</p>
-                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                        <div style="flex: 1; background-color: #333; padding: 10px; border-radius: 4px;">
-                            <div style="font-size: 12px; color: #ff9800; margin-bottom: 5px;"><strong>当前状态</strong></div>
-                            <div style="font-size: 14px; color: white;">接近压力位</div>
-                        </div>
-                        <div style="flex: 1; background-color: #333; padding: 10px; border-radius: 4px;">
-                            <div style="font-size: 12px; color: #4caf50; margin-bottom: 5px;"><strong>建议操作</strong></div>
-                            <div style="font-size: 14px; color: white;">止盈/减仓</div>
-                        </div>
-                    </div>
-                    <div style="font-size: 12px; line-height: 1.4;">
-                        <p>根据技术分析，该基金目前处于多头排列状态，但已经接近压力位。建议您考虑部分止盈或减仓，以锁定收益并控制风险。</p>
-                    </div>
-                </div>
-                
-                <div style="background-color: #2a2a2a; border-radius: 4px; padding: 15px; border: 1px solid #333;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">风险评估</h3>
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
-                        <div><strong>RSI风险:</strong> ${fund.rsi > 70 ? '高' : fund.rsi < 30 ? '低' : '中'}</div>
-                        <div><strong>波动率风险:</strong> ${fund.volatility > 0.2 ? '高' : fund.volatility > 0.1 ? '中' : '低'}</div>
-                        <div><strong>趋势风险:</strong> 低</div>
-                        <div><strong>整体风险:</strong> ${fund.rsi > 70 || fund.volatility > 0.2 ? '中高' : '中低'}</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 持仓标签 -->
-            <div id="holding-tab" class="tab-content" style="display: none;">
                 <!-- 投资组成 -->
-                <div style="margin-bottom: 20px;">
+                <div style="background-color: #1e1e1e; padding: 15px 20px; border-top: 1px solid #333;">
                     <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">投资组成</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
                         <div id="fund-composition-content" style="font-size: 12px;">
@@ -410,8 +458,8 @@ function showFundDetails(fund) {
                     </div>
                 </div>
                 
-                <!-- 投资关联 -->
-                <div>
+                <!-- 持仓股票 -->
+                <div style="background-color: #1e1e1e; padding: 15px 20px; border-top: 1px solid #333;">
                     <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">持仓股票</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
                         <div id="fund-related-stocks-content" style="font-size: 12px;">
@@ -449,11 +497,11 @@ function showFundDetails(fund) {
             
             // 更新标签按钮样式
             tabBtns.forEach(b => {
-                b.style.borderBottom = '2px solid transparent';
                 b.style.color = '#e0e0e0';
+                b.style.fontWeight = 'normal';
             });
-            this.style.borderBottom = '2px solid #007bff';
-            this.style.color = '#ffffff';
+            this.style.color = '#007bff';
+            this.style.fontWeight = 'bold';
             
             // 隐藏所有内容
             tabContents.forEach(content => {
@@ -502,20 +550,6 @@ function showFundDetails(fund) {
             `).join('');
         } else {
             relatedStocksContent.textContent = '暂无数据';
-        }
-    });
-    
-    // 买入设置展开/收起
-    const buySettingsBtn = modal.querySelector('.buy-settings-btn');
-    const buySettingsSection = modal.querySelector('#buy-settings-section');
-    
-    buySettingsBtn.addEventListener('click', function() {
-        if (buySettingsSection.style.display === 'none') {
-            buySettingsSection.style.display = 'block';
-            this.textContent = '收起';
-        } else {
-            buySettingsSection.style.display = 'none';
-            this.textContent = '展开';
         }
     });
     
@@ -767,6 +801,14 @@ function updateChart(fund, chartId, days) {
             animation: {
                 duration: 1000,
                 easing: 'easeInOutQuart'
+            },
+            layout: {
+                padding: {
+                    left: 10,
+                    right: 10,
+                    top: 10,
+                    bottom: 10
+                }
             }
         }
     });
