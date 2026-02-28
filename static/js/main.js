@@ -351,7 +351,7 @@ function showFundDetails(fund) {
             <div id="holding-tab" class="tab-content" style="display: none;">
                 <!-- 我的持仓 -->
                 <div style="background-color: #1e1e1e; padding: 15px 20px; border-bottom: 1px solid #333;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">我的持仓 (持仓: <span id="total-shares">${buySettings.shares}</span>份)</h3>
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">我的持仓 (持仓: <span id="total-shares">${buySettings.shares}</span>份，平均净值: <span id="avg-nav">0.0000</span>元)</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
                         <div id="buy-records-content" style="font-size: 12px;">
                             加载中...
@@ -425,21 +425,57 @@ function showFundDetails(fund) {
     // 加载买入记录
     function loadBuyRecords() {
         const buyRecords = getBuyRecords(fund.id);
+        // 按日期从旧到新排序
+        buyRecords.sort((a, b) => new Date(a.date) - new Date(b.date));
         const buyRecordsContent = modal.querySelector('#buy-records-content');
         const totalSharesElement = modal.querySelector('#total-shares');
+        const avgNavElement = modal.querySelector('#avg-nav');
         
         if (buyRecords.length > 0) {
             let recordsHTML = '';
             let totalShares = 0;
-            buyRecords.forEach(record => {
-                recordsHTML += `<p>• ${record.date} ${record.shares}份 净值${record.nav}元</p>`;
+            let totalAmount = 0;
+            buyRecords.forEach((record, index) => {
+                recordsHTML += `<p style="display: flex; justify-content: space-between; align-items: center;">• ${record.date} ${record.shares}份 净值${record.nav}元 <span class="delete-record" data-index="${index}" style="cursor: pointer; color: #ff4444; margin-left: 10px;">x</span></p>`;
                 totalShares += record.shares;
+                totalAmount += record.shares * record.nav;
             });
             buyRecordsContent.innerHTML = recordsHTML;
             totalSharesElement.textContent = totalShares;
+            const avgNav = totalAmount / totalShares;
+            avgNavElement.textContent = avgNav.toFixed(4);
+            
+            // 添加删除事件监听
+            document.querySelectorAll('.delete-record').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const index = parseInt(this.getAttribute('data-index'));
+                    deleteBuyRecord(fund.id, index);
+                    loadBuyRecords();
+                    // 更新总持仓设置
+                    const updatedRecords = getBuyRecords(fund.id);
+                    const updatedTotalShares = updatedRecords.reduce((total, record) => total + record.shares, 0);
+                    const buySettings = {
+                        date: new Date().toISOString().split('T')[0],
+                        shares: updatedTotalShares
+                    };
+                    localStorage.setItem(`fundBuySettings_${fund.id}`, JSON.stringify(buySettings));
+                    // 重新加载页面以更新预估收益
+                    loadFunds();
+                });
+            });
         } else {
             buyRecordsContent.textContent = '暂无持仓记录';
             totalSharesElement.textContent = '0';
+            avgNavElement.textContent = '0.0000';
+        }
+    }
+    
+    // 删除买入记录
+    function deleteBuyRecord(fundId, index) {
+        const records = getBuyRecords(fundId);
+        if (index >= 0 && index < records.length) {
+            records.splice(index, 1);
+            localStorage.setItem(`fundBuyRecords_${fundId}`, JSON.stringify(records));
         }
     }
     
