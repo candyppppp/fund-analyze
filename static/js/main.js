@@ -366,11 +366,11 @@ function showFundDetails(fund) {
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
                             <div>
                                 <label style="display: block; margin-bottom: 5px;">买入日期:</label>
-                                <input type="date" id="buy-date" value="${buySettings.date}" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 5px; border-radius: 4px; font-size: 12px;">
+                                <input type="date" id="buy-date" value="${new Date().toISOString().split('T')[0]}" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 5px; border-radius: 4px; font-size: 12px;">
                             </div>
                             <div>
                                 <label style="display: block; margin-bottom: 5px;">买入份数:</label>
-                                <input type="number" id="buy-shares" value="${buySettings.shares}" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 5px; border-radius: 4px; font-size: 12px;">
+                                <input type="number" id="buy-shares" value="0" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 5px; border-radius: 4px; font-size: 12px;">
                             </div>
                         </div>
                         <button id="save-buy-settings" style="margin-top: 10px; background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">保存设置</button>
@@ -436,7 +436,7 @@ function showFundDetails(fund) {
             let totalShares = 0;
             let totalAmount = 0;
             buyRecords.forEach((record, index) => {
-                recordsHTML += `<p style="display: flex; justify-content: space-between; align-items: center;">• ${record.date} ${record.shares}份 净值${record.nav}元 <span class="delete-record" data-index="${index}" style="cursor: pointer; color: #ff4444; margin-left: 10px;">x</span></p>`;
+                recordsHTML += `<p style="display: flex; align-items: center;">• ${record.date} ${record.shares}份 净值${record.nav}元<span class="delete-record" data-index="${index}" style="cursor: pointer; color: #ff4444; margin-left: 10px; opacity: 0; transition: opacity 0.2s;">x</span></p>`;
                 totalShares += record.shares;
                 totalAmount += record.shares * record.nav;
             });
@@ -444,6 +444,16 @@ function showFundDetails(fund) {
             totalSharesElement.textContent = totalShares;
             const avgNav = totalAmount / totalShares;
             avgNavElement.textContent = avgNav.toFixed(4);
+            
+            // 添加hover效果
+            document.querySelectorAll('#buy-records-content p').forEach((p, index) => {
+                p.addEventListener('mouseenter', function() {
+                    this.querySelector('.delete-record').style.opacity = '1';
+                });
+                p.addEventListener('mouseleave', function() {
+                    this.querySelector('.delete-record').style.opacity = '0';
+                });
+            });
             
             // 添加删除事件监听
             document.querySelectorAll('.delete-record').forEach(btn => {
@@ -488,7 +498,7 @@ function showFundDetails(fund) {
         const buyShares = parseInt(document.getElementById('buy-shares').value) || 0;
         
         if (buyShares > 0) {
-            // 保存买入记录
+            // 保存买入记录 - 这里暂时使用当前净值，后续可以通过API获取历史净值
             const buyRecord = {
                 date: buyDate,
                 shares: buyShares,
