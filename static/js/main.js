@@ -1,3 +1,8 @@
+
+
+// 导入技术分析模块
+import { calculateMA, calculateSupportResistance, calculateBollingerBands, calculateMACD, calculateKDJ, calculateATR } from './technical-analysis.js';
+
 document.addEventListener('DOMContentLoaded', function() {
     loadFunds();
     loadRealTimeNews();
@@ -33,14 +38,70 @@ function loadRealTimeNews() {
         });
 }
 
+// 市场数据缓存
+let marketDataCache = null;
+let marketDataTimestamp = 0;
+const MARKET_DATA_EXPIRY = 60000; // 市场数据缓存时间（毫秒），1分钟
+
+// 获取市场数据（带缓存）
+function getMarketData() {
+    const now = Date.now();
+    // 检查缓存是否有效
+    if (marketDataCache && (now - marketDataTimestamp) < MARKET_DATA_EXPIRY) {
+        console.log('从本地缓存获取市场数据');
+        return Promise.resolve(marketDataCache);
+    }
+    
+    // 缓存过期，从API获取新数据
+    console.log('从API获取市场数据');
+    return fetch('http://localhost:8888/api/funds/000001/holdings')
+        .then(response => response.json())
+        .then(data => {
+            // 更新缓存
+            marketDataCache = data.market_data;
+            marketDataTimestamp = now;
+            return marketDataCache;
+        })
+        .catch(error => {
+            console.error('获取市场数据失败:', error);
+            // 如果获取失败，返回缓存数据（如果有）
+            return marketDataCache;
+        });
+}
+
 function loadFunds() {
     // 强制从API获取最新数据，而不是使用本地存储的旧数据
     fetch('/api/funds')
         .then(response => response.json())
         .then(funds => {
+            // 先获取市场数据
+            return getMarketData().then(marketData => {
+                // 为每个基金获取股票持仓数据，用于更准确的预测
+                const fundPromises = funds.map(fund => {
+                    return fetch(`http://localhost:8888/api/funds/${fund.code}/holdings`)
+                        .then(response => response.json())
+                        .then(holdings => {
+                            // 将股票持仓数据和市场数据添加到基金对象
+                            fund.stock_holdings = holdings;
+                            fund.market_data = marketData; // 使用共享的市场数据
+                            return fund;
+                        })
+                        .catch(error => {
+                            console.error(`获取基金 ${fund.code} 持仓数据失败:`, error);
+                            // 如果获取失败，继续使用原基金数据，但添加市场数据
+                            fund.market_data = marketData;
+                            return fund;
+                        });
+                });
+                
+                // 等待所有基金的持仓数据获取完成
+                return Promise.all(fundPromises);
+            });
+        })
+        .then(updatedFunds => {
             // 保存到本地存储
-            localStorage.setItem('funds', JSON.stringify(funds));
-            renderFunds(funds);
+            localStorage.setItem('funds', JSON.stringify(updatedFunds));
+            renderFunds(updatedFunds);
         })
         .catch(error => {
             console.error('获取基金数据失败:', error);
@@ -84,8 +145,47 @@ function renderFunds(funds) {
         // 计算预估今日收益
         let estimatedReturn = 0;
         if (buySettings.shares > 0) {
-            estimatedReturn = fund.predicted_return * fund.prices[fund.prices.length - 1] * buySettings.shares;
+            // 基于股票持仓数据和市场数据计算更准确的预估收益
+            let adjustedPredictedReturn = fund.predicted_return;
+            
+            // 如果有股票持仓数据，使用它来调整预测收益率
+            if (fund.stock_holdings && fund.stock_holdings.stocks && fund.stock_holdings.stocks.length > 0) {
+                const totalWeight = fund.stock_holdings.stocks.reduce((sum, stock) => sum + stock.weight, 0);
+                if (totalWeight > 0) {
+                    const weightedReturn = fund.stock_holdings.stocks.reduce((sum, stock) => {
+                        return sum + (stock.weight * (stock.change_ratio || 0));
+                    }, 0) / totalWeight;
+                    // 结合原始预测和股票持仓预测
+                    adjustedPredictedReturn = (fund.predicted_return * 0.4 + weightedReturn * 0.6);
+                }
+            }
+            
+            // 如果有市场数据，进一步调整预测收益率
+            if (fund.market_data) {
+                // 计算大盘平均涨跌幅
+                const indices = fund.market_data.indices || {};
+                const indexChanges = Object.values(indices).map(index => index.change_ratio || 0);
+                if (indexChanges.length > 0) {
+                    const avgIndexChange = indexChanges.reduce((sum, change) => sum + change, 0) / indexChanges.length;
+                    // 大盘对基金的影响
+                    adjustedPredictedReturn += avgIndexChange * 0.05;
+                }
+                
+                // 计算行业板块平均涨跌幅
+                const sectors = fund.market_data.sectors || {};
+                const sectorChanges = Object.values(sectors).map(sector => sector.change_ratio || 0);
+                if (sectorChanges.length > 0) {
+                    const avgSectorChange = sectorChanges.reduce((sum, change) => sum + change, 0) / sectorChanges.length;
+                    // 板块对基金的影响
+                    adjustedPredictedReturn += avgSectorChange * 0.03;
+                }
+            }
+            
+            estimatedReturn = adjustedPredictedReturn * fund.prices[fund.prices.length - 1] * buySettings.shares;
         }
+        
+        // 获取预测置信度
+        const confidence = fund.prediction_confidence || 0.5;
         
         // 获取RSI状态和emoji
         function getRSIStatus(rsi) {
@@ -136,27 +236,33 @@ function renderFunds(funds) {
                 </div>
             </div>
             <div class="fund-performance">
-                <div class="fund-return-container">
-                    <div class="fund-return ${previousDayReturn < 0 ? 'negative' : ''}">
-                        ${previousDayReturn >= 0 ? '+' : ''}${(previousDayReturn * 100).toFixed(2)}%
-                    </div>
-                    <div class="fund-return-label">Previous Day</div>
-                </div>
-                <div class="fund-return-container">
-                    <div class="fund-return ${fund.predicted_return < 0 ? 'negative' : ''}">
-                        ${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%
-                    </div>
-                    <div class="fund-return-label">Real-time Return</div>
-                </div>
-                ${buySettings.shares > 0 ? `
                     <div class="fund-return-container">
-                        <div class="fund-return ${estimatedReturn >= 0 ? '' : 'negative'}">
-                            ${estimatedReturn >= 0 ? '+' : ''}${estimatedReturn.toFixed(2)}元
+                        <div class="fund-return ${previousDayReturn < 0 ? 'negative' : ''}">
+                            ${previousDayReturn >= 0 ? '+' : ''}${(previousDayReturn * 100).toFixed(2)}%
                         </div>
-                        <div class="fund-return-label">Live Profit</div>
+                        <div class="fund-return-label">Previous Day</div>
                     </div>
-                ` : ''}
-            </div>
+                    <div class="fund-return-container">
+                        <div class="fund-return ${fund.predicted_return < 0 ? 'negative' : ''}">
+                            ${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%
+                        </div>
+                        <div class="fund-return-label">Real-time Return</div>
+                    </div>
+                    <div class="fund-return-container">
+                        <div class="fund-return" style="color: #4CAF50;">
+                            ${(confidence * 100).toFixed(0)}%
+                        </div>
+                        <div class="fund-return-label">Confidence</div>
+                    </div>
+                    ${buySettings.shares > 0 ? `
+                        <div class="fund-return-container">
+                            <div class="fund-return ${estimatedReturn >= 0 ? '' : 'negative'}">
+                                ${estimatedReturn >= 0 ? '+' : ''}${estimatedReturn.toFixed(2)}元
+                            </div>
+                            <div class="fund-return-label">Live Profit</div>
+                        </div>
+                    ` : ''}
+                </div>
         `;
         
         // 添加点击事件
@@ -295,129 +401,123 @@ function showFundDetails(fund) {
                 </div>
                 
                 <!-- 趋势图 -->
-                <div style="height: 350px; background-color: #000000; border-bottom: 1px solid #333;">
+                <div style="height: 350px; background-color: #000000; border-bottom: 1px solid #333; margin-bottom: 20px;">
                     <canvas id="${chartId}"></canvas>
+                </div>
+                
+                <!-- 技术指标 -->
+                <div style="height: 300px; background-color: #000000; border-bottom: 1px solid #333;">
+                    <canvas id="${chartId}-tech"></canvas>
+                </div>
+                
+                <!-- 持仓股票 -->
+                <div style="padding: 10px 20px; border-bottom: 1px solid #333;">
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px; white-space: nowrap;">持仓股票</h3>
+                    <div id="stock-holdings" style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
+                        <div style="font-size: 12px; color: #aaa;">加载中...</div>
+                    </div>
                 </div>
             </div>
             
             <!-- 决策标签 -->
             <div id="decision-tab" class="tab-content" style="display: none;">
-                <!-- 趋势信号和智能操作建议 -->
-                <div style="padding: 10px 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 15px;">
-                        <div style="flex: 1;">
-                            <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px;"><strong>趋势信号</strong></div>
-                            ${(() => {
-                                // 计算趋势信号
-                                let trendSignal = '';
-                                let trendColor = '';
-                                let trendDesc = '';
-                                let priceChange = 0;
-                                let trendIcon = '●';
-                                
-                                if (fund.prices && fund.prices.length >= 2) {
-                                    const recentPrice = fund.prices[fund.prices.length - 1];
-                                    const previousPrice = fund.prices[fund.prices.length - 2];
-                                    priceChange = recentPrice - previousPrice;
-                                    
-                                    if (priceChange > 0) {
-                                        trendSignal = '多头排列 (金叉向上)';
-                                        trendColor = '#4caf50';
-                                        trendDesc = '短期均线位于长期均线上方，价格呈上升趋势，市场情绪积极。';
-                                        trendIcon = '✓';
-                                    } else if (priceChange < 0) {
-                                        trendSignal = '空头排列 (死叉向下)';
-                                        trendColor = '#ff4444';
-                                        trendDesc = '短期均线位于长期均线下方，价格呈下降趋势，市场情绪消极。';
-                                        trendIcon = '✗';
-                                    } else {
-                                        trendSignal = '震荡整理';
-                                        trendColor = '#ff9800';
-                                        trendDesc = '价格在一定范围内波动，市场情绪中性。';
-                                        trendIcon = '●';
-                                    }
-                                } else {
-                                    trendSignal = '数据不足';
-                                    trendColor = '#aaa';
-                                    trendDesc = '价格数据不足，无法判断趋势。';
-                                    trendIcon = '●';
-                                }
-                                
-                                return `
-                                    <div style="font-size: 12px; color: ${trendColor}; display: flex; align-items: center; margin-bottom: 8px; white-space: nowrap;">
-                                        <span style="margin-right: 8px;">${trendIcon}</span> ${trendSignal}
-                                    </div>
-                                    <div style="font-size: 11px; color: #aaa; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                        ${trendDesc}
-                                    </div>
-                                `;
-                            })()}
-                        </div>
-                        <div style="flex: 1; text-align: center;">
-                            <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px; white-space: nowrap;"><strong>支撑位 (Low 60d)</strong></div>
-                            <div style="font-size: 12px; color: #e0e0e0; margin-bottom: 8px; white-space: nowrap;">
-                                ${fund.prices && fund.prices.length > 0 ? (Math.min(...fund.prices)).toFixed(4) : '数据不足'}
-                            </div>
-                            <div style="font-size: 11px; color: #4caf50; white-space: nowrap;">
-                                ${fund.prices && fund.prices.length > 0 ? `支撑率 +${((fund.prices[fund.prices.length - 1] / Math.min(...fund.prices) - 1) * 100).toFixed(1)}%` : '-'}
-                            </div>
-                        </div>
-                        <div style="flex: 1; text-align: right;">
-                            <div style="font-size: 14px; color: #e0e0e0; margin-bottom: 10px; white-space: nowrap;"><strong>智能操作建议</strong></div>
-                            ${(() => {
-                                // 基于RSI和预测收益率生成操作建议
-                                let advice = '';
-                                let adviceColor = '';
-                                let adviceDesc = '';
-                                
-                                if (fund.rsi > 70) {
-                                    advice = 'RSI过热, 建议止盈';
-                                    adviceColor = '#ff4444';
-                                    adviceDesc = 'RSI指标过高，当前基金处于超买状态，建议及时止盈，避免追高风险。';
-                                } else if (fund.rsi < 30) {
-                                    advice = 'RSI超卖, 建议买入';
-                                    adviceColor = '#4caf50';
-                                    adviceDesc = 'RSI指标过低，当前基金处于超卖状态，可能存在反弹机会，建议适当买入。';
-                                } else if (fund.predicted_return > 0.01) {
-                                    advice = '看涨信号, 建议持有';
-                                    adviceColor = '#4caf50';
-                                    adviceDesc = '预测收益率为正，短期可能有上涨空间，建议继续持有。';
-                                } else if (fund.predicted_return < -0.01) {
-                                    advice = '看跌信号, 建议减仓';
-                                    adviceColor = '#ff4444';
-                                    adviceDesc = '预测收益率为负，短期可能面临调整，建议适当减仓。';
-                                } else {
-                                    advice = '震荡行情, 建议观望';
-                                    adviceColor = '#ff9800';
-                                    adviceDesc = '市场处于震荡状态，建议保持观望，等待明确信号。';
-                                }
-                                
-                                return `
-                                    <div style="font-size: 12px; color: ${adviceColor}; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 8px; white-space: nowrap;">
-                                        <span style="margin-right: 8px;">●</span> ${advice}
-                                    </div>
-                                    <div style="font-size: 11px; color: #aaa; line-height: 1.3; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                        ${adviceDesc}
-                                    </div>
-                                `;
-                            })()}
-                        </div>
-                    </div>
-                </div>
-                
                 <!-- 基金风险评估 -->
                 <div style="padding: 10px 20px;">
                     <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; white-space: nowrap;">基金风险评估</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 18px; border: 1px solid #333;">
-                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 10px;">
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
                             <div style="font-size: 12px; white-space: nowrap;"><strong>当前净值:</strong> <span style="color: #e0e0e0;">${fund.prices && fund.prices.length > 0 ? fund.prices[fund.prices.length - 1] : '数据不足'}</span></div>
                             <div style="font-size: 12px; white-space: nowrap;"><strong>RSI指标:</strong> <span style="color: #e0e0e0;">${fund.rsi ? fund.rsi.toFixed(2) + ' ' + getRSIMessage(fund.rsi) : '数据不足'}</span></div>
                             <div style="font-size: 12px; white-space: nowrap;"><strong>波动率:</strong> <span style="color: #e0e0e0;">${fund.volatility ? (fund.volatility * 100).toFixed(2) + '%' : '数据不足'}</span></div>
                             <div style="font-size: 12px; white-space: nowrap;"><strong>预测当日收益率:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return ? (fund.predicted_return >= 0 ? '+' : '') + (fund.predicted_return * 100).toFixed(2) + '%' : '数据不足'}</span></div>
+                            <div style="font-size: 12px; white-space: nowrap;"><strong>预测置信度:</strong> <span style="color: #e0e0e0;">${fund.prediction_confidence ? (fund.prediction_confidence * 100).toFixed(0) + '%' : '数据不足'}</span></div>
+                            <div style="font-size: 12px; white-space: nowrap;"><strong>ATR指标:</strong> <span style="color: #e0e0e0;">${fund.atr ? fund.atr.toFixed(4) : '数据不足'}</span></div>
                         </div>
-                        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333;">
-                            <h4 style="color: #e0e0e0; margin: 0 0 10px 0; font-size: 13px; white-space: nowrap;">风险评估</h4>
-                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
+                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333;">
+                            <h4 style="color: #e0e0e0; margin: 0 0 12px 0; font-size: 13px; white-space: nowrap;">技术指标分析</h4>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 12px;">
+                                ${(() => {
+                                    // 计算MACD信号
+                                    let macdSignal = '数据不足';
+                                    let macdSignalColor = '#aaa';
+                                    
+                                    if (fund.macd) {
+                                        const [macdLine, signalLine, histogram] = fund.macd;
+                                        if (macdLine > signalLine) {
+                                            if (histogram > 0) {
+                                                macdSignal = '金叉看多';
+                                                macdSignalColor = '#4caf50';
+                                            } else {
+                                                macdSignal = '金叉初期';
+                                                macdSignalColor = '#8bc34a';
+                                            }
+                                        } else {
+                                            if (histogram < 0) {
+                                                macdSignal = '死叉看空';
+                                                macdSignalColor = '#ff4444';
+                                            } else {
+                                                macdSignal = '死叉初期';
+                                                macdSignalColor = '#ff8a80';
+                                            }
+                                        }
+                                    }
+                                    
+                                    return `<div style="white-space: nowrap;"><strong>MACD信号:</strong> <span style="color: ${macdSignalColor};">${macdSignal}</span></div>`;
+                                })()}
+                                ${(() => {
+                                    // 计算KDJ信号
+                                    let kdjSignal = '数据不足';
+                                    let kdjSignalColor = '#aaa';
+                                    
+                                    if (fund.kdj) {
+                                        const [k, d, j] = fund.kdj;
+                                        if (j > 80) {
+                                            kdjSignal = '超买';
+                                            kdjSignalColor = '#ff4444';
+                                        } else if (j < 20) {
+                                            kdjSignal = '超卖';
+                                            kdjSignalColor = '#4caf50';
+                                        } else if (j > 50) {
+                                            kdjSignal = '多头';
+                                            kdjSignalColor = '#8bc34a';
+                                        } else {
+                                            kdjSignal = '空头';
+                                            kdjSignalColor = '#ff8a80';
+                                        }
+                                    }
+                                    
+                                    return `<div style="white-space: nowrap;"><strong>KDJ信号:</strong> <span style="color: ${kdjSignalColor};">${kdjSignal}</span></div>`;
+                                })()}
+                                ${(() => {
+                                    // 计算布林带信号
+                                    let bollingerSignal = '数据不足';
+                                    let bollingerSignalColor = '#aaa';
+                                    
+                                    if (fund.bollinger_bands && fund.prices && fund.prices.length > 0) {
+                                        const [upperBand, ma, lowerBand] = fund.bollinger_bands;
+                                        const currentPrice = fund.prices[fund.prices.length - 1];
+                                        if (currentPrice > upperBand) {
+                                            bollingerSignal = '突破上轨';
+                                            bollingerSignalColor = '#4caf50';
+                                        } else if (currentPrice < lowerBand) {
+                                            bollingerSignal = '突破下轨';
+                                            bollingerSignalColor = '#ff4444';
+                                        } else if (currentPrice > ma) {
+                                            bollingerSignal = '中轨之上';
+                                            bollingerSignalColor = '#8bc34a';
+                                        } else {
+                                            bollingerSignal = '中轨之下';
+                                            bollingerSignalColor = '#ff8a80';
+                                        }
+                                    }
+                                    
+                                    return `<div style="white-space: nowrap;"><strong>布林带位置:</strong> <span style="color: ${bollingerSignalColor};">${bollingerSignal}</span></div>`;
+                                })()}
+                            </div>
+                        </div>
+                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333;">
+                            <h4 style="color: #e0e0e0; margin: 0 0 12px 0; font-size: 13px; white-space: nowrap;">风险评估</h4>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 12px;">
                                 <div style="white-space: nowrap;"><strong>RSI风险:</strong> <span style="color: ${fund.rsi ? (fund.rsi > 70 ? '#ff4444' : fund.rsi < 30 ? '#4caf50' : '#ff9800') : '#aaa'}">${fund.rsi ? (fund.rsi > 70 ? '高' : fund.rsi < 30 ? '低' : '中') : '数据不足'}</span></div>
                                 <div style="white-space: nowrap;"><strong>波动率风险:</strong> <span style="color: ${fund.volatility ? (fund.volatility > 0.2 ? '#ff4444' : fund.volatility > 0.1 ? '#ff9800' : '#4caf50') : '#aaa'}">${fund.volatility ? (fund.volatility > 0.2 ? '高' : fund.volatility > 0.1 ? '中' : '低') : '数据不足'}</span></div>
                                 ${(() => {
@@ -453,7 +553,7 @@ function showFundDetails(fund) {
                                     
                                     // 计算布林带数据
                                     const bollingerBands = calculateBollingerBands(fund.prices);
-                                    const latestPrice = fund.prices[fund.prices.length - 1];
+                                    const latestPrice = fund.prices && fund.prices.length > 0 ? fund.prices[fund.prices.length - 1] : 0;
                                     const latestUpperBand = bollingerBands.upper[bollingerBands.upper.length - 1];
                                     const latestLowerBand = bollingerBands.lower[bollingerBands.lower.length - 1];
                                     const latestMiddleBand = bollingerBands.middle[bollingerBands.middle.length - 1];
@@ -555,6 +655,220 @@ function showFundDetails(fund) {
                         </div>
                     </div>
                 </div>
+                
+                <!-- 势头信号和智能操作建议 -->
+                <div style="padding: 10px 20px;">
+                    <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; white-space: nowrap;">势头信号</h3>
+                    <div style="background-color: #2a2a2a; border-radius: 4px; padding: 18px; border: 1px solid #333;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;">
+                            <div style="flex: 1;">
+                                <div style="font-size: 13px; color: #e0e0e0; margin-bottom: 12px;"><strong>趋势方向</strong></div>
+                                ${(() => {
+                                    // 计算趋势信号
+                                    let trendSignal = '';
+                                    let trendColor = '';
+                                    let trendDesc = '';
+                                    let priceChange = 0;
+                                    let trendIcon = '●';
+                                    
+                                    if (fund.prices && fund.prices.length >= 2) {
+                                        const recentPrice = fund.prices[fund.prices.length - 1];
+                                        const previousPrice = fund.prices[fund.prices.length - 2];
+                                        priceChange = recentPrice - previousPrice;
+                                        
+                                        if (priceChange > 0) {
+                                            trendSignal = '多头排列 (金叉向上)';
+                                            trendColor = '#4caf50';
+                                            trendDesc = '短期均线位于长期均线上方，价格呈上升趋势，市场情绪积极。';
+                                            trendIcon = '✓';
+                                        } else if (priceChange < 0) {
+                                            trendSignal = '空头排列 (死叉向下)';
+                                            trendColor = '#ff4444';
+                                            trendDesc = '短期均线位于长期均线下方，价格呈下降趋势，市场情绪消极。';
+                                            trendIcon = '✗';
+                                        } else {
+                                            trendSignal = '震荡整理';
+                                            trendColor = '#ff9800';
+                                            trendDesc = '价格在一定范围内波动，市场情绪中性。';
+                                            trendIcon = '●';
+                                        }
+                                    } else {
+                                        trendSignal = '数据不足';
+                                        trendColor = '#aaa';
+                                        trendDesc = '价格数据不足，无法判断趋势。';
+                                        trendIcon = '●';
+                                    }
+                                    
+                                    return `
+                                        <div style="font-size: 12px; color: ${trendColor}; display: flex; align-items: center; margin-bottom: 8px; white-space: nowrap;">
+                                            <span style="margin-right: 8px;">${trendIcon}</span> ${trendSignal}
+                                        </div>
+                                        <div style="font-size: 11px; color: #aaa; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                            ${trendDesc}
+                                        </div>
+                                    `;
+                                })()}
+                            </div>
+                            <div style="flex: 1; text-align: center;">
+                                <div style="font-size: 13px; color: #e0e0e0; margin-bottom: 12px;"><strong>支撑位/阻力位</strong></div>
+                                ${(() => {
+                                    if (fund.prices && fund.prices.length > 0) {
+                                        const minPrice = Math.min(...fund.prices);
+                                        const maxPrice = Math.max(...fund.prices);
+                                        const currentPrice = fund.prices[fund.prices.length - 1];
+                                        const supportRate = ((currentPrice / minPrice - 1) * 100).toFixed(1);
+                                        const resistanceRate = ((maxPrice / currentPrice - 1) * 100).toFixed(1);
+                                        const supportColor = supportRate >= 0 ? '#ff4444' : '#4caf50';
+                                        const resistanceColor = resistanceRate >= 0 ? '#4caf50' : '#ff4444';
+                                        
+                                        return `
+                                            <div style="font-size: 11px; color: #e0e0e0; margin-bottom: 8px; white-space: nowrap;">
+                                                支撑位: ${minPrice.toFixed(4)} <span style="color: ${supportColor};">(${supportRate >= 0 ? '+' : ''}${supportRate}%)</span>
+                                            </div>
+                                            <div style="font-size: 11px; color: #e0e0e0; white-space: nowrap;">
+                                                阻力位: ${maxPrice.toFixed(4)} <span style="color: ${resistanceColor};">(-${resistanceRate}%)</span>
+                                            </div>
+                                        `;
+                                    } else {
+                                        return `
+                                            <div style="font-size: 11px; color: #e0e0e0; margin-bottom: 8px; white-space: nowrap;">
+                                                数据不足
+                                            </div>
+                                        `;
+                                    }
+                                })()}
+                            </div>
+                            <div style="flex: 1; text-align: right;">
+                                <div style="font-size: 13px; color: #e0e0e0; margin-bottom: 12px;"><strong>智能操作建议</strong></div>
+                                ${(() => {
+                                    // 基于RSI、预测收益率和市场环境生成操作建议
+                                    let advice = '';
+                                    let adviceColor = '';
+                                    let adviceDesc = '';
+                                    
+                                    // 计算市场环境影响
+                                    let marketImpact = 0;
+                                    let marketDesc = '';
+                                    if (fund.market_data) {
+                                        const indices = fund.market_data.indices || {};
+                                        const indexChanges = Object.values(indices).map(index => index.change_ratio || 0);
+                                        if (indexChanges.length > 0) {
+                                            const avgIndexChange = indexChanges.reduce((sum, change) => sum + change, 0) / indexChanges.length;
+                                            marketImpact = avgIndexChange;
+                                            if (avgIndexChange > 0.01) {
+                                                marketDesc = '大盘强势上涨，有利于基金表现';
+                                            } else if (avgIndexChange < -0.01) {
+                                                marketDesc = '大盘明显下跌，可能拖累基金表现';
+                                            } else {
+                                                marketDesc = '大盘震荡，对基金影响中性';
+                                            }
+                                        }
+                                    }
+                                    
+                                    // 综合判断
+                                    if (fund.rsi > 70) {
+                                        advice = 'RSI过热, 建议止盈';
+                                        adviceColor = '#ff4444';
+                                        adviceDesc = 'RSI指标过高，当前基金处于超买状态，建议及时止盈，避免追高风险。';
+                                    } else if (fund.rsi < 30) {
+                                        advice = 'RSI超卖, 建议买入';
+                                        adviceColor = '#4caf50';
+                                        adviceDesc = 'RSI指标过低，当前基金处于超卖状态，可能存在反弹机会，建议适当买入。';
+                                    } else if (fund.predicted_return > 0.01) {
+                                        advice = '看涨信号, 建议持有';
+                                        adviceColor = '#4caf50';
+                                        adviceDesc = '预测收益率为正，短期可能有上涨空间，建议继续持有。';
+                                    } else if (fund.predicted_return < -0.01) {
+                                        advice = '看跌信号, 建议减仓';
+                                        adviceColor = '#ff4444';
+                                        adviceDesc = '预测收益率为负，短期可能面临调整，建议适当减仓。';
+                                    } else {
+                                        advice = '震荡行情, 建议观望';
+                                        adviceColor = '#ff9800';
+                                        adviceDesc = '建议保持观望，等待明确信号。';
+                                    }
+                                    
+                                    // 结合市场环境调整建议
+                                    if (marketImpact > 0.01 && fund.predicted_return < 0) {
+                                        advice = '谨慎看跌, 建议观望';
+                                        adviceColor = '#ff9800';
+                                        adviceDesc = '预测收益率为负，但大盘强势上涨，可能抵消部分下跌风险，建议观望为主。';
+                                    } else if (marketImpact < -0.01 && fund.predicted_return > 0) {
+                                        advice = '谨慎看涨, 建议轻仓';
+                                        adviceColor = '#ff9800';
+                                        adviceDesc = '预测收益率为正，但大盘明显下跌，可能拖累基金表现，建议轻仓操作。';
+                                    }
+                                    
+                                    return `
+                                        <div style="font-size: 12px; color: ${adviceColor}; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 8px; white-space: nowrap;">
+                                            <span style="margin-right: 8px;">●</span> ${advice}
+                                        </div>
+                                        <div style="font-size: 11px; color: #aaa; line-height: 1.3; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                            ${marketDesc ? marketDesc + '，' + adviceDesc : adviceDesc}
+                                        </div>
+                                    `;
+                                })()}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 市场环境分析 -->
+                <div style="padding: 10px 20px; margin-top: 10px;">
+                    <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; white-space: nowrap;">市场环境分析</h3>
+                    ${(() => {
+                        if (fund.market_data) {
+                            const indices = fund.market_data.indices || {};
+                            const sectors = fund.market_data.sectors || {};
+                            
+                            if (Object.keys(indices).length > 0 || Object.keys(sectors).length > 0) {
+                                return `
+                                    <div style="background-color: #2a2a2a; border-radius: 4px; padding: 18px; border: 1px solid #333;">
+                                        ${Object.keys(indices).length > 0 ? `
+                                            <div style="margin-bottom: 15px;">
+                                                <h4 style="color: #e0e0e0; margin: 0 0 10px 0; font-size: 13px;">大盘指数</h4>
+                                                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 11px;">
+                                                    ${Object.entries(indices).map(([name, data]) => {
+                                                        const changePercent = (data.change_ratio * 100).toFixed(2);
+                                                        const changeColor = data.change_ratio >= 0 ? '#ff4444' : '#4caf50';
+                                                        return `
+                                                            <div style="white-space: nowrap;">
+                                                                <strong>${name}:</strong> ${data.current_price ? data.current_price.toFixed(2) : '0.00'} 
+                                                                <span style="color: ${changeColor};">
+                                                                    (${data.change_ratio >= 0 ? '+' : ''}${changePercent}%)
+                                                                </span>
+                                                            </div>
+                                                        `;
+                                                    }).join('')}
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                        ${Object.keys(sectors).length > 0 ? `
+                                            <div>
+                                                <h4 style="color: #e0e0e0; margin: 0 0 10px 0; font-size: 13px;">行业板块</h4>
+                                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 11px;">
+                                                    ${Object.entries(sectors).map(([name, data]) => {
+                                                        const changePercent = (data.change_ratio * 100).toFixed(2);
+                                                        const changeColor = data.change_ratio >= 0 ? '#ff4444' : '#4caf50';
+                                                        return `
+                                                            <div style="white-space: nowrap;">
+                                                                <strong>${name}:</strong> ${data.current_price ? data.current_price.toFixed(2) : '0.00'} 
+                                                                <span style="color: ${changeColor};">
+                                                                    (${data.change_ratio >= 0 ? '+' : ''}${changePercent}%)
+                                                                </span>
+                                                            </div>
+                                                        `;
+                                                    }).join('')}
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            }
+                        }
+                        return '<div style="color: #aaa; font-size: 12px;">市场数据获取中...</div>';
+                    })()}
+                </div>
             </div>
             
             <!-- 持仓标签 -->
@@ -597,6 +911,8 @@ function showFundDetails(fund) {
     // 点击空白区域关闭弹窗
     modal.addEventListener('click', function(e) {
         if (e.target === modal) {
+            // 清除股票更新定时器
+            clearStockUpdateInterval(fund.code);
             document.body.removeChild(modal);
         }
     });
@@ -810,12 +1126,277 @@ function showFundDetails(fund) {
     style.textContent = `
         .positive { color: #ff4444; }
         .negative { color: #4CAF50; }
+        .bg-red { background-color: rgba(255, 68, 68, 0.2); }
+        .bg-green { background-color: rgba(76, 175, 80, 0.2); }
+        .border-red { border-color: #ff4444; background-color: rgba(255, 68, 68, 0.1); }
+        .border-green { border-color: #4CAF50; background-color: rgba(76, 175, 80, 0.1); }
         .return-value { font-weight: bold; }
     `;
     modalContent.appendChild(style);
     
     // 初始化图表
     updateChart(fund, chartId, 7);
+    
+    // 加载持仓股票数据
+    loadStockHoldings(fund.code);
+}
+
+// 股票持仓数据缓存
+const stockHoldingsCache = {};
+const stockHoldingsCacheExpiry = 300; // 缓存时间（秒）
+let stockUpdateIntervals = {}; // 存储每个基金的更新定时器
+
+// 检查是否在开市时间内
+function isTradingTime() {
+    const now = new Date();
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    const dayOfWeek = now.getDay();
+    
+    // 周一到周五，9:30-11:30 和 13:00-15:00
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        if ((hour === 9 && minute >= 30) || (hour === 10) || (hour === 11 && minute < 30) ||
+            (hour === 13) || (hour === 14) || (hour === 15 && minute === 0)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// 加载基金持仓股票数据
+function loadStockHoldings(fundCode) {
+    const stockHoldingsElement = document.getElementById('stock-holdings');
+    
+    // 显示加载中状态
+    stockHoldingsElement.innerHTML = '<div style="font-size: 12px; color: #aaa; padding: 20px; text-align: center;">加载中...</div>';
+    
+    // 从API获取持仓股票数据
+    fetch(`http://localhost:8888/api/funds/${fundCode}/holdings`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('获取到的持仓股票数据:', data);
+            
+            // 存储到缓存
+            const cacheKey = `stock_holdings_${fundCode}`;
+            const currentTime = Date.now() / 1000;
+            stockHoldingsCache[cacheKey] = {
+                timestamp: currentTime,
+                data: data
+            };
+            
+            // 更新标题为"股票持仓 (X%)"
+            const stockRatio = data.stock_ratio ? data.stock_ratio.toFixed(1) : 0;
+            const titleElement = stockHoldingsElement.parentElement.querySelector('h3');
+            if (titleElement) {
+                titleElement.textContent = `股票持仓 (${stockRatio}%)`;
+            }
+            
+            // 渲染数据并添加弹跳效果
+            renderStockHoldings(data, stockHoldingsElement, true);
+            
+            // 设置自动更新
+            setupStockUpdateInterval(fundCode);
+        })
+        .catch(error => {
+            console.error('获取持仓股票数据失败:', error);
+            stockHoldingsElement.innerHTML = '<div style="font-size: 12px; color: #ff4444;">获取持仓股票数据失败</div>';
+        });
+}
+
+// 设置股票数据自动更新
+function setupStockUpdateInterval(fundCode) {
+    // 清除之前的定时器
+    if (stockUpdateIntervals[fundCode]) {
+        clearInterval(stockUpdateIntervals[fundCode]);
+    }
+    
+    // 清除之前的股票定时器
+    if (stockUpdateTimers[fundCode]) {
+        stockUpdateTimers[fundCode].forEach(timer => clearInterval(timer));
+        delete stockUpdateTimers[fundCode];
+    }
+    
+    // 每15秒整体更新一次数据
+    stockUpdateIntervals[fundCode] = setInterval(() => {
+        if (isTradingTime()) {
+            const stockHoldingsElement = document.getElementById('stock-holdings');
+            if (stockHoldingsElement) {
+                fetch(`http://localhost:8888/api/funds/${fundCode}/holdings`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // 存储到缓存
+                        const cacheKey = `stock_holdings_${fundCode}`;
+                        const currentTime = Date.now() / 1000;
+                        stockHoldingsCache[cacheKey] = {
+                            timestamp: currentTime,
+                            data: data
+                        };
+                        
+                        // 渲染数据
+                        renderStockHoldings(data, stockHoldingsElement, true);
+                    })
+                    .catch(error => {
+                        console.error('自动更新持仓股票数据失败:', error);
+                    });
+            }
+        }
+    }, 15000);
+    
+    // 为每个股票设置独立的更新定时器
+    setTimeout(() => {
+        const stockHoldingsElement = document.getElementById('stock-holdings');
+        if (stockHoldingsElement) {
+            if (!stockUpdateTimers[fundCode]) {
+                stockUpdateTimers[fundCode] = [];
+            }
+            
+            // 为每个股票设置随机的闪烁动画
+            const stockCards = stockHoldingsElement.querySelectorAll('.stock-card');
+            stockCards.forEach(card => {
+                // 随机5-15秒的间隔，缩短更新周期
+                const randomInterval = 5000 + Math.random() * 10000;
+                const timer = setInterval(() => {
+                    if (isTradingTime()) {
+                        // 随机选择闪烁或脉冲动画
+                        if (Math.random() > 0.5) {
+                            flashCard(card);
+                        } else {
+                            pulseCard(card);
+                        }
+                    }
+                }, randomInterval);
+                stockUpdateTimers[fundCode].push(timer);
+            });
+        }
+    }, 1000); // 延迟1秒，确保DOM已经渲染
+}
+
+// 清除股票数据自动更新
+function clearStockUpdateInterval(fundCode) {
+    if (stockUpdateIntervals[fundCode]) {
+        clearInterval(stockUpdateIntervals[fundCode]);
+        delete stockUpdateIntervals[fundCode];
+    }
+    
+    // 清除单个股票的更新定时器
+    if (stockUpdateTimers[fundCode]) {
+        stockUpdateTimers[fundCode].forEach(timer => clearInterval(timer));
+        delete stockUpdateTimers[fundCode];
+    }
+}
+
+// 添加CSS动画样式
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes flash-update {
+        0% { background-color: rgba(255, 255, 255, 0.25); }
+        100% { background-color: transparent; }
+    }
+    
+    @keyframes pulse-border {
+        0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+    }
+    
+    .flash-update {
+        animation: flash-update 0.6s ease-out;
+    }
+    
+    .pulse-border {
+        animation: pulse-border 0.6s ease-out;
+    }
+`;
+document.head.appendChild(style);
+
+// 存储股票更新定时器
+let stockUpdateTimers = {};
+
+// 闪烁卡片动画
+function flashCard(cardEl) {
+    // 添加闪烁动画类
+    cardEl.classList.add('flash-update');
+    // 动画结束后移除类
+    cardEl.addEventListener('animationend', () => {
+        cardEl.classList.remove('flash-update');
+    }, { once: true });
+}
+
+// 脉冲边框动画
+function pulseCard(cardEl) {
+    // 添加脉冲动画类
+    cardEl.classList.add('pulse-border');
+    // 动画结束后移除类
+    cardEl.addEventListener('animationend', () => {
+        cardEl.classList.remove('pulse-border');
+    }, { once: true });
+}
+
+// 渲染股票持仓数据
+function renderStockHoldings(data, element, addBounceEffect = false) {
+    if (data.stocks && data.stocks.length > 0) {
+        let holdingsHTML = '';
+        
+        // 按照权重排序
+        data.stocks.sort((a, b) => b.weight - a.weight);
+        
+        // 显示全部股票
+        const displayStocks = data.stocks;
+        
+        // 计算股票占比
+        const stockRatio = data.stock_ratio ? data.stock_ratio.toFixed(1) : 0;
+        
+        // 添加股票网格
+        holdingsHTML += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px;">';
+        
+        // 批量处理股票数据，减少DOM操作
+        const stockElements = displayStocks.map(stock => {
+            const changeRatio = (stock.change_ratio * 100).toFixed(2);
+            const isPositive = stock.change_ratio >= 0;
+            const borderColor = isPositive ? '#ff4444' : '#4CAF50';
+            const bgColor = isPositive ? 'rgba(255, 68, 68, 0.1)' : 'rgba(76, 175, 80, 0.1)';
+            const textColor = isPositive ? '#ff4444' : '#4CAF50';
+            
+            return `
+                <div class="stock-card" data-stock-code="${stock.code}" style="background-color: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 4px; padding: 10px; transition: all 0.3s ease;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <div style="font-size: 12px; color: #e0e0e0; font-weight: bold;">${stock.name || stock.code}</div>
+                        <div style="font-size: 10px; color: #aaa;">持仓: ${stock.weight.toFixed(2)}%</div>
+                    </div>
+                    <div style="font-size: 10px; color: #aaa; margin-bottom: 4px;">${stock.code}</div>
+                    <div style="font-size: 12px; font-weight: bold; color: ${textColor};">
+                        价格: ${stock.current_price.toFixed(2)}元  
+                        涨幅: ${isPositive ? '+' : ''}${stock.change_amount.toFixed(2)}元  
+                        ${isPositive ? '+' : ''}${changeRatio}%
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        holdingsHTML += stockElements;
+        holdingsHTML += '</div>';
+        
+        // 渲染HTML
+        element.innerHTML = holdingsHTML;
+        
+        // 添加单个股票的闪烁动画效果
+        if (addBounceEffect) {
+            const stockCards = element.querySelectorAll('.stock-card');
+            stockCards.forEach((card, index) => {
+                // 为每个股票卡片设置不同的动画延迟
+                setTimeout(() => {
+                    // 随机选择闪烁或脉冲动画
+                    if (Math.random() > 0.5) {
+                        flashCard(card);
+                    } else {
+                        pulseCard(card);
+                    }
+                }, index * 100); // 每个卡片延迟100ms，形成交错效果
+            });
+        }
+    } else {
+        element.innerHTML = '<div style="font-size: 12px; color: #aaa; padding: 20px; text-align: center;">暂无持仓股票数据</div>';
+    }
 }
 
 function getFundDetails(code) {
@@ -884,8 +1465,7 @@ function saveBuyRecord(fundId, record) {
     localStorage.setItem(`fundBuyRecords_${fundId}`, JSON.stringify(records));
 }
 
-// 导入技术分析模块
-import { calculateMA, calculateSupportResistance, calculateBollingerBands } from './technical-analysis.js';
+
 
 function updateChart(fund, chartId, days) {
     // 计算需要显示的数据点数量
@@ -916,6 +1496,15 @@ function updateChart(fund, chartId, days) {
     
     // 计算布林带
     const bollingerBands = calculateBollingerBands(displayPrices);
+    
+    // 计算MACD
+    const macd = calculateMACD(displayPrices);
+    
+    // 计算KDJ
+    const kdj = calculateKDJ(displayPrices);
+    
+    // 计算ATR
+    const atr = calculateATR(displayPrices);
     
     // 获取图表上下文
     const ctx = document.getElementById(chartId).getContext('2d');
@@ -1057,7 +1646,9 @@ function updateChart(fund, chartId, days) {
                         font: {
                             size: 11
                         },
-                        maxRotation: 0
+                        maxRotation: 0,
+                        autoSkip: true,
+                        maxTicksLimit: 8
                     },
                     grid: {
                         color: 'rgba(255, 255, 255, 0.1)',
@@ -1094,7 +1685,182 @@ function updateChart(fund, chartId, days) {
                     left: 10,
                     right: 10,
                     top: 20,
-                    bottom: 10
+                    bottom: 30
+                }
+            }
+        }
+    });
+    
+    // 更新技术指标图表
+    updateTechChart(fund, chartId, days);
+}
+
+function updateTechChart(fund, chartId, days) {
+    // 计算需要显示的数据点数量
+    const prices = fund.prices && fund.prices.length > 0 ? fund.prices : [];
+    const dates = fund.dates && fund.dates.length > 0 ? fund.dates : [];
+    
+    let displayPrices = prices;
+    let displayDates = dates;
+    
+    if (days > 0) {
+        const startIndex = Math.max(0, prices.length - days);
+        displayPrices = prices.slice(startIndex);
+        displayDates = dates.slice(startIndex);
+    }
+    
+    // 计算技术指标
+    const macd = calculateMACD(displayPrices);
+    const kdj = calculateKDJ(displayPrices);
+    const atr = calculateATR(displayPrices);
+    
+    // 获取技术指标图表上下文
+    const techChartId = `${chartId}-tech`;
+    const ctx = document.getElementById(techChartId).getContext('2d');
+    
+    // 销毁现有图表
+    if (window.techChart) {
+        window.techChart.destroy();
+    }
+    
+    // 创建技术指标图表
+    window.techChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: displayDates,
+            datasets: [
+                {
+                    label: 'MACD',
+                    data: macd.macdLine,
+                    borderColor: '#ff9800',
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    pointHoverRadius: 0
+                },
+                {
+                    label: 'Signal',
+                    data: macd.signalLine,
+                    borderColor: '#f44336',
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    pointHoverRadius: 0
+                },
+                {
+                    label: 'K',
+                    data: kdj.k,
+                    borderColor: '#33b5e5',
+                    borderWidth: 1.5,
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    pointHoverRadius: 0
+                },
+                {
+                    label: 'D',
+                    data: kdj.d,
+                    borderColor: '#4caf50',
+                    borderWidth: 1.5,
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    pointHoverRadius: 0
+                },
+                {
+                    label: 'J',
+                    data: kdj.j,
+                    borderColor: '#9c27b0',
+                    borderWidth: 1.5,
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    pointHoverRadius: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#ffffff',
+                    bodyColor: '#e0e0e0',
+                    borderColor: '#333',
+                    borderWidth: 1,
+                    padding: 10,
+                    displayColors: false,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += context.parsed.y.toFixed(4);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            backgroundColor: '#000000',
+            scales: {
+                x: {
+                    position: 'bottom',
+                    ticks: {
+                        color: '#aaa',
+                        font: {
+                            size: 11
+                        },
+                        maxRotation: 0,
+                        autoSkip: true,
+                        maxTicksLimit: 8
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)',
+                        drawBorder: false
+                    }
+                },
+                y: {
+                    position: 'left',
+                    ticks: {
+                        color: '#aaa',
+                        font: {
+                            size: 11
+                        },
+                        callback: function(value) {
+                            return value.toFixed(3);
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)',
+                        drawBorder: false
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            animation: {
+                duration: 1000,
+                easing: 'easeInOutQuart'
+            },
+            layout: {
+                padding: {
+                    left: 10,
+                    right: 10,
+                    top: 20,
+                    bottom: 30
                 }
             }
         }
