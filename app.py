@@ -25,6 +25,10 @@ fund_holdings_cache_expiry = 28800  # 基金持仓数据缓存时间（秒），
 market_data_cache = {}
 market_data_cache_expiry = 120  # 市场数据缓存时间（秒），2分钟
 
+# 基金数据缓存
+fund_data_cache = {}
+fund_data_cache_expiry = 300  # 基金数据缓存时间（秒），5分钟
+
 # 获取基金持仓数据
 def get_fund_holdings(code):
     """获取基金的持仓数据"""
@@ -33,7 +37,6 @@ def get_fund_holdings(code):
     current_time = time.time()
     
     if cache_key in fund_holdings_cache and current_time - fund_holdings_cache[cache_key]['timestamp'] < fund_holdings_cache_expiry:
-        print(f"从缓存获取基金 {code} 持仓数据")
         return fund_holdings_cache[cache_key]['data']
     
     holdings = {
@@ -47,7 +50,6 @@ def get_fund_holdings(code):
     
     # 优先从东方财富JS数据获取（响应速度快，数据结构清晰）
     try:
-        print("尝试从东方财富JS数据获取基金持仓数据...")
         fund_data_url = f"https://fund.eastmoney.com/pingzhongdata/{code}.js"
         response = requests.get(fund_data_url, headers=headers, timeout=5)
         
@@ -60,7 +62,6 @@ def get_fund_holdings(code):
                 data_hold_stock_str = data_hold_stock_match.group(1)
                 try:
                     data_hold_stock = json.loads('[' + data_hold_stock_str + ']')
-                    print(f"成功解析 Data_holdStock，共 {len(data_hold_stock)} 只股票")
                     
                     for stock in data_hold_stock:  # 显示全部股票
                         try:
@@ -78,11 +79,10 @@ def get_fund_holdings(code):
                                         'weight': weight
                                     }
                                     holdings['stocks'].append(stock_info)
-                                    print(f"添加股票: {stock_name}, 代码: {clean_code}, 权重: {weight}%")
-                        except Exception as e:
-                            print(f"解析股票数据失败: {e}")
-                except Exception as e:
-                    print(f"解析 Data_holdStock 失败: {e}")
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
             
             # 如果 Data_holdStock 为空，尝试提取其他变量
             if not holdings['stocks']:
@@ -92,7 +92,6 @@ def get_fund_holdings(code):
                     data_hold_stock_new_str = data_hold_stock_new_match.group(1)
                     try:
                         data_hold_stock_new = json.loads('[' + data_hold_stock_new_str + ']')
-                        print(f"成功解析 Data_holdStockNew，共 {len(data_hold_stock_new)} 只股票")
                         
                         for stock in data_hold_stock_new:  # 显示全部股票
                             try:
@@ -110,11 +109,10 @@ def get_fund_holdings(code):
                                             'weight': weight
                                         }
                                         holdings['stocks'].append(stock_info)
-                                        print(f"添加股票: {stock_name}, 代码: {clean_code}, 权重: {weight}%")
-                            except Exception as e:
-                                print(f"解析股票数据失败: {e}")
-                    except Exception as e:
-                        print(f"解析 Data_holdStockNew 失败: {e}")
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
             
             # 如果仍然没有数据，尝试提取 stockCodes 和 stockNames 变量
             if not holdings['stocks']:
@@ -124,7 +122,6 @@ def get_fund_holdings(code):
                     stock_codes_str = stock_codes_match.group(1)
                     try:
                         stock_codes = json.loads('[' + stock_codes_str + ']')
-                        print(f"成功解析 stockCodes，共 {len(stock_codes)} 只股票")
                         
                         # 尝试提取 stockNames 变量
                         stock_names_match = re.search(r'var stockNames\s*=\s*\[(.*?)\];', data_str)
@@ -133,9 +130,8 @@ def get_fund_holdings(code):
                             try:
                                 stock_names_str = stock_names_match.group(1)
                                 stock_names = json.loads('[' + stock_names_str + ']')
-                                print(f"成功解析 stockNames，共 {len(stock_names)} 个股票名称")
-                            except Exception as e:
-                                print(f"解析 stockNames 失败: {e}")
+                            except Exception:
+                                pass
                         
                         # 为每只股票创建默认数据
                         for i, code in enumerate(stock_codes):  # 显示全部股票
@@ -187,9 +183,8 @@ def get_fund_holdings(code):
                                 'weight': weight
                             }
                             holdings['stocks'].append(stock_info)
-                            print(f"添加股票: {stock_name}, 代码: {clean_code}, 权重: {weight}%")
-                    except Exception as e:
-                        print(f"解析 stockCodes 失败: {e}")
+                    except Exception:
+                        pass
             
             # 尝试提取资产配置数据
             asset_match = re.search(r'var Data_assetAllocation = \[(.*?)\];', data_str, re.DOTALL)
@@ -204,12 +199,11 @@ def get_fund_holdings(code):
                             for item in asset_json:
                                 if item.get('assetType') == '股票' or item.get('name') == '股票':
                                     holdings['stock_ratio'] = float(item.get('ratio', 0)) * 100
-                                    print(f"提取到股票占比: {holdings['stock_ratio']}%")
                                     break
-                        except Exception as e:
-                            print(f"解析资产配置JSON失败: {e}")
-                except Exception as e:
-                    print(f"提取资产配置数据失败: {e}")
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
             
             # 如果没有提取到资产配置数据，尝试从其他地方获取
             if holdings['stock_ratio'] == 0 and holdings['stocks']:
@@ -217,14 +211,12 @@ def get_fund_holdings(code):
                 total_weight = sum(stock['weight'] for stock in holdings['stocks'])
                 if total_weight > 0:
                     holdings['stock_ratio'] = min(total_weight, 100.0)
-                    print(f"计算股票占比: {holdings['stock_ratio']}%")
-    except Exception as e:
-        print(f"从东方财富JS数据获取持仓数据失败: {e}")
+    except Exception:
+        pass
     
     # 如果从JS数据获取失败，尝试从HTML页面获取
     if not holdings['stocks']:
         try:
-            print("尝试从东方财富HTML页面获取基金持仓数据...")
             fund_url = f"http://fund.eastmoney.com/{code}.html"
             response = requests.get(fund_url, headers=headers, timeout=5)
             
@@ -248,7 +240,6 @@ def get_fund_holdings(code):
                                 'weight': float(weight_match.group(1))
                             }
                             holdings['stocks'].append(stock_info)
-                            print(f"添加股票: {stock_info['name']}, 代码: {stock_info['code']}, 权重: {stock_info['weight']}%")
                 
                 # 尝试提取资产配置数据
                 asset_match = re.search(r'资产配置.*?<table.*?>(.*?)</table>', data_str, re.DOTALL)
@@ -257,9 +248,8 @@ def get_fund_holdings(code):
                     stock_ratio_match = re.search(r'股票.*?<td.*?>(\d+\.?\d*)%</td>', asset_html)
                     if stock_ratio_match:
                         holdings['stock_ratio'] = float(stock_ratio_match.group(1))
-                        print(f"提取到股票占比: {holdings['stock_ratio']}%")
-        except Exception as e:
-            print(f"从HTML页面获取数据失败: {e}")
+        except Exception:
+            pass
     
     # 清理无效的股票代码并获取股票名称
     valid_stocks = []
@@ -312,10 +302,9 @@ def get_stock_name(stock_code):
             if name_match:
                 stock_name = name_match.group(1)
                 if stock_name and stock_name != '' and '股本结构' not in stock_name:
-                    print(f"从东方财富API获取股票名称: {stock_name}")
                     return stock_name
-    except Exception as e:
-        print(f"从东方财富API获取股票 {stock_code} 名称失败: {e}")
+    except Exception:
+        pass
     
     # 数据源2: 新浪财经API
     try:
@@ -336,15 +325,13 @@ def get_stock_name(stock_code):
         if response.status_code == 200:
             stock_data = response.text
             # 解析股票数据
-            # 新浪财经API返回格式: var hq_str_sh600519="贵州茅台,1785.00,1779.00,1781.00,1798.00,1765.00,1781.00,1782.00,14700,26284700,100,1781.00,200,1780.00,300,1779.00,500,1778.00,200,1777.00,100,1782.00,200,1783.00,300,1784.00,500,1785.00,200,1786.00,2025-12-12,15:00:03,00"
             name_match = re.search(r'"(.*?),', stock_data)
             if name_match:
                 stock_name = name_match.group(1)
                 if stock_name and stock_name != '' and stock_name != 'null':
-                    print(f"从新浪财经API获取股票名称: {stock_name}")
                     return stock_name
-    except Exception as e:
-        print(f"从新浪财经API获取股票 {stock_code} 名称失败: {e}")
+    except Exception:
+        pass
     
     # 数据源3: 百度股票API
     try:
@@ -362,10 +349,9 @@ def get_stock_name(stock_code):
             if name_match:
                 stock_name = name_match.group(1)
                 if stock_name and stock_name != '' and '股票行情' not in stock_name:
-                    print(f"从百度股票API获取股票名称: {stock_name}")
                     return stock_name
-    except Exception as e:
-        print(f"从百度股票API获取股票 {stock_code} 名称失败: {e}")
+    except Exception:
+        pass
     
     # 数据源4: 同花顺API
     try:
@@ -383,15 +369,12 @@ def get_stock_name(stock_code):
             if name_match:
                 stock_name = name_match.group(1)
                 if stock_name and stock_name != '' and '同花顺' not in stock_name:
-                    print(f"从同花顺API获取股票名称: {stock_name}")
                     return stock_name
-    except Exception as e:
-        print(f"从同花顺API获取股票 {stock_code} 名称失败: {e}")
+    except Exception:
+        pass
     
     # 如果所有数据源都失败，返回默认名称
-    default_name = f'股票{stock_code}'
-    print(f"使用默认股票名称: {default_name}")
-    return default_name
+    return f'股票{stock_code}'
 
 # 批量获取股票实时数据
 def get_batch_stock_real_time_data(stock_codes):
@@ -409,9 +392,6 @@ def get_batch_stock_real_time_data(stock_codes):
             cached_stocks.append(stock_code)
         else:
             uncached_stocks.append(stock_code)
-    
-    if cached_stocks:
-        print(f"从缓存获取股票数据: {cached_stocks}")
     
     # 批量获取未缓存的股票数据
     if uncached_stocks:
@@ -435,12 +415,10 @@ def get_batch_stock_real_time_data(stock_codes):
                 
                 code_str = ",".join(full_codes)
                 stock_url = f"http://hq.sinajs.cn/list={code_str}"
-                print(f"批量获取股票实时数据: {stock_url}")
                 response = requests.get(stock_url, headers=headers, timeout=3)  # 减少超时时间
                 
                 if response.status_code == 200:
                     stock_data = response.text
-                    print(f"批量获取股票数据成功，长度: {len(stock_data)}")
                     
                     # 解析数据
                     lines = stock_data.strip().split('\n')
@@ -473,18 +451,16 @@ def get_batch_stock_real_time_data(stock_codes):
                                                 'timestamp': time.time(),
                                                 'data': stock_data
                                             }
-                            except Exception as e:
-                                print(f"解析股票数据失败: {e}")
+                            except Exception:
+                                pass
                 else:
-                    print(f"股票实时数据API响应状态: {response.status_code}")
                     for stock_code in batch_codes:
                         results[stock_code] = {
                             'current_price': 0,
                             'change_amount': 0,
                             'change_ratio': 0
                         }
-            except Exception as e:
-                print(f"批量获取股票实时数据失败: {e}")
+            except Exception:
                 for stock_code in batch_codes:
                     results[stock_code] = {
                         'current_price': 0,
@@ -502,7 +478,6 @@ def get_stock_real_time_data(stock_code):
     current_time = time.time()
     
     if cache_key in stock_cache and current_time - stock_cache[cache_key]['timestamp'] < stock_cache_expiry:
-        print(f"从缓存获取股票 {stock_code} 数据")
         return stock_cache[cache_key]['data']
     
     # 调用批量获取函数
@@ -521,7 +496,6 @@ def get_market_data():
     current_time = time.time()
     
     if cache_key in market_data_cache and current_time - market_data_cache[cache_key]['timestamp'] < market_data_cache_expiry:
-        print("从缓存获取市场数据")
         return market_data_cache[cache_key]['data']
     
     try:
@@ -565,12 +539,10 @@ def get_market_data():
         all_codes = list(index_codes.keys()) + list(sector_codes.keys())
         code_str = ",".join(all_codes)
         market_url = f"http://hq.sinajs.cn/list={code_str}"
-        print(f"获取市场数据: {market_url}")
         response = requests.get(market_url, headers=headers, timeout=5)
         
         if response.status_code == 200:
             market_data = response.text
-            print(f"市场数据获取成功，长度: {len(market_data)}")
             
             # 解析数据
             lines = market_data.strip().split('\n')
@@ -607,8 +579,8 @@ def get_market_data():
                                         'change_amount': change_amount,
                                         'change_ratio': change
                                     }
-                    except Exception as e:
-                        print(f"解析市场数据失败: {e}")
+                    except Exception:
+                        pass
             
             # 存储到缓存
             market_data_cache[cache_key] = {
@@ -616,19 +588,23 @@ def get_market_data():
                 'data': result
             }
             
-            print(f"市场数据解析完成，指数: {len(result['indices'])}, 板块: {len(result['sectors'])}")
             return result
         else:
-            print(f"市场数据API响应状态: {response.status_code}")
             return {'indices': {}, 'sectors': {}}
-    except Exception as e:
-        print(f"获取市场数据失败: {e}")
+    except Exception:
         return {'indices': {}, 'sectors': {}}
 
 # 获取基金数据
 def get_fund_data(code):
+    # 检查缓存
+    cache_key = f"fund_data_{code}"
+    current_time = time.time()
+    
+    if cache_key in fund_data_cache and current_time - fund_data_cache[cache_key]['timestamp'] < fund_data_cache_expiry:
+        cached_data = fund_data_cache[cache_key]['data']
+        return cached_data['name'], cached_data['prices'], cached_data['dates'], cached_data['returns']
+    
     try:
-        print(f"开始获取基金 {code} 数据...")
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
@@ -639,66 +615,51 @@ def get_fund_data(code):
         dates = []
         returns = []
         
-        # 数据源1: 新浪财经API
+        # 数据源1: 新浪财经API - 优先获取基金名称和最新净值
+        fund_name_obtained = False
         try:
-            print("尝试使用新浪财经API获取基金基本信息和净值...")
             fund_url = f"http://fundgz.1234567.com.cn/js/{code}.js"
-            response = requests.get(fund_url, headers=headers, timeout=5)
+            response = requests.get(fund_url, headers=headers, timeout=3)
             response.encoding = 'utf-8'
             
-            # 检查响应状态
             if response.status_code == 200:
-                # 解析新浪财经的JS格式数据
                 data_str = response.text.strip().replace('jsonpgz(', '').replace(');', '')
                 data = json.loads(data_str)
                 
                 # 提取基金名称
                 name = data.get('name', f'基金{code}')
-                print(f"新浪财经API获取到基金名称: {name}")
+                fund_name_obtained = True
                 
                 # 提取当前净值和日期
                 if 'jzrq' in data and 'dwjz' in data:
                     date_str = data['jzrq']
                     nav = float(data['dwjz'])
-                    # 先添加新浪财经的最新数据
                     prices.append(nav)
                     dates.append(date_str)
-                    print(f"新浪财经API获取到最新净值数据: {date_str} - {nav}")
-            else:
-                print(f"新浪财经API响应状态错误: {response.status_code}")
-        except Exception as e:
-            print(f"新浪财经API失败: {e}")
-            # 数据源2: 天天基金网API
+        except Exception:
+            pass
+        
+        # 如果未获取到基金名称，尝试从天天基金网获取
+        if not fund_name_obtained:
             try:
-                print("尝试使用天天基金网API获取基金基本信息...")
                 fund_url = f"https://fund.eastmoney.com/{code}.html"
-                response = requests.get(fund_url, headers=headers, timeout=5)
+                response = requests.get(fund_url, headers=headers, timeout=3)
                 response.encoding = 'utf-8'
                 
-                # 检查响应状态
                 if response.status_code == 200:
-                    # 简单解析HTML获取基金名称
                     import re
                     match = re.search(r'<title>(.*?)_基金净值_天天基金网</title>', response.text)
                     if match:
                         name = match.group(1)
-                        print(f"天天基金网API获取到基金名称: {name}")
-                    else:
-                        print("天天基金网API未获取到基金名称")
-                else:
-                    print(f"天天基金网API响应状态错误: {response.status_code}")
-            except Exception as e:
-                print(f"天天基金网API失败: {e}")
+            except Exception:
+                pass
         
         # 获取历史净值数据
         # 数据源1: 天天基金网API（优先使用，因为提供更完整的历史数据）
+        history_data_obtained = False
         try:
-            print("尝试使用天天基金网API获取历史净值数据...")
-            # 天天基金网净值API
             fund_data_url = f"https://fund.eastmoney.com/f10/F10DataApi.aspx?type=lsjz&code={code}&page=1&per=100"
-            print(f"天天基金网API URL: {fund_data_url}")
             
-            # 使用更完整的请求头
             tian_tian_headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
                 "Referer": f"https://fund.eastmoney.com/{code}.html",
@@ -707,234 +668,137 @@ def get_fund_data(code):
                 "Connection": "keep-alive"
             }
             
-            response = requests.get(fund_data_url, headers=tian_tian_headers, timeout=10)
-            
-            print(f"天天基金网API响应状态: {response.status_code}")
+            response = requests.get(fund_data_url, headers=tian_tian_headers, timeout=5)
             
             if response.status_code == 200:
                 try:
-                    # 打印响应的前500个字符，以便调试
-                    print(f"天天基金网API响应前500字符: {response.text[:500]}...")
-                    
-                    # 解析HTML数据
-                    # 使用字符串操作提取content部分
-                    try:
-                        # 找到content的起始位置
-                        content_start = response.text.find('content:"')
-                        if content_start != -1:
-                            content_start += len('content:"')
-                            # 找到content的结束位置
-                            content_end = response.text.find('"', content_start)
-                            if content_end != -1:
-                                content = response.text[content_start:content_end]
-                                # 然后从content中提取表格
-                                table_start = content.find('<table')
-                                table_end = content.find('</table>', table_start)
-                                if table_start != -1 and table_end != -1:
-                                    table_html = content[table_start:table_end + len('</table>')]
-                                    # 提取行数据
-                                    row_start = table_html.find('<tr')
-                                    rows = []
-                                    while row_start != -1:
-                                        row_end = table_html.find('</tr>', row_start)
-                                        if row_end != -1:
-                                            rows.append(table_html[row_start:row_end + len('</tr>')])
-                                            row_start = table_html.find('<tr', row_end)
+                    content_start = response.text.find('content:"')
+                    if content_start != -1:
+                        content_start += len('content:"')
+                        content_end = response.text.find('"', content_start)
+                        if content_end != -1:
+                            content = response.text[content_start:content_end]
+                            table_start = content.find('<table')
+                            table_end = content.find('</table>', table_start)
+                            if table_start != -1 and table_end != -1:
+                                table_html = content[table_start:table_end + len('</table>')]
+                                row_start = table_html.find('<tr')
+                                rows = []
+                                while row_start != -1:
+                                    row_end = table_html.find('</tr>', row_start)
+                                    if row_end != -1:
+                                        rows.append(table_html[row_start:row_end + len('</tr>')])
+                                        row_start = table_html.find('<tr', row_end)
+                                    else:
+                                        break
+                                
+                                tian_tian_prices = []
+                                tian_tian_dates = []
+                                
+                                for i, row in enumerate(rows):
+                                    if i == 0:
+                                        continue
+                                    col_start = row.find('<td')
+                                    cols = []
+                                    while col_start != -1:
+                                        col_end = row.find('</td>', col_start)
+                                        if col_end != -1:
+                                            col_content = row[col_start:col_end + len('</td>')]
+                                            col_text = col_content.replace('<td', '').replace('</td>', '').replace('class="tor bold"', '').replace('class="tor bold red"', '').replace('class="red unbold"', '').strip()
+                                            text_start = col_text.find('>')
+                                            if text_start != -1:
+                                                col_text = col_text[text_start + 1:].strip()
+                                            cols.append(col_text)
+                                            col_start = row.find('<td', col_end)
                                         else:
                                             break
                                     
-                                    # 存储天天基金网的数据，以便后续处理
-                                    tian_tian_prices = []
-                                    tian_tian_dates = []
-                                    
-                                    for i, row in enumerate(rows):
-                                        if i == 0:  # 跳过表头
-                                            continue
-                                        # 提取列数据
-                                        col_start = row.find('<td')
-                                        cols = []
-                                        while col_start != -1:
-                                            col_end = row.find('</td>', col_start)
-                                            if col_end != -1:
-                                                # 提取td标签内的内容
-                                                col_content = row[col_start:col_end + len('</td>')]
-                                                # 去除标签
-                                                col_text = col_content.replace('<td', '').replace('</td>', '').replace('class="tor bold"', '').replace('class="tor bold red"', '').replace('class="red unbold"', '').strip()
-                                                # 提取文本内容
-                                                text_start = col_text.find('>')
-                                                if text_start != -1:
-                                                    col_text = col_text[text_start + 1:].strip()
-                                                cols.append(col_text)
-                                                col_start = row.find('<td', col_end)
-                                            else:
-                                                break
-                                        
-                                        if len(cols) >= 4:
-                                            date_str = cols[0]
-                                            nav_str = cols[1]
-                                            try:
-                                                nav = float(nav_str)
-                                                tian_tian_prices.append(nav)
-                                                tian_tian_dates.append(date_str)
-                                                print(f"天天基金网API获取到净值数据: {date_str} - {nav}")
-                                            except ValueError:
-                                                print(f"解析净值数据失败: {nav_str}")
-                                    
-                                    # 反转数据，使其按时间正序排列
+                                    if len(cols) >= 4:
+                                        date_str = cols[0]
+                                        nav_str = cols[1]
+                                        try:
+                                            nav = float(nav_str)
+                                            tian_tian_prices.append(nav)
+                                            tian_tian_dates.append(date_str)
+                                        except ValueError:
+                                            pass
+                                
+                                if tian_tian_prices:
                                     tian_tian_prices.reverse()
                                     tian_tian_dates.reverse()
-                                    
-                                    # 添加到主数据列表
                                     prices.extend(tian_tian_prices)
                                     dates.extend(tian_tian_dates)
-                                    
-                                    if tian_tian_prices:
-                                        print(f"天天基金网API成功提取 {len(tian_tian_prices)} 条净值数据")
-                                    else:
-                                        print("天天基金网API没有获取到净值数据")
-                                else:
-                                    print("天天基金网API没有找到净值表格")
-                            else:
-                                print("天天基金网API响应格式不正确：找不到content结束位置")
-                        else:
-                            print("天天基金网API响应格式不正确：找不到content起始位置")
-                    except Exception as e:
-                        print(f"解析天天基金网API响应失败: {e}")
-                except Exception as e:
-                    print(f"解析天天基金网API响应失败: {e}")
-            else:
-                print(f"天天基金网API响应状态错误: {response.status_code}")
-        except Exception as e:
-            print(f"天天基金网API失败: {e}")
-            # 数据源2: 东方财富API
+                                    history_data_obtained = True
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        
+        # 如果未获取到历史数据，尝试从东方财富API获取
+        if not history_data_obtained:
             try:
-                print("尝试使用东方财富API获取历史净值数据...")
-                # 东方财富API URL
                 fund_data_url = f"https://fund.eastmoney.com/pingzhongdata/{code}.js"
-                print(f"东方财富API URL: {fund_data_url}")
-                response = requests.get(fund_data_url, headers=headers, timeout=10)
-                
-                # 检查响应状态
-                print(f"东方财富API响应状态: {response.status_code}")
+                response = requests.get(fund_data_url, headers=headers, timeout=5)
                 
                 if response.status_code == 200:
                     try:
-                        # 解析JS格式数据
                         data_str = response.text
-                        # 提取净值数据
                         import re
                         net_value_match = re.search(r'var Data_netWorthTrend = \[(.*?)\];', data_str, re.DOTALL)
                         if net_value_match:
                             net_value_data = net_value_match.group(1)
-                            # 转换为JSON格式
                             net_value_json = '[' + net_value_data + ']'
                             net_value_list = json.loads(net_value_json)
-                            print(f"东方财富API获取到 {len(net_value_list)} 条净值数据")
                             
-                            # 东方财富API返回的数据是按时间倒序排列的（最新的数据在前）
-                            # 取最近365天的数据，确保有足够的历史数据供前端查询
-                            recent_data = net_value_list[:365]  # 取前365条数据（最新的）
-                            print(f"取最近 {len(recent_data)} 条数据")
+                            recent_data = net_value_list[:365]
                             
-                            # 遍历数据，按时间正序添加
                             for item in reversed(recent_data):
                                 try:
                                     nav = item['y']
                                     timestamp = item['x']
-                                    # 添加调试信息，打印原始时间戳
-                                    if len(prices) < 5:  # 只打印前5条数据的时间戳
-                                        print(f"原始时间戳: {timestamp}, 转换后: {time.strftime('%Y-%m-%d', time.localtime(timestamp / 1000))}")
                                     date_str = time.strftime('%Y-%m-%d', time.localtime(timestamp / 1000))
                                     prices.append(nav)
                                     dates.append(date_str)
-                                except (ValueError, KeyError) as e:
-                                    print(f"解析东方财富净值数据失败: {e}")
-                                    print(f"失败的数据项: {item}")
-                            
-                            if prices:
-                                print(f"东方财富API成功提取 {len(prices)} 条净值数据")
-                            else:
-                                print("东方财富API没有获取到净值数据")
-                        else:
-                            print("东方财富API没有找到净值数据")
-                    except Exception as e:
-                        print(f"解析东方财富API响应失败: {e}")
-                else:
-                    print(f"东方财富API响应状态错误: {response.status_code}")
-            except Exception as e:
-                print(f"东方财富API失败: {e}")
-                # 数据源3: 新浪财经API
-                try:
-                    print("尝试使用新浪财经API获取历史净值数据...")
-                    # 新浪财经基金净值API
-                    fund_data_url = f"http://fundgz.1234567.com.cn/js/{code}.js"
-                    print(f"新浪财经API URL: {fund_data_url}")
-                    response = requests.get(fund_data_url, headers=headers, timeout=10)
-                    
-                    print(f"新浪财经API响应状态: {response.status_code}")
-                    
-                    if response.status_code == 200:
-                        try:
-                            # 解析新浪财经的JS格式数据
-                            data_str = response.text.strip().replace('jsonpgz(', '').replace(');', '')
-                            data = json.loads(data_str)
-                            print(f"新浪财经API响应数据: {data}")
-                            
-                            # 提取当前净值
-                            if 'jzrq' in data and 'dwjz' in data:
-                                date_str = data['jzrq']
-                                nav = float(data['dwjz'])
-                                prices.append(nav)
-                                dates.append(date_str)
-                                print(f"新浪财经API获取到净值数据: {date_str} - {nav}")
-                            else:
-                                print("新浪财经API没有净值数据")
-                        except Exception as e:
-                            print(f"解析新浪财经API响应失败: {e}")
-                    else:
-                        print(f"新浪财经API响应状态错误: {response.status_code}")
-                except Exception as e:
-                    print(f"新浪财经API失败: {e}")
+                                except (ValueError, KeyError):
+                                    pass
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        
+        # 去重处理，避免重复数据
+        unique_data = {}
+        for date, price in zip(dates, prices):
+            unique_data[date] = price
+        
+        # 按日期排序
+        sorted_dates = sorted(unique_data.keys())
+        sorted_prices = [unique_data[date] for date in sorted_dates]
         
         # 计算收益率数据
-        if len(prices) > 1:
+        if len(sorted_prices) > 1:
             returns = []
-            for i in range(1, len(prices)):
+            for i in range(1, len(sorted_prices)):
                 try:
-                    daily_return = (prices[i] - prices[i-1]) / prices[i-1]
+                    daily_return = (sorted_prices[i] - sorted_prices[i-1]) / sorted_prices[i-1]
                     returns.append(daily_return)
-                except (ZeroDivisionError, TypeError) as e:
-                    print(f"计算收益率失败: {e}")
+                except (ZeroDivisionError, TypeError):
                     returns.append(0)
-            # 填充第一个收益率为0
             returns.insert(0, 0)
-        else:
-            print("价格数据不足，无法计算收益率")
         
-        # 添加调试信息，打印最近10条日期和净值数据
-        print(f"基金 {code} 数据获取完成，名称: {name}, 价格数据量: {len(prices)}, 收益率数据量: {len(returns)}")
+        # 存储到缓存
+        fund_data_cache[cache_key] = {
+            'timestamp': time.time(),
+            'data': {
+                'name': name,
+                'prices': sorted_prices,
+                'dates': sorted_dates,
+                'returns': returns
+            }
+        }
         
-        # 打印最近10条数据（最新的）
-        if len(prices) >= 10:
-            print(f"最近10条数据（最新的）: {list(zip(dates[-10:], prices[-10:]))}")
-        else:
-            print(f"所有数据: {list(zip(dates, prices))}")
-        
-        # 检查是否包含2026-01-28的数据
-        if '2026-01-28' in dates:
-            index = dates.index('2026-01-28')
-            print(f"找到2026-01-28的净值数据: {prices[index]}")
-        else:
-            print("未找到2026-01-28的净值数据")
-            # 打印所有2026年的数据
-            print("2026年的数据:")
-            for i, date in enumerate(dates):
-                if date.startswith('2026'):
-                    print(f"日期: {date}, 净值: {prices[i]}")
-            
-        return name, prices, dates, returns
-    except Exception as e:
-        print(f"获取基金数据失败: {e}")
+        return name, sorted_prices, sorted_dates, returns
+    except Exception:
         # 如果API调用失败，返回空数据
         return f'基金{code}', [], [], []
 
@@ -951,33 +815,28 @@ def add_fund():
     try:
         data = request.get_json()
         code = data['code']
-        print(f"收到添加基金请求，基金代码: {code}")
         
         # 获取基金数据
         name, prices, dates, returns = get_fund_data(code)
         
         # 获取市场数据
         market_data = get_market_data()
-        print(f"获取市场数据成功，指数: {len(market_data.get('indices', {}))}, 板块: {len(market_data.get('sectors', {}))}")
         
         # 获取基金持仓数据
         holdings = get_fund_holdings(code)
-        print(f"获取基金持仓数据成功，股票数量: {len(holdings.get('stocks', []))}")
         
         # 检查数据是否有效
         if not prices:
-            print(f"基金 {code} 没有获取到价格数据")
             # 仍然创建基金对象，但数据为空
+            pass
         
         fund = Fund(name, code, prices, dates, returns)
         # 使用市场数据和持仓数据更新预测
         fund.predicted_return = fund.calculate_predicted_return(stock_holdings=holdings, market_data=market_data)
         fund.prediction_confidence = fund.calculate_prediction_confidence()
         funds.append(fund)
-        print(f"基金 {code} 添加成功，ID: {fund.id}")
         return jsonify(fund.to_dict()), 201
     except Exception as e:
-        print(f"添加基金失败: {e}")
         return jsonify({'error': str(e)}), 400
 
 @app.route('/api/funds/<int:fund_id>', methods=['DELETE'])
@@ -989,17 +848,13 @@ def delete_fund(fund_id):
 @app.route('/api/funds/<string:code>/details', methods=['GET'])
 def get_fund_details(code):
     try:
-        print(f"开始获取基金 {code} 详情...")
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
         
         # 使用东方财富API获取基金详情
         fund_data_url = f"https://fund.eastmoney.com/pingzhongdata/{code}.js"
-        print(f"东方财富API URL: {fund_data_url}")
-        response = requests.get(fund_data_url, headers=headers, timeout=10)
-        
-        print(f"东方财富API响应状态: {response.status_code}")
+        response = requests.get(fund_data_url, headers=headers, timeout=5)  # 减少超时时间
         
         if response.status_code == 200:
             try:
@@ -1026,12 +881,8 @@ def get_fund_details(code):
                     manager_match = re.search(r'var Data_currentFundManager = \[(.*?)\];', data_str, re.DOTALL)
                     if manager_match:
                         fund_details['field'] = "混合基金"  # 默认类型
-                        print("未提取到基金类型，使用默认值: 混合基金")
                 if type_match:
                     fund_details['field'] = type_match.group(1)
-                    print(f"提取到基金类型: {fund_details['field']}")
-                else:
-                    print("未提取到基金类型")
                 
                 # 提取基金成立时间
                 # 尝试从不同的变量中提取成立时间
@@ -1048,30 +899,18 @@ def get_fund_details(code):
                         dates = re.findall(r'"(.*?)"', dates_str)
                         if dates:
                             fund_details['establishmentDate'] = dates[0]
-                            print(f"从规模变动数据中提取到成立时间: {fund_details['establishmentDate']}")
                 if establish_match:
                     fund_details['establishmentDate'] = establish_match.group(1)
-                    print(f"提取到成立时间: {fund_details['establishmentDate']}")
-                else:
-                    print("未提取到成立时间")
                 
                 # 清空composition和relatedStocks数组，因为我们不再使用这些数据
                 fund_details['composition'] = []
                 fund_details['relatedStocks'] = []
                 
-                print(f"基金 {code} 详情获取完成")
-                print(f"获取到的详情数据: {fund_details}")
                 return jsonify(fund_details)
-            except Exception as e:
-                print(f"解析东方财富API响应失败: {e}")
-                # 打印部分响应内容，以便调试
-                print(f"响应内容前500字符: {data_str[:500]}")
-        else:
-            print(f"东方财富API响应状态错误: {response.status_code}")
-            # 打印响应内容，以便调试
-            print(f"响应内容: {response.text}")
-    except Exception as e:
-        print(f"获取基金详情失败: {e}")
+            except Exception:
+                pass
+    except Exception:
+        pass
     
     # 如果API调用失败，返回空数据
     return jsonify({
@@ -1087,8 +926,7 @@ def get_news():
         # 返回空数组，因为外部API调用可能被阻止
         # 在实际生产环境中，可以使用更稳定的新闻数据源
         return jsonify([])
-    except Exception as e:
-        print(f"获取新闻失败: {e}")
+    except Exception:
         # 如果API调用失败，返回空数组
         return jsonify([])
 
@@ -1098,8 +936,7 @@ def get_market_data_api():
     try:
         market_data = get_market_data()
         return jsonify(market_data)
-    except Exception as e:
-        print(f"获取市场数据失败: {e}")
+    except Exception:
         return jsonify({'indices': {}, 'sectors': {}})
 
 @app.route('/api/funds/<string:code>/nav', methods=['GET'])
@@ -1136,7 +973,6 @@ def get_fund_nav(code):
         else:
             return jsonify({'nav': None, 'error': '未找到该日期的净值数据'})
     except Exception as e:
-        print(f"获取基金净值失败: {e}")
         return jsonify({'nav': None, 'error': str(e)})
 
 @app.route('/api/funds/<string:code>/holdings', methods=['GET'])

@@ -803,34 +803,34 @@ function showFundDetails(fund) {
                                     if (fund.rsi > 70) {
                                         advice = 'RSI过热, 建议止盈';
                                         adviceColor = '#ff4444';
-                                        adviceDesc = 'RSI指标过高，当前基金处于超买状态，建议及时止盈，避免追高风险。';
+                                        adviceDesc = 'RSI过高，建议止盈';
                                     } else if (fund.rsi < 30) {
                                         advice = 'RSI超卖, 建议买入';
                                         adviceColor = '#4caf50';
-                                        adviceDesc = 'RSI指标过低，当前基金处于超卖状态，可能存在反弹机会，建议适当买入。';
+                                        adviceDesc = 'RSI过低，建议买入';
                                     } else if (fund.predicted_return > 0.01) {
                                         advice = '看涨信号, 建议持有';
                                         adviceColor = '#4caf50';
-                                        adviceDesc = '预测收益率为正，短期可能有上涨空间，建议继续持有。';
+                                        adviceDesc = '预测上涨，建议持有';
                                     } else if (fund.predicted_return < -0.01) {
                                         advice = '看跌信号, 建议减仓';
                                         adviceColor = '#ff4444';
-                                        adviceDesc = '预测收益率为负，短期可能面临调整，建议适当减仓。';
+                                        adviceDesc = '预测下跌，建议减仓';
                                     } else {
                                         advice = '震荡行情, 建议观望';
                                         adviceColor = '#ff9800';
-                                        adviceDesc = '建议保持观望，等待明确信号。';
+                                        adviceDesc = '建议观望';
                                     }
                                     
                                     // 结合市场环境调整建议
                                     if (marketImpact > 0.01 && fund.predicted_return < 0) {
                                         advice = '谨慎看跌, 建议观望';
                                         adviceColor = '#ff9800';
-                                        adviceDesc = '预测收益率为负，但大盘强势上涨，可能抵消部分下跌风险，建议观望为主。';
+                                        adviceDesc = '大盘上涨，建议观望';
                                     } else if (marketImpact < -0.01 && fund.predicted_return > 0) {
                                         advice = '谨慎看涨, 建议轻仓';
                                         adviceColor = '#ff9800';
-                                        adviceDesc = '预测收益率为正，但大盘明显下跌，可能拖累基金表现，建议轻仓操作。';
+                                        adviceDesc = '大盘下跌，建议轻仓';
                                     }
                                     
                                     return `
@@ -838,7 +838,7 @@ function showFundDetails(fund) {
                                             <span style="margin-right: 8px;">●</span> ${advice}
                                         </div>
                                         <div style="font-size: 11px; color: #aaa; line-height: 1.3; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                            ${marketDesc ? marketDesc + '，' + adviceDesc : adviceDesc}
+                                            ${marketDesc ? marketDesc : adviceDesc}
                                         </div>
                                     `;
                                 })()}
