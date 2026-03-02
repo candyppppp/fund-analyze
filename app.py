@@ -641,7 +641,7 @@ def get_fund_data(code):
         
         # 数据源1: 新浪财经API
         try:
-            print("尝试使用新浪财经API获取基金基本信息...")
+            print("尝试使用新浪财经API获取基金基本信息和净值...")
             fund_url = f"http://fundgz.1234567.com.cn/js/{code}.js"
             response = requests.get(fund_url, headers=headers, timeout=5)
             response.encoding = 'utf-8'
@@ -655,6 +655,15 @@ def get_fund_data(code):
                 # 提取基金名称
                 name = data.get('name', f'基金{code}')
                 print(f"新浪财经API获取到基金名称: {name}")
+                
+                # 提取当前净值和日期
+                if 'jzrq' in data and 'dwjz' in data:
+                    date_str = data['jzrq']
+                    nav = float(data['dwjz'])
+                    # 先添加新浪财经的最新数据
+                    prices.append(nav)
+                    dates.append(date_str)
+                    print(f"新浪财经API获取到最新净值数据: {date_str} - {nav}")
             else:
                 print(f"新浪财经API响应状态错误: {response.status_code}")
         except Exception as e:
@@ -682,101 +691,178 @@ def get_fund_data(code):
                 print(f"天天基金网API失败: {e}")
         
         # 获取历史净值数据
-        # 数据源1: 东方财富API
+        # 数据源1: 天天基金网API（优先使用，因为提供更完整的历史数据）
         try:
-            print("尝试使用东方财富API获取历史净值数据...")
-            # 东方财富API URL
-            fund_data_url = f"https://fund.eastmoney.com/pingzhongdata/{code}.js"
-            print(f"东方财富API URL: {fund_data_url}")
-            response = requests.get(fund_data_url, headers=headers, timeout=10)
+            print("尝试使用天天基金网API获取历史净值数据...")
+            # 天天基金网净值API
+            fund_data_url = f"https://fund.eastmoney.com/f10/F10DataApi.aspx?type=lsjz&code={code}&page=1&per=100"
+            print(f"天天基金网API URL: {fund_data_url}")
             
-            # 检查响应状态
-            print(f"东方财富API响应状态: {response.status_code}")
+            # 使用更完整的请求头
+            tian_tian_headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                "Referer": f"https://fund.eastmoney.com/{code}.html",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "zh-CN,zh;q=0.9",
+                "Connection": "keep-alive"
+            }
+            
+            response = requests.get(fund_data_url, headers=tian_tian_headers, timeout=10)
+            
+            print(f"天天基金网API响应状态: {response.status_code}")
             
             if response.status_code == 200:
                 try:
-                    # 解析JS格式数据
-                    data_str = response.text
-                    # 提取净值数据
-                    import re
-                    net_value_match = re.search(r'var Data_netWorthTrend = \[(.*?)\];', data_str, re.DOTALL)
-                    if net_value_match:
-                        net_value_data = net_value_match.group(1)
-                        # 转换为JSON格式
-                        net_value_json = '[' + net_value_data + ']'
-                        net_value_list = json.loads(net_value_json)
-                        print(f"东方财富API获取到 {len(net_value_list)} 条净值数据")
-                        
-                        # 取最近365天的数据，确保有足够的历史数据供前端查询
-                        recent_data = net_value_list[-365:]
-                        print(f"取最近 {len(recent_data)} 条数据")
-                        
-                        for item in recent_data:
-                            try:
-                                nav = item['y']
-                                date_str = time.strftime('%Y-%m-%d', time.localtime(item['x'] / 1000))
-                                prices.append(nav)
-                                dates.append(date_str)
-                            except (ValueError, KeyError) as e:
-                                print(f"解析东方财富净值数据失败: {e}")
-                                print(f"失败的数据项: {item}")
-                        
-                        if prices:
-                            print(f"东方财富API成功提取 {len(prices)} 条净值数据")
+                    # 打印响应的前500个字符，以便调试
+                    print(f"天天基金网API响应前500字符: {response.text[:500]}...")
+                    
+                    # 解析HTML数据
+                    # 使用字符串操作提取content部分
+                    try:
+                        # 找到content的起始位置
+                        content_start = response.text.find('content:"')
+                        if content_start != -1:
+                            content_start += len('content:"')
+                            # 找到content的结束位置
+                            content_end = response.text.find('"', content_start)
+                            if content_end != -1:
+                                content = response.text[content_start:content_end]
+                                # 然后从content中提取表格
+                                table_start = content.find('<table')
+                                table_end = content.find('</table>', table_start)
+                                if table_start != -1 and table_end != -1:
+                                    table_html = content[table_start:table_end + len('</table>')]
+                                    # 提取行数据
+                                    row_start = table_html.find('<tr')
+                                    rows = []
+                                    while row_start != -1:
+                                        row_end = table_html.find('</tr>', row_start)
+                                        if row_end != -1:
+                                            rows.append(table_html[row_start:row_end + len('</tr>')])
+                                            row_start = table_html.find('<tr', row_end)
+                                        else:
+                                            break
+                                    
+                                    # 存储天天基金网的数据，以便后续处理
+                                    tian_tian_prices = []
+                                    tian_tian_dates = []
+                                    
+                                    for i, row in enumerate(rows):
+                                        if i == 0:  # 跳过表头
+                                            continue
+                                        # 提取列数据
+                                        col_start = row.find('<td')
+                                        cols = []
+                                        while col_start != -1:
+                                            col_end = row.find('</td>', col_start)
+                                            if col_end != -1:
+                                                # 提取td标签内的内容
+                                                col_content = row[col_start:col_end + len('</td>')]
+                                                # 去除标签
+                                                col_text = col_content.replace('<td', '').replace('</td>', '').replace('class="tor bold"', '').replace('class="tor bold red"', '').replace('class="red unbold"', '').strip()
+                                                # 提取文本内容
+                                                text_start = col_text.find('>')
+                                                if text_start != -1:
+                                                    col_text = col_text[text_start + 1:].strip()
+                                                cols.append(col_text)
+                                                col_start = row.find('<td', col_end)
+                                            else:
+                                                break
+                                        
+                                        if len(cols) >= 4:
+                                            date_str = cols[0]
+                                            nav_str = cols[1]
+                                            try:
+                                                nav = float(nav_str)
+                                                tian_tian_prices.append(nav)
+                                                tian_tian_dates.append(date_str)
+                                                print(f"天天基金网API获取到净值数据: {date_str} - {nav}")
+                                            except ValueError:
+                                                print(f"解析净值数据失败: {nav_str}")
+                                    
+                                    # 反转数据，使其按时间正序排列
+                                    tian_tian_prices.reverse()
+                                    tian_tian_dates.reverse()
+                                    
+                                    # 添加到主数据列表
+                                    prices.extend(tian_tian_prices)
+                                    dates.extend(tian_tian_dates)
+                                    
+                                    if tian_tian_prices:
+                                        print(f"天天基金网API成功提取 {len(tian_tian_prices)} 条净值数据")
+                                    else:
+                                        print("天天基金网API没有获取到净值数据")
+                                else:
+                                    print("天天基金网API没有找到净值表格")
+                            else:
+                                print("天天基金网API响应格式不正确：找不到content结束位置")
                         else:
-                            print("东方财富API没有获取到净值数据")
-                    else:
-                        print("东方财富API没有找到净值数据")
+                            print("天天基金网API响应格式不正确：找不到content起始位置")
+                    except Exception as e:
+                        print(f"解析天天基金网API响应失败: {e}")
                 except Exception as e:
-                    print(f"解析东方财富API响应失败: {e}")
+                    print(f"解析天天基金网API响应失败: {e}")
             else:
-                print(f"东方财富API响应状态错误: {response.status_code}")
+                print(f"天天基金网API响应状态错误: {response.status_code}")
         except Exception as e:
-            print(f"东方财富API失败: {e}")
-            # 数据源2: 天天基金网API
+            print(f"天天基金网API失败: {e}")
+            # 数据源2: 东方财富API
             try:
-                print("尝试使用天天基金网API获取历史净值数据...")
-                # 天天基金网净值API
-                fund_data_url = f"https://fund.eastmoney.com/f10/F10DataApi.aspx?type=lsjz&code={code}&page=1&per=40"
-                print(f"天天基金网API URL: {fund_data_url}")
+                print("尝试使用东方财富API获取历史净值数据...")
+                # 东方财富API URL
+                fund_data_url = f"https://fund.eastmoney.com/pingzhongdata/{code}.js"
+                print(f"东方财富API URL: {fund_data_url}")
                 response = requests.get(fund_data_url, headers=headers, timeout=10)
                 
-                print(f"天天基金网API响应状态: {response.status_code}")
+                # 检查响应状态
+                print(f"东方财富API响应状态: {response.status_code}")
                 
                 if response.status_code == 200:
                     try:
-                        # 解析HTML数据
+                        # 解析JS格式数据
+                        data_str = response.text
+                        # 提取净值数据
                         import re
-                        # 提取表格数据
-                        table_match = re.search(r'<table class="w782">(.*?)</table>', response.text, re.DOTALL)
-                        if table_match:
-                            table_html = table_match.group(1)
-                            # 提取行数据
-                            row_matches = re.findall(r'<tr>(.*?)</tr>', table_html, re.DOTALL)
-                            for row_html in row_matches[1:41]:  # 跳过表头，取前40条数据
-                                # 提取列数据
-                                col_matches = re.findall(r'<td[^>]*>(.*?)</td>', row_html, re.DOTALL)
-                                if len(col_matches) >= 4:
-                                    date_str = re.sub(r'\s+', ' ', col_matches[0]).strip()
-                                    nav_str = re.sub(r'\s+', ' ', col_matches[1]).strip()
-                                    try:
-                                        nav = float(nav_str)
-                                        prices.append(nav)
-                                        dates.append(date_str)
-                                        print(f"天天基金网API获取到净值数据: {date_str} - {nav}")
-                                    except ValueError:
-                                        print(f"解析净值数据失败: {nav_str}")
-                            # 反转数据，使其按时间正序排列
-                            prices.reverse()
-                            dates.reverse()
+                        net_value_match = re.search(r'var Data_netWorthTrend = \[(.*?)\];', data_str, re.DOTALL)
+                        if net_value_match:
+                            net_value_data = net_value_match.group(1)
+                            # 转换为JSON格式
+                            net_value_json = '[' + net_value_data + ']'
+                            net_value_list = json.loads(net_value_json)
+                            print(f"东方财富API获取到 {len(net_value_list)} 条净值数据")
+                            
+                            # 东方财富API返回的数据是按时间倒序排列的（最新的数据在前）
+                            # 取最近365天的数据，确保有足够的历史数据供前端查询
+                            recent_data = net_value_list[:365]  # 取前365条数据（最新的）
+                            print(f"取最近 {len(recent_data)} 条数据")
+                            
+                            # 遍历数据，按时间正序添加
+                            for item in reversed(recent_data):
+                                try:
+                                    nav = item['y']
+                                    timestamp = item['x']
+                                    # 添加调试信息，打印原始时间戳
+                                    if len(prices) < 5:  # 只打印前5条数据的时间戳
+                                        print(f"原始时间戳: {timestamp}, 转换后: {time.strftime('%Y-%m-%d', time.localtime(timestamp / 1000))}")
+                                    date_str = time.strftime('%Y-%m-%d', time.localtime(timestamp / 1000))
+                                    prices.append(nav)
+                                    dates.append(date_str)
+                                except (ValueError, KeyError) as e:
+                                    print(f"解析东方财富净值数据失败: {e}")
+                                    print(f"失败的数据项: {item}")
+                            
+                            if prices:
+                                print(f"东方财富API成功提取 {len(prices)} 条净值数据")
+                            else:
+                                print("东方财富API没有获取到净值数据")
                         else:
-                            print("天天基金网API没有找到净值表格")
+                            print("东方财富API没有找到净值数据")
                     except Exception as e:
-                        print(f"解析天天基金网API响应失败: {e}")
+                        print(f"解析东方财富API响应失败: {e}")
                 else:
-                    print(f"天天基金网API响应状态错误: {response.status_code}")
+                    print(f"东方财富API响应状态错误: {response.status_code}")
             except Exception as e:
-                print(f"天天基金网API失败: {e}")
+                print(f"东方财富API失败: {e}")
                 # 数据源3: 新浪财经API
                 try:
                     print("尝试使用新浪财经API获取历史净值数据...")
@@ -825,7 +911,27 @@ def get_fund_data(code):
         else:
             print("价格数据不足，无法计算收益率")
         
+        # 添加调试信息，打印最近10条日期和净值数据
         print(f"基金 {code} 数据获取完成，名称: {name}, 价格数据量: {len(prices)}, 收益率数据量: {len(returns)}")
+        
+        # 打印最近10条数据（最新的）
+        if len(prices) >= 10:
+            print(f"最近10条数据（最新的）: {list(zip(dates[-10:], prices[-10:]))}")
+        else:
+            print(f"所有数据: {list(zip(dates, prices))}")
+        
+        # 检查是否包含2026-01-28的数据
+        if '2026-01-28' in dates:
+            index = dates.index('2026-01-28')
+            print(f"找到2026-01-28的净值数据: {prices[index]}")
+        else:
+            print("未找到2026-01-28的净值数据")
+            # 打印所有2026年的数据
+            print("2026年的数据:")
+            for i, date in enumerate(dates):
+                if date.startswith('2026'):
+                    print(f"日期: {date}, 净值: {prices[i]}")
+            
         return name, prices, dates, returns
     except Exception as e:
         print(f"获取基金数据失败: {e}")
