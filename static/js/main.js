@@ -296,6 +296,11 @@ function addFund() {
     })
     .then(data => {
         console.log('添加基金API返回数据:', data);
+        // 检查是否有错误
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
         // 重新从API获取所有基金数据并保存到本地存储
         fetch('/api/funds')
             .then(response => {
@@ -314,6 +319,7 @@ function addFund() {
     })
     .catch(error => {
         console.error('添加基金失败:', error);
+        alert('添加基金失败，请稍后重试');
     });
 }
 

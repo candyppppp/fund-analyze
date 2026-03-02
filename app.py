@@ -844,6 +844,11 @@ def add_fund():
         data = request.get_json()
         code = data['code']
         
+        # 检查基金是否已经存在
+        for existing_fund in funds:
+            if existing_fund.code == code:
+                return jsonify({'error': '基金已经存在'}), 400
+        
         # 获取基金数据
         name, prices, dates, returns = get_fund_data(code)
         
