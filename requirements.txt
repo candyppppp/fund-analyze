@@ -1,7 +1,6 @@
 Flask
 Flask-CORS
 numpy
-scikit-learn
 pytest
 gunicorn
 requests
