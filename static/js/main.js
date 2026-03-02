@@ -179,43 +179,10 @@ function renderFunds(funds) {
         // 计算预估今日收益
         let estimatedReturn = 0;
         if (buySettings.shares > 0) {
-            // 基于股票持仓数据和市场数据计算更准确的预估收益
-            let adjustedPredictedReturn = fund.predicted_return;
-            
-            // 如果有股票持仓数据，使用它来调整预测收益率
-            if (fund.stock_holdings && fund.stock_holdings.stocks && fund.stock_holdings.stocks.length > 0) {
-                const totalWeight = fund.stock_holdings.stocks.reduce((sum, stock) => sum + stock.weight, 0);
-                if (totalWeight > 0) {
-                    const weightedReturn = fund.stock_holdings.stocks.reduce((sum, stock) => {
-                        return sum + (stock.weight * (stock.change_ratio || 0));
-                    }, 0) / totalWeight;
-                    // 结合原始预测和股票持仓预测
-                    adjustedPredictedReturn = (fund.predicted_return * 0.4 + weightedReturn * 0.6);
-                }
-            }
-            
-            // 如果有市场数据，进一步调整预测收益率
-            if (fund.market_data) {
-                // 计算大盘平均涨跌幅
-                const indices = fund.market_data.indices || {};
-                const indexChanges = Object.values(indices).map(index => index.change_ratio || 0);
-                if (indexChanges.length > 0) {
-                    const avgIndexChange = indexChanges.reduce((sum, change) => sum + change, 0) / indexChanges.length;
-                    // 大盘对基金的影响
-                    adjustedPredictedReturn += avgIndexChange * 0.05;
-                }
-                
-                // 计算行业板块平均涨跌幅
-                const sectors = fund.market_data.sectors || {};
-                const sectorChanges = Object.values(sectors).map(sector => sector.change_ratio || 0);
-                if (sectorChanges.length > 0) {
-                    const avgSectorChange = sectorChanges.reduce((sum, change) => sum + change, 0) / sectorChanges.length;
-                    // 板块对基金的影响
-                    adjustedPredictedReturn += avgSectorChange * 0.03;
-                }
-            }
-            
-            estimatedReturn = adjustedPredictedReturn * fund.prices[fund.prices.length - 1] * buySettings.shares;
+            // 直接使用基金的预测收益率计算预估收益金额
+            // 公式：预估收益金额 = 上一个交易日的净值 * 预估收益率 * 份数
+            const previousNetValue = fund.prices[fund.prices.length - 1];
+            estimatedReturn = previousNetValue * fund.predicted_return * buySettings.shares;
         }
         
         // 获取预测置信度

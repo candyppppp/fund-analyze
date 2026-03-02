@@ -47,8 +47,9 @@ class Fund:
         if stock_holdings and stock_holdings.get('stocks'):
             total_weight = sum(stock['weight'] for stock in stock_holdings['stocks'])
             if total_weight > 0:
-                weighted_sum = sum(stock['weight'] * stock.get('change_ratio', 0) for stock in stock_holdings['stocks'])
-                stock_based_return = weighted_sum / total_weight
+                # 将股票权重从百分比转换为小数形式
+                weighted_sum = sum((stock['weight'] / 100) * stock.get('change_ratio', 0) for stock in stock_holdings['stocks'])
+                stock_based_return = weighted_sum
         
         # 基于高级技术指标的调整
         technical_adjustment = 0
