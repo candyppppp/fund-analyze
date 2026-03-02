@@ -36,7 +36,21 @@ def get_fund_holdings(code):
     cache_key = f"fund_holdings_{code}"
     current_time = time.time()
     
-    if cache_key in fund_holdings_cache and current_time - fund_holdings_cache[cache_key]['timestamp'] < fund_holdings_cache_expiry:
+    # 判断是否为交易日交易时间
+    now = datetime.now()
+    is_trading_day = now.weekday() < 5  # 周一到周五
+    is_trading_time = 9 <= now.hour < 15  # 9:00-15:00
+    
+    # 根据是否为交易时间设置不同的缓存过期时间
+    if is_trading_day and is_trading_time:
+        # 交易日交易时间：15秒缓存，确保数据及时更新
+        current_cache_expiry = 15
+    else:
+        # 非交易时间：8小时缓存
+        current_cache_expiry = 28800
+    
+    # 检查缓存是否有效
+    if cache_key in fund_holdings_cache and current_time - fund_holdings_cache[cache_key]['timestamp'] < current_cache_expiry:
         return fund_holdings_cache[cache_key]['data']
     
     holdings = {
@@ -47,6 +61,8 @@ def get_fund_holdings(code):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
+    
+    data_obtained = False
     
     # 优先从东方财富JS数据获取（响应速度快，数据结构清晰）
     try:
@@ -81,11 +97,13 @@ def get_fund_holdings(code):
                                     holdings['stocks'].append(stock_info)
                         except Exception:
                             pass
+                    if holdings['stocks']:
+                        data_obtained = True
                 except Exception:
                     pass
             
             # 如果 Data_holdStock 为空，尝试提取其他变量
-            if not holdings['stocks']:
+            if not data_obtained:
                 # 尝试提取 Data_holdStockNew 变量
                 data_hold_stock_new_match = re.search(r'var Data_holdStockNew = \[(.*?)\];', data_str, re.DOTALL)
                 if data_hold_stock_new_match:
@@ -111,11 +129,13 @@ def get_fund_holdings(code):
                                         holdings['stocks'].append(stock_info)
                             except Exception:
                                 pass
+                        if holdings['stocks']:
+                            data_obtained = True
                     except Exception:
                         pass
             
             # 如果仍然没有数据，尝试提取 stockCodes 和 stockNames 变量
-            if not holdings['stocks']:
+            if not data_obtained:
                 # 尝试提取 stockCodes 变量
                 stock_codes_match = re.search(r'var stockCodes\s*=\s*\[(.*?)\];', data_str)
                 if stock_codes_match:
@@ -183,6 +203,8 @@ def get_fund_holdings(code):
                                 'weight': weight
                             }
                             holdings['stocks'].append(stock_info)
+                        if holdings['stocks']:
+                            data_obtained = True
                     except Exception:
                         pass
             
@@ -215,7 +237,7 @@ def get_fund_holdings(code):
         pass
     
     # 如果从JS数据获取失败，尝试从HTML页面获取
-    if not holdings['stocks']:
+    if not data_obtained:
         try:
             fund_url = f"http://fund.eastmoney.com/{code}.html"
             response = requests.get(fund_url, headers=headers, timeout=5)
@@ -240,6 +262,8 @@ def get_fund_holdings(code):
                                 'weight': float(weight_match.group(1))
                             }
                             holdings['stocks'].append(stock_info)
+                    if holdings['stocks']:
+                        data_obtained = True
                 
                 # 尝试提取资产配置数据
                 asset_match = re.search(r'资产配置.*?<table.*?>(.*?)</table>', data_str, re.DOTALL)
@@ -261,6 +285,10 @@ def get_fund_holdings(code):
                 stock['name'] = get_stock_name(code)
             valid_stocks.append(stock)
     holdings['stocks'] = valid_stocks
+    
+    # 如果获取数据失败，尝试使用缓存中的旧数据
+    if not data_obtained and cache_key in fund_holdings_cache:
+        return fund_holdings_cache[cache_key]['data']
     
     # 存储到缓存
     fund_holdings_cache[cache_key] = {
