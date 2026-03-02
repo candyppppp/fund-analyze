@@ -54,11 +54,11 @@ function getMarketData() {
     
     // 缓存过期，从API获取新数据
     console.log('从API获取市场数据');
-    return fetch('http://localhost:8888/api/funds/000001/holdings')
+    return fetch('http://localhost:8888/api/market-data')
         .then(response => response.json())
         .then(data => {
             // 更新缓存
-            marketDataCache = data.market_data;
+            marketDataCache = data;
             marketDataTimestamp = now;
             return marketDataCache;
         })
@@ -70,47 +70,78 @@ function getMarketData() {
 }
 
 function loadFunds() {
-    // 强制从API获取最新数据，而不是使用本地存储的旧数据
+    // 先尝试从本地存储加载数据，提高响应速度
+    const savedFunds = localStorage.getItem('funds');
+    if (savedFunds) {
+        const funds = JSON.parse(savedFunds);
+        renderFunds(funds);
+    }
+    
+    // 然后在后台从API获取最新数据
     fetch('/api/funds')
         .then(response => response.json())
         .then(funds => {
             // 先获取市场数据
             return getMarketData().then(marketData => {
-                // 为每个基金获取股票持仓数据，用于更准确的预测
-                const fundPromises = funds.map(fund => {
-                    return fetch(`http://localhost:8888/api/funds/${fund.code}/holdings`)
-                        .then(response => response.json())
-                        .then(holdings => {
-                            // 将股票持仓数据和市场数据添加到基金对象
-                            fund.stock_holdings = holdings;
-                            fund.market_data = marketData; // 使用共享的市场数据
-                            return fund;
-                        })
-                        .catch(error => {
-                            console.error(`获取基金 ${fund.code} 持仓数据失败:`, error);
-                            // 如果获取失败，继续使用原基金数据，但添加市场数据
-                            fund.market_data = marketData;
-                            return fund;
-                        });
+                // 为每个基金添加市场数据
+                funds.forEach(fund => {
+                    fund.market_data = marketData;
                 });
                 
-                // 等待所有基金的持仓数据获取完成
-                return Promise.all(fundPromises);
+                // 批量获取基金持仓数据，减少API请求
+                const fundCodes = funds.map(fund => fund.code);
+                const batchSize = 3; // 每批处理3个基金
+                const batches = [];
+                
+                for (let i = 0; i < fundCodes.length; i += batchSize) {
+                    batches.push(fundCodes.slice(i, i + batchSize));
+                }
+                
+                // 按批次处理，避免同时发起过多请求
+                let processedFunds = funds;
+                const processBatch = (batchIndex) => {
+                    if (batchIndex >= batches.length) {
+                        return Promise.resolve(processedFunds);
+                    }
+                    
+                    const batch = batches[batchIndex];
+                    const batchPromises = batch.map(code => {
+                        return fetch(`http://localhost:8888/api/funds/${code}/holdings`)
+                            .then(response => response.json())
+                            .then(holdings => {
+                                // 找到对应的基金并添加持仓数据
+                                const fund = processedFunds.find(f => f.code === code);
+                                if (fund) {
+                                    fund.stock_holdings = holdings;
+                                }
+                                return holdings;
+                            })
+                            .catch(error => {
+                                console.error(`获取基金 ${code} 持仓数据失败:`, error);
+                                return null;
+                            });
+                    });
+                    
+                    return Promise.all(batchPromises).then(() => {
+                        // 延迟500ms处理下一批，避免请求过于集中
+                        return new Promise(resolve => setTimeout(() => {
+                            resolve(processBatch(batchIndex + 1));
+                        }, 500));
+                    });
+                };
+                
+                return processBatch(0);
             });
         })
         .then(updatedFunds => {
             // 保存到本地存储
             localStorage.setItem('funds', JSON.stringify(updatedFunds));
+            // 重新渲染以显示最新数据
             renderFunds(updatedFunds);
         })
         .catch(error => {
             console.error('获取基金数据失败:', error);
-            // 如果API调用失败，尝试从本地存储加载
-            const savedFunds = localStorage.getItem('funds');
-            if (savedFunds) {
-                const funds = JSON.parse(savedFunds);
-                renderFunds(funds);
-            }
+            // 如果API调用失败，已经显示了本地存储的数据
         });
 }
 
@@ -1039,35 +1070,58 @@ function showFundDetails(fund) {
                 }
             }
             
-            // 保存买入记录
-            const buyRecord = {
-                date: buyDate,
-                shares: buyShares,
-                nav: buyNav
-            };
-            saveBuyRecord(fund.id, buyRecord);
+            // 保存买入记录的函数
+            function saveBuyRecordWithNav(nav) {
+                const buyRecord = {
+                    date: buyDate,
+                    shares: buyShares,
+                    nav: nav
+                };
+                saveBuyRecord(fund.id, buyRecord);
+                
+                // 计算总持仓
+                const buyRecords = getBuyRecords(fund.id);
+                const totalShares = buyRecords.reduce((total, record) => total + record.shares, 0);
+                
+                // 保存总持仓
+                const buySettings = {
+                    date: buyDate,
+                    shares: totalShares
+                };
+                localStorage.setItem(`fundBuySettings_${fund.id}`, JSON.stringify(buySettings));
+                
+                // 重新加载买入记录
+                loadBuyRecords();
+                
+                // 初始化表单
+                document.getElementById('buy-date').value = new Date().toISOString().split('T')[0];
+                document.getElementById('buy-shares').value = 0;
+                
+                alert('买入设置已保存');
+                // 重新加载页面以更新预估收益
+                loadFunds();
+            }
             
-            // 计算总持仓
-            const buyRecords = getBuyRecords(fund.id);
-            const totalShares = buyRecords.reduce((total, record) => total + record.shares, 0);
-            
-            // 保存总持仓
-            const buySettings = {
-                date: buyDate,
-                shares: totalShares
-            };
-            localStorage.setItem(`fundBuySettings_${fund.id}`, JSON.stringify(buySettings));
-            
-            // 重新加载买入记录
-            loadBuyRecords();
-            
-            // 初始化表单
-            document.getElementById('buy-date').value = new Date().toISOString().split('T')[0];
-            document.getElementById('buy-shares').value = 0;
-            
-            alert('买入设置已保存');
-            // 重新加载页面以更新预估收益
-            loadFunds();
+            // 确保净值数据的一致性，无论线上还是本地环境
+            // 当找不到对应日期的净值时，使用后端API获取该日期的净值
+            if (buyNav === fund.prices[fund.prices.length - 1] && buyDate !== fund.dates[fund.dates.length - 1]) {
+                // 尝试从后端API获取历史净值
+                fetch(`/api/funds/${fund.code}/nav?date=${buyDate}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.nav) {
+                            buyNav = data.nav;
+                            console.log(`从后端API获取到 ${buyDate} 的净值: ${buyNav}`);
+                        }
+                        saveBuyRecordWithNav(buyNav);
+                    })
+                    .catch(error => {
+                        console.error('获取历史净值失败:', error);
+                        saveBuyRecordWithNav(buyNav);
+                    });
+            } else {
+                saveBuyRecordWithNav(buyNav);
+            }
         } else {
             alert('请输入有效的买入份数');
         }
@@ -1143,7 +1197,7 @@ function showFundDetails(fund) {
 
 // 股票持仓数据缓存
 const stockHoldingsCache = {};
-const stockHoldingsCacheExpiry = 300; // 缓存时间（秒）
+const stockHoldingsCacheExpiry = 600; // 缓存时间（秒），增加到10分钟
 let stockUpdateIntervals = {}; // 存储每个基金的更新定时器
 
 // 检查是否在开市时间内
@@ -1167,6 +1221,29 @@ function isTradingTime() {
 function loadStockHoldings(fundCode) {
     const stockHoldingsElement = document.getElementById('stock-holdings');
     
+    // 检查缓存
+    const cacheKey = `stock_holdings_${fundCode}`;
+    const currentTime = Date.now() / 1000;
+    
+    if (stockHoldingsCache[cacheKey] && (currentTime - stockHoldingsCache[cacheKey].timestamp) < stockHoldingsCacheExpiry) {
+        console.log('从缓存获取持仓股票数据');
+        const cachedData = stockHoldingsCache[cacheKey].data;
+        
+        // 更新标题为"股票持仓 (X%)"
+        const stockRatio = cachedData.stock_ratio ? cachedData.stock_ratio.toFixed(1) : 0;
+        const titleElement = stockHoldingsElement.parentElement.querySelector('h3');
+        if (titleElement) {
+            titleElement.textContent = `股票持仓 (${stockRatio}%)`;
+        }
+        
+        // 渲染数据
+        renderStockHoldings(cachedData, stockHoldingsElement, false);
+        
+        // 设置自动更新
+        setupStockUpdateInterval(fundCode);
+        return;
+    }
+    
     // 显示加载中状态
     stockHoldingsElement.innerHTML = '<div style="font-size: 12px; color: #aaa; padding: 20px; text-align: center;">加载中...</div>';
     
@@ -1177,8 +1254,6 @@ function loadStockHoldings(fundCode) {
             console.log('获取到的持仓股票数据:', data);
             
             // 存储到缓存
-            const cacheKey = `stock_holdings_${fundCode}`;
-            const currentTime = Date.now() / 1000;
             stockHoldingsCache[cacheKey] = {
                 timestamp: currentTime,
                 data: data
@@ -1242,33 +1317,8 @@ function setupStockUpdateInterval(fundCode) {
         }
     }, 15000);
     
-    // 为每个股票设置独立的更新定时器
-    setTimeout(() => {
-        const stockHoldingsElement = document.getElementById('stock-holdings');
-        if (stockHoldingsElement) {
-            if (!stockUpdateTimers[fundCode]) {
-                stockUpdateTimers[fundCode] = [];
-            }
-            
-            // 为每个股票设置随机的闪烁动画
-            const stockCards = stockHoldingsElement.querySelectorAll('.stock-card');
-            stockCards.forEach(card => {
-                // 随机5-15秒的间隔，缩短更新周期
-                const randomInterval = 5000 + Math.random() * 10000;
-                const timer = setInterval(() => {
-                    if (isTradingTime()) {
-                        // 随机选择闪烁或脉冲动画
-                        if (Math.random() > 0.5) {
-                            flashCard(card);
-                        } else {
-                            pulseCard(card);
-                        }
-                    }
-                }, randomInterval);
-                stockUpdateTimers[fundCode].push(timer);
-            });
-        }
-    }, 1000); // 延迟1秒，确保DOM已经渲染
+    // 移除为每个股票设置的独立定时器，减少定时器数量
+    // 只在数据更新时添加动画效果
 }
 
 // 清除股票数据自动更新
@@ -1309,8 +1359,8 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// 存储股票更新定时器
-let stockUpdateTimers = {};
+// 存储股票更新定时器 (不再使用，已简化更新逻辑)
+// let stockUpdateTimers = {};
 
 // 闪烁卡片动画
 function flashCard(cardEl) {

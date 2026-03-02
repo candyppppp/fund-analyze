@@ -15,15 +15,15 @@ funds = []
 
 # 股票数据缓存
 stock_cache = {}
-stock_cache_expiry = 30  # 股票数据缓存时间（秒）
+stock_cache_expiry = 300  # 股票数据缓存时间（秒），增加到5分钟，减少API调用
 
 # 基金持仓数据缓存
 fund_holdings_cache = {}
-fund_holdings_cache_expiry = 86400  # 基金持仓数据缓存时间（秒），1天
+fund_holdings_cache_expiry = 28800  # 基金持仓数据缓存时间（秒），8小时，减少API调用
 
 # 市场数据缓存
 market_data_cache = {}
-market_data_cache_expiry = 60  # 市场数据缓存时间（秒），1分钟
+market_data_cache_expiry = 120  # 市场数据缓存时间（秒），2分钟
 
 # 获取基金持仓数据
 def get_fund_holdings(code):
@@ -393,6 +393,107 @@ def get_stock_name(stock_code):
     print(f"使用默认股票名称: {default_name}")
     return default_name
 
+# 批量获取股票实时数据
+def get_batch_stock_real_time_data(stock_codes):
+    """批量获取股票的实时数据，减少API调用次数"""
+    results = {}
+    cached_stocks = []
+    uncached_stocks = []
+    
+    # 检查缓存
+    current_time = time.time()
+    for stock_code in stock_codes:
+        cache_key = f"stock_{stock_code}"
+        if cache_key in stock_cache and current_time - stock_cache[cache_key]['timestamp'] < stock_cache_expiry:
+            results[stock_code] = stock_cache[cache_key]['data']
+            cached_stocks.append(stock_code)
+        else:
+            uncached_stocks.append(stock_code)
+    
+    if cached_stocks:
+        print(f"从缓存获取股票数据: {cached_stocks}")
+    
+    # 批量获取未缓存的股票数据
+    if uncached_stocks:
+        # 限制批量请求数量，避免API限制
+        batch_size = 10
+        for i in range(0, len(uncached_stocks), batch_size):
+            batch_codes = uncached_stocks[i:i+batch_size]
+            try:
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                    "Referer": "https://finance.sina.com.cn/"
+                }
+                
+                # 构建批量API URL
+                full_codes = []
+                for stock_code in batch_codes:
+                    if stock_code.startswith('6'):
+                        full_codes.append(f"sh{stock_code}")
+                    else:
+                        full_codes.append(f"sz{stock_code}")
+                
+                code_str = ",".join(full_codes)
+                stock_url = f"http://hq.sinajs.cn/list={code_str}"
+                print(f"批量获取股票实时数据: {stock_url}")
+                response = requests.get(stock_url, headers=headers, timeout=3)  # 减少超时时间
+                
+                if response.status_code == 200:
+                    stock_data = response.text
+                    print(f"批量获取股票数据成功，长度: {len(stock_data)}")
+                    
+                    # 解析数据
+                    lines = stock_data.strip().split('\n')
+                    for line in lines:
+                        if line:
+                            try:
+                                # 提取股票代码
+                                code_part = line.split('=')[0]
+                                stock_code = code_part.split('_')[-1].replace('sh', '').replace('sz', '')
+                                if stock_code in batch_codes:
+                                    # 解析股票数据
+                                    data_part = line.split('=', 1)[1].strip('"')
+                                    stock_info = data_part.split(',')
+                                    if len(stock_info) > 3:
+                                        # 计算涨跌幅
+                                        current_price = float(stock_info[3])
+                                        previous_close = float(stock_info[2])
+                                        if previous_close > 0:
+                                            change = (current_price - previous_close) / previous_close
+                                            change_amount = current_price - previous_close
+                                            stock_data = {
+                                                'current_price': current_price,
+                                                'change_amount': change_amount,
+                                                'change_ratio': change
+                                            }
+                                            results[stock_code] = stock_data
+                                            # 存储到缓存
+                                            cache_key = f"stock_{stock_code}"
+                                            stock_cache[cache_key] = {
+                                                'timestamp': time.time(),
+                                                'data': stock_data
+                                            }
+                            except Exception as e:
+                                print(f"解析股票数据失败: {e}")
+                else:
+                    print(f"股票实时数据API响应状态: {response.status_code}")
+                    for stock_code in batch_codes:
+                        results[stock_code] = {
+                            'current_price': 0,
+                            'change_amount': 0,
+                            'change_ratio': 0
+                        }
+            except Exception as e:
+                print(f"批量获取股票实时数据失败: {e}")
+                for stock_code in batch_codes:
+                    results[stock_code] = {
+                        'current_price': 0,
+                        'change_amount': 0,
+                        'change_ratio': 0
+                    }
+    
+    return results
+
 # 获取股票实时数据
 def get_stock_real_time_data(stock_code):
     """获取股票的实时数据，包括当前价格、涨跌金额和涨跌比例"""
@@ -404,71 +505,13 @@ def get_stock_real_time_data(stock_code):
         print(f"从缓存获取股票 {stock_code} 数据")
         return stock_cache[cache_key]['data']
     
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Referer": "https://finance.sina.com.cn/"
-        }
-        
-        # 使用新浪财经API获取股票实时数据
-        # 对于沪市股票，需要添加sh前缀；深市股票添加sz前缀
-        if stock_code.startswith('6'):
-            full_code = f"sh{stock_code}"
-        else:
-            full_code = f"sz{stock_code}"
-        
-        stock_url = f"http://hq.sinajs.cn/list={full_code}"
-        print(f"获取股票 {stock_code} 实时数据: {stock_url}")
-        response = requests.get(stock_url, headers=headers, timeout=3)
-        
-        if response.status_code == 200:
-            stock_data = response.text
-            print(f"股票 {stock_code} 实时数据: {stock_data[:100]}...")
-            # 解析股票数据
-            stock_info = stock_data.split(',')
-            if len(stock_info) > 3:
-                # 计算涨跌幅
-                try:
-                    current_price = float(stock_info[3])
-                    previous_close = float(stock_info[2])
-                    if previous_close > 0:
-                        change = (current_price - previous_close) / previous_close
-                        change_amount = current_price - previous_close
-                        # 存储到缓存
-                        stock_cache[cache_key] = {
-                            'timestamp': time.time(),
-                            'data': {
-                                'current_price': current_price,
-                                'change_amount': change_amount,
-                                'change_ratio': change
-                            }
-                        }
-                        return {
-                            'current_price': current_price,
-                            'change_amount': change_amount,
-                            'change_ratio': change
-                        }
-                except (ValueError, IndexError) as e:
-                    print(f"解析股票 {stock_code} 实时数据失败: {e}")
-            return {
-                'current_price': 0,
-                'change_amount': 0,
-                'change_ratio': 0
-            }
-        else:
-            print(f"股票 {stock_code} 实时数据API响应状态: {response.status_code}")
-            return {
-                'current_price': 0,
-                'change_amount': 0,
-                'change_ratio': 0
-            }
-    except Exception as e:
-        print(f"获取股票 {stock_code} 实时数据失败: {e}")
-        return {
-            'current_price': 0,
-            'change_amount': 0,
-            'change_ratio': 0
-        }
+    # 调用批量获取函数
+    results = get_batch_stock_real_time_data([stock_code])
+    return results.get(stock_code, {
+        'current_price': 0,
+        'change_amount': 0,
+        'change_ratio': 0
+    })
 
 # 获取市场数据（大盘指数和行业板块）
 def get_market_data():
@@ -664,8 +707,8 @@ def get_fund_data(code):
                         net_value_list = json.loads(net_value_json)
                         print(f"东方财富API获取到 {len(net_value_list)} 条净值数据")
                         
-                        # 只取最近60天的数据
-                        recent_data = net_value_list[-60:]
+                        # 取最近180天的数据，确保有足够的历史数据供前端查询
+                        recent_data = net_value_list[-180:]
                         print(f"取最近 {len(recent_data)} 条数据")
                         
                         for item in recent_data:
@@ -899,6 +942,53 @@ def get_news():
         # 如果API调用失败，返回空数组
         return jsonify([])
 
+@app.route('/api/market-data', methods=['GET'])
+def get_market_data_api():
+    """获取市场数据，包括主要大盘指数和行业板块的实时数据"""
+    try:
+        market_data = get_market_data()
+        return jsonify(market_data)
+    except Exception as e:
+        print(f"获取市场数据失败: {e}")
+        return jsonify({'indices': {}, 'sectors': {}})
+
+@app.route('/api/funds/<string:code>/nav', methods=['GET'])
+def get_fund_nav(code):
+    """获取基金在指定日期的净值"""
+    try:
+        # 验证基金代码格式
+        if not re.match(r'^\d{6}$', code):
+            return jsonify({'error': '无效的基金代码格式'}), 400
+        
+        # 获取日期参数
+        date = request.args.get('date')
+        if not date:
+            return jsonify({'error': '缺少日期参数'}), 400
+        
+        # 验证日期格式
+        try:
+            datetime.strptime(date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'error': '无效的日期格式，应为YYYY-MM-DD'}), 400
+        
+        # 获取基金数据
+        name, prices, dates, returns = get_fund_data(code)
+        
+        # 查找指定日期的净值
+        nav = None
+        for i, fund_date in enumerate(dates):
+            if fund_date == date:
+                nav = prices[i]
+                break
+        
+        if nav:
+            return jsonify({'nav': nav})
+        else:
+            return jsonify({'nav': None, 'error': '未找到该日期的净值数据'})
+    except Exception as e:
+        print(f"获取基金净值失败: {e}")
+        return jsonify({'nav': None, 'error': str(e)})
+
 @app.route('/api/funds/<string:code>/holdings', methods=['GET'])
 def get_fund_holdings_api(code):
     """获取基金的股票持仓数据"""
@@ -912,19 +1002,28 @@ def get_fund_holdings_api(code):
         if not holdings:
             return jsonify({'stocks': [], 'stock_ratio': 0, 'market_data': {'indices': {}, 'sectors': {}}})
         
-        # 获取股票实时数据
+        # 批量获取股票实时数据
         stocks_with_data = []
-        for stock in holdings.get('stocks', []):
-            stock_data = get_stock_real_time_data(stock['code'])
-            stock_info = {
-                'code': stock['code'],
-                'name': stock.get('name', f'股票{stock["code"]}'),
-                'weight': stock['weight'],
-                'current_price': stock_data.get('current_price', 0),
-                'change_amount': stock_data.get('change_amount', 0),
-                'change_ratio': stock_data.get('change_ratio', 0)
-            }
-            stocks_with_data.append(stock_info)
+        stock_codes = [stock['code'] for stock in holdings.get('stocks', [])]
+        if stock_codes:
+            stock_data_map = get_batch_stock_real_time_data(stock_codes)
+            for stock in holdings.get('stocks', []):
+                stock_data = stock_data_map.get(stock['code'], {
+                    'current_price': 0,
+                    'change_amount': 0,
+                    'change_ratio': 0
+                })
+                stock_info = {
+                    'code': stock['code'],
+                    'name': stock.get('name', f'股票{stock["code"]}'),
+                    'weight': stock['weight'],
+                    'current_price': stock_data.get('current_price', 0),
+                    'change_amount': stock_data.get('change_amount', 0),
+                    'change_ratio': stock_data.get('change_ratio', 0)
+                }
+                stocks_with_data.append(stock_info)
+        else:
+            stocks_with_data = []
         
         # 获取市场数据
         market_data = get_market_data()
