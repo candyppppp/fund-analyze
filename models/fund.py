@@ -3,9 +3,15 @@ from utils.indicators import (
     calculate_kdj, calculate_bollinger_bands, calculate_atr,
     calculate_volume_analysis
 )
+from .ml_model import MLModel
 
 class Fund:
     id_counter = 1
+    # 共享的机器学习模型
+    ml_model = MLModel()
+    # 用于训练模型的数据
+    training_data = []
+    training_labels = []
     
     def __init__(self, name, code, prices, dates, returns, volumes=None):
         self.id = Fund.id_counter
@@ -24,6 +30,9 @@ class Fund:
         self.bollinger_bands = calculate_bollinger_bands(prices)
         self.atr = calculate_atr(prices)
         self.volume_ratio = calculate_volume_analysis(self.volumes)
+        # 用于模型训练的特征和标签
+        self.features = None
+        self.label = None
         # 计算预测收益率
         self.predicted_return = self.calculate_predicted_return()
         # 计算预测置信度
@@ -34,7 +43,8 @@ class Fund:
         if len(self.prices) < 2:
             return 0
         
-        # 1. 基于最近价格趋势的预测
+        # 1. 传统预测方法
+        # 基于最近价格趋势的预测
         recent_returns = []
         for i in range(1, min(5, len(self.prices))):
             return_rate = (self.prices[-i] - self.prices[-(i+1)]) / self.prices[-(i+1)]
@@ -42,7 +52,7 @@ class Fund:
         
         avg_return = sum(recent_returns) / len(recent_returns)
         
-        # 2. 基于股票持仓的预测
+        # 基于股票持仓的预测
         stock_based_return = 0
         if stock_holdings and stock_holdings.get('stocks'):
             total_weight = sum(stock['weight'] for stock in stock_holdings['stocks'])
@@ -50,7 +60,7 @@ class Fund:
                 weighted_sum = sum(stock['weight'] * stock.get('change_ratio', 0) for stock in stock_holdings['stocks'])
                 stock_based_return = weighted_sum / total_weight
         
-        # 3. 基于高级技术指标的调整
+        # 基于高级技术指标的调整
         technical_adjustment = 0
         
         # MACD指标
@@ -137,7 +147,7 @@ class Fund:
             else:
                 technical_adjustment += 0.0005
         
-        # 4. 基于市场环境的调整
+        # 基于市场环境的调整
         market_adjustment = 0
         if market_data:
             # 大盘指数影响
@@ -164,7 +174,7 @@ class Fund:
                     # 板块对基金的影响因子
                     market_adjustment += avg_sector_change * 0.005
         
-        # 5. 基于趋势线的调整
+        # 基于趋势线的调整
         # 计算最近的趋势斜率
         if len(self.prices) >= 10:
             recent_prices = self.prices[-10:]
@@ -184,9 +194,35 @@ class Fund:
                 else:
                     technical_adjustment -= 0.0008
         
-        # 6. 综合预测结果
+        # 综合传统预测结果
         # 权重分配：价格趋势20%，股票持仓50%，技术指标20%，市场环境10%
-        final_prediction = avg_return * 0.2 + stock_based_return * 0.5 + technical_adjustment * 0.2 + market_adjustment * 0.1
+        traditional_prediction = avg_return * 0.2 + stock_based_return * 0.5 + technical_adjustment * 0.2 + market_adjustment * 0.1
+        
+        # 2. 机器学习预测方法
+        ml_prediction = None
+        if market_data or stock_holdings:
+            # 提取特征
+            self.features = self.ml_model.feature_extraction(self, market_data, stock_holdings)
+            
+            # 尝试使用机器学习模型预测
+            ml_prediction = self.ml_model.predict(self.features)
+            
+            # 存储训练数据
+            if len(self.returns) > 0:
+                self.label = self.returns[-1]
+                Fund.training_data.append(self.features)
+                Fund.training_labels.append(self.label)
+                
+                # 当训练数据足够时，训练模型
+                if len(Fund.training_data) >= 50:
+                    print("训练机器学习模型...")
+                    self.ml_model.train(Fund.training_data, Fund.training_labels)
+        
+        # 3. 综合预测结果
+        final_prediction = traditional_prediction
+        if ml_prediction is not None:
+            # 结合机器学习预测和传统预测
+            final_prediction = traditional_prediction * 0.7 + ml_prediction * 0.3
         
         # 限制预测范围，避免极端值
         final_prediction = max(min(final_prediction, 0.1), -0.1)
@@ -242,6 +278,12 @@ class Fund:
             confidence += 0.1
         elif self.volatility > 0.3:
             confidence -= 0.1
+        
+        # 基于机器学习模型的置信度调整
+        if self.features is not None:
+            ml_confidence = self.ml_model.calculate_prediction_confidence(self.features)
+            # 结合机器学习置信度
+            confidence = confidence * 0.7 + ml_confidence * 0.3
         
         # 限制置信度范围
         confidence = max(min(confidence, 0.95), 0.05)

@@ -767,14 +767,19 @@ def add_fund():
         market_data = get_market_data()
         print(f"获取市场数据成功，指数: {len(market_data.get('indices', {}))}, 板块: {len(market_data.get('sectors', {}))}")
         
+        # 获取基金持仓数据
+        holdings = get_fund_holdings(code)
+        print(f"获取基金持仓数据成功，股票数量: {len(holdings.get('stocks', []))}")
+        
         # 检查数据是否有效
         if not prices:
             print(f"基金 {code} 没有获取到价格数据")
             # 仍然创建基金对象，但数据为空
         
         fund = Fund(name, code, prices, dates, returns)
-        # 使用市场数据更新预测
-        fund.predicted_return = fund.calculate_predicted_return(market_data=market_data)
+        # 使用市场数据和持仓数据更新预测
+        fund.predicted_return = fund.calculate_predicted_return(stock_holdings=holdings, market_data=market_data)
+        fund.prediction_confidence = fund.calculate_prediction_confidence()
         funds.append(fund)
         print(f"基金 {code} 添加成功，ID: {fund.id}")
         return jsonify(fund.to_dict()), 201
@@ -924,11 +929,22 @@ def get_fund_holdings_api(code):
         # 获取市场数据
         market_data = get_market_data()
         
-        return jsonify({
+        # 构建完整的持仓数据
+        holdings_data = {
             'stocks': stocks_with_data,
             'stock_ratio': holdings.get('stock_ratio', 0),
             'market_data': market_data
-        })
+        }
+        
+        # 尝试使用持仓数据更新基金的预测
+        for fund in funds:
+            if fund.code == code:
+                fund.predicted_return = fund.calculate_predicted_return(stock_holdings=holdings_data, market_data=market_data)
+                fund.prediction_confidence = fund.calculate_prediction_confidence()
+                print(f"更新基金 {code} 的预测数据")
+                break
+        
+        return jsonify(holdings_data)
     except Exception as e:
         print(f"获取基金持仓数据失败: {e}")
         return jsonify({'stocks': [], 'stock_ratio': 0, 'market_data': {'indices': {}, 'sectors': {}}})
