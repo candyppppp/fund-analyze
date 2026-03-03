@@ -51258,3 +51258,158 @@
 2026-03-03 15:16:51,119 - app - INFO - 成功保存 5 只基金
 2026-03-03 15:18:08,644 - __main__ - INFO - 开始保存基金数据
 2026-03-03 15:18:08,654 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 15:21:22,052 - __main__ - INFO - 开始保存基金数据
+2026-03-03 15:21:22,063 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 15:21:51,128 - app - INFO - 开始保存基金数据
+2026-03-03 15:21:51,139 - app - INFO - 成功保存 5 只基金
+2026-03-03 15:23:08,661 - __main__ - INFO - 开始保存基金数据
+2026-03-03 15:23:08,671 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 15:25:17,809 - app - INFO - 开始加载基金数据
+2026-03-03 15:25:17,813 - app - INFO - 成功加载 5 只基金
+2026-03-03 15:25:17,813 - app - INFO - 定时保存线程已启动
+2026-03-03 15:25:17,813 - app - INFO - 定时更新基金数据线程已启动
+2026-03-03 15:25:17,819 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-03-03 15:25:17,819 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-03-03 15:25:19,383 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 15:25:19] "GET / HTTP/1.1" 200 -
+2026-03-03 15:25:19,433 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 15:25:19] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2026-03-03 15:25:19,433 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 15:25:19] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2026-03-03 15:25:19,437 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 15:25:19] "[36mGET /static/js/technical-analysis.js HTTP/1.1[0m" 304 -
+2026-03-03 15:25:19,442 - app - INFO - 获取基金列表
+2026-03-03 15:25:19,444 - app - INFO - get_funds 执行时间: 1.99ms
+2026-03-03 15:25:19,444 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 15:25:19] "GET /api/funds HTTP/1.1" 200 -
+2026-03-03 15:25:19,445 - app - INFO - 获取实时快讯
+2026-03-03 15:25:19,446 - app - INFO - get_news 执行时间: 0.37ms
+2026-03-03 15:25:19,446 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 15:25:19] "GET /api/news HTTP/1.1" 200 -
+2026-03-03 15:25:19,492 - app - INFO - 获取市场数据
+2026-03-03 15:25:19,493 - app - INFO - get_market_data_api 执行时间: 0.55ms
+2026-03-03 15:25:19,493 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 15:25:19] "GET /api/market-data HTTP/1.1" 200 -
+2026-03-03 15:25:19,498 - app - INFO - 获取基金持仓数据: 020274
+2026-03-03 15:25:19,499 - app - INFO - 获取基金持仓数据: 008887
+2026-03-03 15:25:19,500 - app - INFO - 获取基金持仓数据: 023638
+2026-03-03 15:25:19,500 - app - INFO - 获取基金持仓数据: 025856
+2026-03-03 15:25:19,500 - app - INFO - 获取基金持仓数据: 000619
+2026-03-03 15:25:19,635 - utils.data_sources - INFO - 从新浪财经获取基金 020274 最新净值成功
+2026-03-03 15:25:19,700 - utils.data_sources - ERROR - 从腾讯财经获取基金最新净值失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=020274 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 15:25:19,897 - app - INFO - 获取基金持仓数据成功: 023638
+2026-03-03 15:25:19,898 - app - INFO - get_fund_holdings_api 执行时间: 397.96ms
+2026-03-03 15:25:19,898 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 15:25:19] "GET /api/funds/023638/holdings HTTP/1.1" 200 -
+2026-03-03 15:25:20,098 - utils.data_sources - INFO - 支付宝基金返回数据: <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtm...
+2026-03-03 15:25:20,101 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 15:25:20,101 - app - INFO - 从新浪财经获取基金 020274 数据: 日期=2026-03-02, 净值=1.6667
+2026-03-03 15:25:20,286 - app - INFO - 获取基金持仓数据成功: 025856
+2026-03-03 15:25:20,286 - app - INFO - get_fund_holdings_api 执行时间: 786.40ms
+2026-03-03 15:25:20,287 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 15:25:20] "GET /api/funds/025856/holdings HTTP/1.1" 200 -
+2026-03-03 15:25:21,627 - app - INFO - 获取基金持仓数据成功: 000619
+2026-03-03 15:25:21,628 - app - INFO - get_fund_holdings_api 执行时间: 2128.07ms
+2026-03-03 15:25:21,629 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 15:25:21] "GET /api/funds/000619/holdings HTTP/1.1" 200 -
+2026-03-03 15:25:21,867 - app - INFO - 获取基金持仓数据成功: 008887
+2026-03-03 15:25:21,867 - app - INFO - get_fund_holdings_api 执行时间: 2368.62ms
+2026-03-03 15:25:21,868 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 15:25:21] "GET /api/funds/008887/holdings HTTP/1.1" 200 -
+2026-03-03 15:25:22,115 - app - INFO - 获取基金持仓数据成功: 020274
+2026-03-03 15:25:22,115 - app - INFO - get_fund_holdings_api 执行时间: 2617.72ms
+2026-03-03 15:25:22,116 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 15:25:22] "GET /api/funds/020274/holdings HTTP/1.1" 200 -
+2026-03-03 15:25:27,399 - utils.data_sources - INFO - 东方财富API返回了 380 个数据点
+2026-03-03 15:25:27,401 - utils.data_sources - INFO - 从东方财富获取基金 020274 历史数据成功
+2026-03-03 15:25:27,710 - utils.data_sources - INFO - 从天天基金获取基金 020274 历史数据成功
+2026-03-03 15:25:36,082 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 15:25:36,085 - utils.data_sources - INFO - 从腾讯财经获取基金 020274 历史数据成功
+2026-03-03 15:25:36,085 - utils.data_sources - INFO - 选择最佳数据源: 腾讯财经
+2026-03-03 15:25:36,085 - app - INFO - 从天天基金网获取基金 020274 历史数据，共 400 条记录
+2026-03-03 15:25:36,086 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.6667
+2026-03-03 15:25:36,086 - app - INFO - 获取基金 020274 数据成功，共 400 条记录
+2026-03-03 15:25:36,253 - utils.data_sources - INFO - 从新浪财经获取基金 020274 预估收益率成功
+2026-03-03 15:25:36,263 - utils.data_sources - ERROR - 从腾讯财经获取基金预估收益率失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=020274 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 15:25:36,485 - utils.data_sources - INFO - 支付宝基金预估收益率返回: <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtm...
+2026-03-03 15:25:36,487 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 15:25:36,491 - app - INFO - 更新基金 020274 数据成功
+2026-03-03 15:25:36,551 - utils.data_sources - INFO - 从新浪财经获取基金 008887 最新净值成功
+2026-03-03 15:25:36,562 - utils.data_sources - ERROR - 从腾讯财经获取基金最新净值失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=008887 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 15:25:36,954 - utils.data_sources - INFO - 支付宝基金返回数据: <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtm...
+2026-03-03 15:25:36,956 - utils.data_sources - WARNING - 数据源 alipay 连续失败 3 次，标记为不健康
+2026-03-03 15:25:36,956 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 15:25:36,956 - app - INFO - 从新浪财经获取基金 008887 数据: 日期=2026-03-02, 净值=1.6859
+2026-03-03 15:25:45,099 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 15:25:45,102 - utils.data_sources - INFO - 从东方财富获取基金 008887 历史数据成功
+2026-03-03 15:25:45,393 - utils.data_sources - INFO - 从天天基金获取基金 008887 历史数据成功
+2026-03-03 15:25:53,179 - utils.data_sources - INFO - 东方财富API返回了 380 个数据点
+2026-03-03 15:25:53,181 - utils.data_sources - INFO - 从腾讯财经获取基金 008887 历史数据成功
+2026-03-03 15:25:53,182 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 15:25:53,182 - app - INFO - 从天天基金网获取基金 008887 历史数据，共 400 条记录
+2026-03-03 15:25:53,182 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.6859
+2026-03-03 15:25:53,182 - app - INFO - 获取基金 008887 数据成功，共 400 条记录
+2026-03-03 15:25:53,322 - utils.data_sources - INFO - 从新浪财经获取基金 008887 预估收益率成功
+2026-03-03 15:25:53,333 - utils.data_sources - ERROR - 从腾讯财经获取基金预估收益率失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=008887 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 15:25:53,333 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 15:25:53,333 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 15:25:53,337 - app - INFO - 更新基金 008887 数据成功
+2026-03-03 15:25:53,416 - utils.data_sources - INFO - 从新浪财经获取基金 025856 最新净值成功
+2026-03-03 15:25:53,425 - utils.data_sources - ERROR - 从腾讯财经获取基金最新净值失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=025856 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 15:25:53,425 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 15:25:53,425 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 15:25:53,425 - app - INFO - 从新浪财经获取基金 025856 数据: 日期=2026-03-02, 净值=1.3782
+2026-03-03 15:25:54,784 - utils.data_sources - INFO - 东方财富API返回了 60 个数据点
+2026-03-03 15:25:54,785 - utils.data_sources - INFO - 从东方财富获取基金 025856 历史数据成功
+2026-03-03 15:25:55,080 - utils.data_sources - INFO - 从天天基金获取基金 025856 历史数据成功
+2026-03-03 15:25:56,335 - utils.data_sources - INFO - 东方财富API返回了 60 个数据点
+2026-03-03 15:25:56,338 - utils.data_sources - INFO - 从腾讯财经获取基金 025856 历史数据成功
+2026-03-03 15:25:56,338 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 15:25:56,338 - app - INFO - 从天天基金网获取基金 025856 历史数据，共 60 条记录
+2026-03-03 15:25:56,338 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.3782
+2026-03-03 15:25:56,338 - app - INFO - 获取基金 025856 数据成功，共 60 条记录
+2026-03-03 15:25:56,401 - utils.data_sources - INFO - 从新浪财经获取基金 025856 预估收益率成功
+2026-03-03 15:25:56,412 - utils.data_sources - ERROR - 从腾讯财经获取基金预估收益率失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=025856 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 15:25:56,412 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 15:25:56,412 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 15:25:56,413 - app - INFO - 更新基金 025856 数据成功
+2026-03-03 15:25:56,506 - utils.data_sources - INFO - 从新浪财经获取基金 023638 最新净值成功
+2026-03-03 15:25:56,518 - utils.data_sources - ERROR - 从腾讯财经获取基金最新净值失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=023638 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 15:25:56,518 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 15:25:56,518 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 15:25:56,518 - app - INFO - 从新浪财经获取基金 023638 数据: 日期=2026-03-02, 净值=2.0409
+2026-03-03 15:26:01,300 - utils.data_sources - INFO - 东方财富API返回了 225 个数据点
+2026-03-03 15:26:01,301 - utils.data_sources - INFO - 从东方财富获取基金 023638 历史数据成功
+2026-03-03 15:26:01,876 - utils.data_sources - INFO - 从天天基金获取基金 023638 历史数据成功
+2026-03-03 15:26:07,193 - utils.data_sources - INFO - 东方财富API返回了 225 个数据点
+2026-03-03 15:26:07,196 - utils.data_sources - INFO - 从腾讯财经获取基金 023638 历史数据成功
+2026-03-03 15:26:07,196 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 15:26:07,196 - app - INFO - 从天天基金网获取基金 023638 历史数据，共 225 条记录
+2026-03-03 15:26:07,196 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=2.0409
+2026-03-03 15:26:07,196 - app - INFO - 获取基金 023638 数据成功，共 225 条记录
+2026-03-03 15:26:07,336 - utils.data_sources - INFO - 从新浪财经获取基金 023638 预估收益率成功
+2026-03-03 15:26:07,347 - utils.data_sources - ERROR - 从腾讯财经获取基金预估收益率失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=023638 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 15:26:07,347 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 15:26:07,348 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 15:26:07,350 - app - INFO - 更新基金 023638 数据成功
+2026-03-03 15:26:07,428 - utils.data_sources - INFO - 从新浪财经获取基金 000619 最新净值成功
+2026-03-03 15:26:07,437 - utils.data_sources - ERROR - 从腾讯财经获取基金最新净值失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=000619 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 15:26:07,437 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 15:26:07,437 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 15:26:07,437 - app - INFO - 从新浪财经获取基金 000619 数据: 日期=2026-03-02, 净值=5.578
+2026-03-03 15:26:15,613 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 15:26:15,614 - utils.data_sources - INFO - 从东方财富获取基金 000619 历史数据成功
+2026-03-03 15:26:15,967 - utils.data_sources - INFO - 从天天基金获取基金 000619 历史数据成功
+2026-03-03 15:26:22,072 - __main__ - INFO - 开始保存基金数据
+2026-03-03 15:26:22,081 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 15:26:23,629 - utils.data_sources - INFO - 东方财富API返回了 380 个数据点
+2026-03-03 15:26:23,631 - utils.data_sources - INFO - 从腾讯财经获取基金 000619 历史数据成功
+2026-03-03 15:26:23,631 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 15:26:23,631 - app - INFO - 从天天基金网获取基金 000619 历史数据，共 400 条记录
+2026-03-03 15:26:23,631 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=5.578
+2026-03-03 15:26:23,631 - app - INFO - 获取基金 000619 数据成功，共 400 条记录
+2026-03-03 15:26:23,706 - utils.data_sources - INFO - 从新浪财经获取基金 000619 预估收益率成功
+2026-03-03 15:26:23,717 - utils.data_sources - ERROR - 从腾讯财经获取基金预估收益率失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=000619 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 15:26:23,717 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 15:26:23,717 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 15:26:23,720 - app - INFO - 更新基金 000619 数据成功
+2026-03-03 15:26:23,720 - app - INFO - 开始保存基金数据
+2026-03-03 15:26:23,726 - app - INFO - 成功保存 5 只基金
+2026-03-03 15:26:23,726 - app - INFO - 后台更新基金数据完成
+2026-03-03 15:28:08,677 - __main__ - INFO - 开始保存基金数据
+2026-03-03 15:28:08,689 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 15:30:17,818 - app - INFO - 开始保存基金数据
+2026-03-03 15:30:17,829 - app - INFO - 成功保存 5 只基金
+2026-03-03 15:31:22,090 - __main__ - INFO - 开始保存基金数据
+2026-03-03 15:31:22,100 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 15:33:08,695 - __main__ - INFO - 开始保存基金数据
+2026-03-03 15:33:08,701 - __main__ - INFO - 成功保存 5 只基金
