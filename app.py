@@ -12,13 +12,22 @@ import os
 import logging
 
 # 配置日志
+import os
+
+# 检查是否在 Vercel 环境中
+is_vercel = os.environ.get('VERCEL') is not None
+
+# 配置日志处理器
+handlers = [logging.StreamHandler()]
+
+# 只在本地环境中使用文件日志
+if not is_vercel:
+    handlers.append(logging.FileHandler('fund_analyze.log'))
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('fund_analyze.log'),
-        logging.StreamHandler()
-    ]
+    handlers=handlers
 )
 
 logger = logging.getLogger(__name__)
