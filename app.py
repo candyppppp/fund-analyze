@@ -1116,20 +1116,18 @@ def add_fund():
         def fetch_data():
             nonlocal result, error
             try:
-                # 并行获取数据，提高性能
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                    # 提交并行任务
-                    future_fund = executor.submit(get_fund_data, code)
-                    future_market = executor.submit(get_market_data)
-                    future_holdings = executor.submit(get_fund_holdings, code)
-                    future_estimated_return = executor.submit(data_source_manager.get_fund_estimated_return, code)
-                    
-                    # 等待所有任务完成
-                    name, prices, dates, returns = future_fund.result(timeout=8)
-                    market_data = future_market.result(timeout=3)
-                    holdings = future_holdings.result(timeout=8)
-                    real_time_estimated_return = future_estimated_return.result(timeout=3)
+                # 优先使用新浪财经API，减少对其他数据源的依赖
+                # 获取基金基本数据
+                name, prices, dates, returns = get_fund_data(code)
+                
+                # 获取市场数据
+                market_data = get_market_data()
+                
+                # 获取持仓数据
+                holdings = get_fund_holdings(code)
+                
+                # 获取实时预估收益率
+                real_time_estimated_return = data_source_manager.get_fund_estimated_return(code)
                 
                 result = {
                     'name': name,
@@ -1148,7 +1146,7 @@ def add_fund():
         # 启动线程获取数据
         thread = threading.Thread(target=fetch_data)
         thread.start()
-        thread.join(timeout=12)  # 设置12秒超时，给并行任务足够时间
+        thread.join(timeout=8)  # 减少超时时间，避免请求超时
         
         if error:
             return jsonify({'error': error}), 500
