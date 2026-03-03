@@ -29,8 +29,36 @@ class Fund:
         # 计算预测置信度
         self.prediction_confidence = self.calculate_prediction_confidence()
     
-    def calculate_predicted_return(self, stock_holdings=None, market_data=None):
-        # 基于多种因素预测当天收益率
+    def calculate_predicted_return(self, stock_holdings=None, market_data=None, real_time_estimated_return=None):
+        # 优先使用实时预估收益率数据
+        if real_time_estimated_return and 'gszzl' in real_time_estimated_return:
+            # 使用数据源提供的实时预估收益率
+            real_time_return = real_time_estimated_return['gszzl']
+            
+            # 只进行轻微的市场环境调整，避免过度调整导致数据波动
+            market_adjustment = 0
+            if market_data:
+                # 大盘指数影响
+                indices = market_data.get('indices', {})
+                if indices:
+                    # 计算大盘平均涨跌幅
+                    index_changes = []
+                    for index_name, index_data in indices.items():
+                        index_changes.append(index_data.get('change_ratio', 0))
+                    if index_changes:
+                        avg_index_change = sum(index_changes) / len(index_changes)
+                        # 大盘对基金的影响因子，使用较小的调整系数
+                        market_adjustment = avg_index_change * 0.1
+            
+            # 综合调整后的预测
+            final_prediction = real_time_return + market_adjustment
+            
+            # 限制预测范围，避免极端值
+            final_prediction = max(min(final_prediction, 0.1), -0.1)
+            
+            return final_prediction
+        
+        # 如果没有实时预估数据，使用传统计算方法
         if len(self.prices) < 2:
             return 0
         
@@ -54,8 +82,11 @@ class Fund:
         # 基于高级技术指标的调整
         technical_adjustment = 0
         
+        # 重新计算技术指标，确保使用最新数据
+        from utils.indicators import calculate_macd, calculate_kdj, calculate_bollinger_bands, calculate_atr
+        
         # MACD指标
-        macd_line, signal_line, histogram = self.macd
+        macd_line, signal_line, histogram = calculate_macd(self.prices)
         if macd_line > signal_line:
             if histogram > 0:
                 # 金叉且柱状图为正，强烈看多
@@ -72,7 +103,7 @@ class Fund:
                 technical_adjustment -= 0.001
         
         # KDJ指标
-        k, d, j = self.kdj
+        k, d, j = calculate_kdj(self.prices)
         if j > 80:
             # 超买，可能回调
             technical_adjustment -= 0.0015
@@ -87,7 +118,7 @@ class Fund:
             technical_adjustment -= 0.0005
         
         # 布林带
-        upper_band, ma, lower_band = self.bollinger_bands
+        upper_band, ma, lower_band = calculate_bollinger_bands(self.prices)
         current_price = self.prices[-1]
         if current_price > upper_band:
             # 突破上轨，可能继续上涨
@@ -117,26 +148,13 @@ class Fund:
             technical_adjustment -= 0.0003
         
         # ATR指标（波动率）
-        if self.atr > 0.02:
+        atr = calculate_atr(self.prices)
+        if atr > 0.02:
             # 高波动率，可能加剧价格波动
             if avg_return > 0:
                 technical_adjustment += 0.0008
             else:
                 technical_adjustment -= 0.0008
-        
-        # 成交量分析
-        if self.volume_ratio > 1.5:
-            # 成交量放大，趋势可能加强
-            if avg_return > 0:
-                technical_adjustment += 0.0008
-            else:
-                technical_adjustment -= 0.0008
-        elif self.volume_ratio < 0.5:
-            # 成交量缩小，趋势可能反转
-            if avg_return > 0:
-                technical_adjustment -= 0.0005
-            else:
-                technical_adjustment += 0.0005
         
         # 基于市场环境的调整
         market_adjustment = 0

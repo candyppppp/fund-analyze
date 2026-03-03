@@ -128,7 +128,7 @@ export function calculateTrendLine(prices, dates) {
  * @returns {Object} 包含布林带数据的对象
  */
 export function calculateBollingerBands(prices, period = 20, stdDev = 2) {
-    if (!prices || prices.length < period) {
+    if (!prices || prices.length < 1) {
         return {
             middle: [],
             upper: [],
@@ -136,24 +136,34 @@ export function calculateBollingerBands(prices, period = 20, stdDev = 2) {
         };
     }
     
-    const middle = calculateMA(prices, period);
+    // 确保返回的数据长度与输入数据一致
+    const middle = [];
     const upper = [];
     const lower = [];
     
     for (let i = 0; i < prices.length; i++) {
         if (i < period - 1) {
+            middle.push(null);
             upper.push(null);
             lower.push(null);
         } else {
-            // 计算标准差
+            // 计算移动平均线
             let sum = 0;
             for (let j = 0; j < period; j++) {
-                sum += Math.pow(prices[i - j] - middle[i], 2);
+                sum += prices[i - j];
             }
-            const std = Math.sqrt(sum / period);
+            const ma = sum / period;
+            middle.push(ma);
             
-            upper.push(parseFloat((middle[i] + stdDev * std).toFixed(4)));
-            lower.push(parseFloat((middle[i] - stdDev * std).toFixed(4)));
+            // 计算标准差
+            let variance = 0;
+            for (let j = 0; j < period; j++) {
+                variance += Math.pow(prices[i - j] - ma, 2);
+            }
+            const std = Math.sqrt(variance / period);
+            
+            upper.push(parseFloat((ma + stdDev * std).toFixed(4)));
+            lower.push(parseFloat((ma - stdDev * std).toFixed(4)));
         }
     }
     
