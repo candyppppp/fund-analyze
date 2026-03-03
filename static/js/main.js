@@ -279,6 +279,8 @@ function loadFunds() {
                 // 先显示本地数据，提供即时反馈
                 renderFunds(fundsData);
                 hideLoading();
+                // 启动每个基金的持仓更新定时器
+                startFundHoldingsUpdateIntervals(fundsData);
             }
         } catch (error) {
             console.error('读取本地存储失败:', error);
@@ -291,49 +293,59 @@ function loadFunds() {
             // 显示缓存数据
             renderFunds(cachedFunds);
             hideLoading();
-            // 后台更新数据
-            updateFundsInBackground();
             // 启动每个基金的持仓更新定时器
             startFundHoldingsUpdateIntervals(cachedFunds);
-            resolve(cachedFunds);
-            return;
         }
         
-        // 从API获取最新数据
-        console.log('从API获取基金数据');
-        fetch('/api/funds')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(funds => {
-                // 更新缓存
-                cacheManager.set('funds', funds);
-                // 保存到本地存储
-                try {
-                    localStorage.setItem('funds', JSON.stringify(funds));
-                } catch (error) {
-                    console.error('保存到本地存储失败:', error);
-                    showWarning('本地存储空间不足，数据可能无法持久保存');
-                }
-                
-                // 处理基金数据
-                return processFunds(funds);
-            })
-            .then(updatedFunds => {
-                resolve(updatedFunds);
-            })
-            .catch(error => {
-                console.error('获取基金数据失败:', error);
-                showError('获取基金数据失败，显示本地缓存数据');
-                // 如果API调用失败，已经显示了本地存储的数据
-                reject(error);
-            })
-            .finally(() => {
-                hideLoading();
-            });
+        // 后台更新数据，即使网络不好也不影响显示
+        updateFundsInBackground();
+        
+        // 确保至少返回本地存储的数据
+        if (fundsData) {
+            resolve(fundsData);
+        } else if (cachedFunds) {
+            resolve(cachedFunds);
+        } else {
+            // 从API获取最新数据
+            console.log('从API获取基金数据');
+            fetch('/api/funds')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(funds => {
+                    // 更新缓存
+                    cacheManager.set('funds', funds);
+                    // 保存到本地存储
+                    try {
+                        localStorage.setItem('funds', JSON.stringify(funds));
+                    } catch (error) {
+                        console.error('保存到本地存储失败:', error);
+                        showWarning('本地存储空间不足，数据可能无法持久保存');
+                    }
+                    
+                    // 处理基金数据
+                    return processFunds(funds);
+                })
+                .then(updatedFunds => {
+                    resolve(updatedFunds);
+                })
+                .catch(error => {
+                    console.error('获取基金数据失败:', error);
+                    showError('获取基金数据失败，显示本地缓存数据');
+                    // 如果API调用失败，返回本地存储的数据
+                    if (fundsData) {
+                        resolve(fundsData);
+                    } else {
+                        reject(error);
+                    }
+                })
+                .finally(() => {
+                    hideLoading();
+                });
+        }
     });
 }
 
@@ -351,46 +363,52 @@ function updateFundsInBackground() {
             return response.json();
         })
         .then(funds => {
-            // 更新缓存
-            cacheManager.set('funds', funds);
-            // 保存到本地存储
-            try {
-                localStorage.setItem('funds', JSON.stringify(funds));
-            } catch (error) {
-                console.error('保存到本地存储失败:', error);
-            }
-            // 重新渲染以显示最新数据
-            renderFunds(funds);
-            // 重启持仓更新定时器
-            startFundHoldingsUpdateIntervals(funds);
-            
-            // 为更新的基金添加闪烁效果
-            if (currentFunds) {
-                funds.forEach(updatedFund => {
-                    const currentFund = currentFunds.find(f => f.code === updatedFund.code);
-                    if (currentFund) {
-                        // 检查数据是否有变化
-                        const hasChanged = 
-                            updatedFund.predicted_return !== currentFund.predicted_return ||
-                            updatedFund.prediction_confidence !== currentFund.prediction_confidence;
-                        
-                        if (hasChanged) {
-                            // 为变化的基金添加闪烁效果
-                            setTimeout(() => {
-                                const fundElement = document.getElementById(`fund-${updatedFund.id}`);
-                                if (fundElement) {
-                                    flashCard(fundElement);
-                                }
-                            }, 100);
+            // 确保基金数据不为空
+            if (funds && funds.length > 0) {
+                // 更新缓存
+                cacheManager.set('funds', funds);
+                // 保存到本地存储
+                try {
+                    localStorage.setItem('funds', JSON.stringify(funds));
+                } catch (error) {
+                    console.error('保存到本地存储失败:', error);
+                }
+                // 重新渲染以显示最新数据
+                renderFunds(funds);
+                // 重启持仓更新定时器
+                startFundHoldingsUpdateIntervals(funds);
+                
+                // 为更新的基金添加闪烁效果
+                if (currentFunds) {
+                    funds.forEach(updatedFund => {
+                        const currentFund = currentFunds.find(f => f.code === updatedFund.code);
+                        if (currentFund) {
+                            // 检查数据是否有变化
+                            const hasChanged = 
+                                updatedFund.predicted_return !== currentFund.predicted_return ||
+                                updatedFund.prediction_confidence !== currentFund.prediction_confidence;
+                            
+                            if (hasChanged) {
+                                // 为变化的基金添加闪烁效果
+                                setTimeout(() => {
+                                    const fundElement = document.getElementById(`fund-${updatedFund.id}`);
+                                    if (fundElement) {
+                                        flashCard(fundElement);
+                                    }
+                                }, 100);
+                            }
                         }
-                    }
-                });
+                    });
+                }
+                
+                console.log('后台更新基金数据完成');
+            } else {
+                console.log('获取到空的基金数据，使用缓存数据');
             }
-            
-            console.log('后台更新基金数据完成');
         })
         .catch(error => {
             console.error('后台更新基金数据失败:', error);
+            // 网络错误时不更新数据，保持使用缓存
         });
 }
 

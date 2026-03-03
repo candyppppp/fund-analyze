@@ -51433,3 +51433,924 @@
 2026-03-03 15:48:08,754 - __main__ - INFO - 成功保存 5 只基金
 2026-03-03 15:50:17,862 - app - INFO - 开始保存基金数据
 2026-03-03 15:50:17,872 - app - INFO - 成功保存 5 只基金
+2026-03-03 15:51:22,117 - __main__ - INFO - 开始保存基金数据
+2026-03-03 15:51:22,128 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 15:53:08,709 - __main__ - INFO - 开始保存基金数据
+2026-03-03 15:53:08,717 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 15:55:17,875 - app - INFO - 开始保存基金数据
+2026-03-03 15:55:17,886 - app - INFO - 成功保存 5 只基金
+2026-03-03 15:56:22,134 - __main__ - INFO - 开始保存基金数据
+2026-03-03 15:56:22,145 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 15:58:08,725 - __main__ - INFO - 开始保存基金数据
+2026-03-03 15:58:08,737 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 15:59:45,922 - app - INFO - 获取基金持仓数据: 008887
+2026-03-03 15:59:45,924 - app - INFO - 从缓存获取基金持仓API数据: 008887
+2026-03-03 15:59:45,925 - app - INFO - get_fund_holdings_api 执行时间: 2.85ms
+2026-03-03 15:59:45,925 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 15:59:45] "GET /api/funds/008887/holdings HTTP/1.1" 200 -
+2026-03-03 16:00:17,891 - app - INFO - 开始保存基金数据
+2026-03-03 16:00:17,901 - app - INFO - 成功保存 5 只基金
+2026-03-03 16:00:22,512 - app - INFO - 获取基金列表
+2026-03-03 16:00:22,524 - app - INFO - get_funds 执行时间: 12.26ms
+2026-03-03 16:00:22,526 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:00:22] "GET /api/funds HTTP/1.1" 200 -
+2026-03-03 16:00:22,528 - app - INFO - 获取市场数据
+2026-03-03 16:00:22,573 - app - INFO - get_market_data_api 执行时间: 44.64ms
+2026-03-03 16:00:22,574 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:00:22] "GET /api/market-data HTTP/1.1" 200 -
+2026-03-03 16:00:22,576 - app - INFO - 获取基金持仓数据: 020274
+2026-03-03 16:00:22,576 - app - INFO - 从缓存获取基金持仓API数据: 020274
+2026-03-03 16:00:22,576 - app - INFO - get_fund_holdings_api 执行时间: 0.47ms
+2026-03-03 16:00:22,576 - app - INFO - 获取基金持仓数据: 008887
+2026-03-03 16:00:22,577 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:00:22] "GET /api/funds/020274/holdings HTTP/1.1" 200 -
+2026-03-03 16:00:22,577 - app - INFO - 从缓存获取基金持仓API数据: 008887
+2026-03-03 16:00:22,577 - app - INFO - 获取基金持仓数据: 025856
+2026-03-03 16:00:22,577 - app - INFO - get_fund_holdings_api 执行时间: 0.95ms
+2026-03-03 16:00:22,578 - app - INFO - 获取基金持仓数据: 023638
+2026-03-03 16:00:22,578 - app - INFO - 从缓存获取基金持仓API数据: 025856
+2026-03-03 16:00:22,578 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:00:22] "GET /api/funds/008887/holdings HTTP/1.1" 200 -
+2026-03-03 16:00:22,578 - app - INFO - 获取基金持仓数据: 000619
+2026-03-03 16:00:22,578 - app - INFO - 从缓存获取基金持仓API数据: 023638
+2026-03-03 16:00:22,579 - app - INFO - get_fund_holdings_api 执行时间: 1.50ms
+2026-03-03 16:00:22,579 - app - INFO - 从缓存获取基金持仓API数据: 000619
+2026-03-03 16:00:22,579 - app - INFO - get_fund_holdings_api 执行时间: 1.21ms
+2026-03-03 16:00:22,579 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:00:22] "GET /api/funds/025856/holdings HTTP/1.1" 200 -
+2026-03-03 16:00:22,579 - app - INFO - get_fund_holdings_api 执行时间: 0.95ms
+2026-03-03 16:00:22,579 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:00:22] "GET /api/funds/023638/holdings HTTP/1.1" 200 -
+2026-03-03 16:00:22,580 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:00:22] "GET /api/funds/000619/holdings HTTP/1.1" 200 -
+2026-03-03 16:00:22,696 - utils.data_sources - INFO - 从新浪财经获取基金 020274 最新净值成功
+2026-03-03 16:00:22,724 - utils.data_sources - ERROR - 从腾讯财经获取基金最新净值失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=020274 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 16:00:22,724 - utils.data_sources - INFO - 尝试恢复数据源 alipay
+2026-03-03 16:00:23,009 - utils.data_sources - INFO - 支付宝基金返回数据: <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtm...
+2026-03-03 16:00:23,011 - utils.data_sources - WARNING - 数据源 alipay 连续失败 4 次，标记为不健康
+2026-03-03 16:00:23,011 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:23,011 - app - INFO - 从新浪财经获取基金 020274 数据: 日期=2026-03-02, 净值=1.6667
+2026-03-03 16:00:29,374 - utils.data_sources - INFO - 东方财富API返回了 380 个数据点
+2026-03-03 16:00:29,377 - utils.data_sources - INFO - 从东方财富获取基金 020274 历史数据成功
+2026-03-03 16:00:29,600 - utils.data_sources - INFO - 从天天基金获取基金 020274 历史数据成功
+2026-03-03 16:00:36,162 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 16:00:36,166 - utils.data_sources - INFO - 从腾讯财经获取基金 020274 历史数据成功
+2026-03-03 16:00:36,166 - utils.data_sources - INFO - 选择最佳数据源: 腾讯财经
+2026-03-03 16:00:36,166 - app - INFO - 从天天基金网获取基金 020274 历史数据，共 400 条记录
+2026-03-03 16:00:36,166 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.6667
+2026-03-03 16:00:36,166 - app - INFO - 获取基金 020274 数据成功，共 400 条记录
+2026-03-03 16:00:36,207 - utils.data_sources - INFO - 从新浪财经获取基金 020274 预估收益率成功
+2026-03-03 16:00:36,217 - utils.data_sources - ERROR - 从腾讯财经获取基金预估收益率失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=020274 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 16:00:36,218 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:36,218 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:36,227 - app - INFO - 更新基金 020274 数据成功
+2026-03-03 16:00:36,266 - utils.data_sources - INFO - 从新浪财经获取基金 008887 最新净值成功
+2026-03-03 16:00:36,275 - utils.data_sources - ERROR - 从腾讯财经获取基金最新净值失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=008887 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 16:00:36,276 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:36,276 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:36,276 - app - INFO - 从新浪财经获取基金 008887 数据: 日期=2026-03-02, 净值=1.6859
+2026-03-03 16:00:38,528 - app - INFO - 获取基金列表
+2026-03-03 16:00:38,529 - app - INFO - 从缓存获取基金 020274 数据
+2026-03-03 16:00:38,532 - app - INFO - get_funds 执行时间: 4.03ms
+2026-03-03 16:00:38,533 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:00:38] "GET /api/funds HTTP/1.1" 200 -
+2026-03-03 16:00:38,578 - utils.data_sources - INFO - 从新浪财经获取基金 020274 预估收益率成功
+2026-03-03 16:00:38,588 - utils.data_sources - ERROR - 从腾讯财经获取基金预估收益率失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=020274 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 16:00:38,588 - utils.data_sources - WARNING - 数据源 tencent 连续失败 3 次，标记为不健康
+2026-03-03 16:00:38,588 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:38,588 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:38,591 - app - INFO - 更新基金 020274 数据成功
+2026-03-03 16:00:38,652 - utils.data_sources - INFO - 从新浪财经获取基金 008887 最新净值成功
+2026-03-03 16:00:38,652 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:38,652 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:38,653 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:38,653 - app - INFO - 从新浪财经获取基金 008887 数据: 日期=2026-03-02, 净值=1.6859
+2026-03-03 16:00:43,370 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 16:00:43,372 - utils.data_sources - INFO - 从东方财富获取基金 008887 历史数据成功
+2026-03-03 16:00:43,601 - utils.data_sources - INFO - 从天天基金获取基金 008887 历史数据成功
+2026-03-03 16:00:43,601 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:43,601 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:00:43,601 - app - INFO - 从天天基金网获取基金 008887 历史数据，共 400 条记录
+2026-03-03 16:00:43,601 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.6859
+2026-03-03 16:00:43,601 - app - INFO - 获取基金 008887 数据成功，共 400 条记录
+2026-03-03 16:00:43,652 - utils.data_sources - INFO - 从新浪财经获取基金 008887 预估收益率成功
+2026-03-03 16:00:43,652 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:43,652 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:43,652 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:43,655 - app - INFO - 更新基金 008887 数据成功
+2026-03-03 16:00:43,710 - utils.data_sources - INFO - 从新浪财经获取基金 025856 最新净值成功
+2026-03-03 16:00:43,710 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:43,710 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:43,710 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:43,710 - app - INFO - 从新浪财经获取基金 025856 数据: 日期=2026-03-02, 净值=1.3782
+2026-03-03 16:00:44,998 - utils.data_sources - INFO - 东方财富API返回了 60 个数据点
+2026-03-03 16:00:45,000 - utils.data_sources - INFO - 从东方财富获取基金 025856 历史数据成功
+2026-03-03 16:00:45,139 - utils.data_sources - INFO - 从天天基金获取基金 025856 历史数据成功
+2026-03-03 16:00:45,140 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:45,140 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:00:45,140 - app - INFO - 从天天基金网获取基金 025856 历史数据，共 60 条记录
+2026-03-03 16:00:45,140 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.3782
+2026-03-03 16:00:45,140 - app - INFO - 获取基金 025856 数据成功，共 60 条记录
+2026-03-03 16:00:45,202 - utils.data_sources - INFO - 从新浪财经获取基金 025856 预估收益率成功
+2026-03-03 16:00:45,202 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:45,202 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:45,202 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:45,203 - app - INFO - 更新基金 025856 数据成功
+2026-03-03 16:00:45,261 - utils.data_sources - INFO - 从新浪财经获取基金 023638 最新净值成功
+2026-03-03 16:00:45,261 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:45,261 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:45,261 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:45,261 - app - INFO - 从新浪财经获取基金 023638 数据: 日期=2026-03-02, 净值=2.0409
+2026-03-03 16:00:46,111 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 16:00:46,113 - utils.data_sources - INFO - 从东方财富获取基金 008887 历史数据成功
+2026-03-03 16:00:46,304 - utils.data_sources - INFO - 从天天基金获取基金 008887 历史数据成功
+2026-03-03 16:00:46,304 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:46,304 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:00:46,304 - app - INFO - 从天天基金网获取基金 008887 历史数据，共 400 条记录
+2026-03-03 16:00:46,305 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.6859
+2026-03-03 16:00:46,305 - app - INFO - 获取基金 008887 数据成功，共 400 条记录
+2026-03-03 16:00:46,345 - utils.data_sources - INFO - 从新浪财经获取基金 008887 预估收益率成功
+2026-03-03 16:00:46,346 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:46,346 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:46,346 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:46,349 - app - INFO - 更新基金 008887 数据成功
+2026-03-03 16:00:46,349 - app - INFO - 从缓存获取基金 025856 数据
+2026-03-03 16:00:46,405 - utils.data_sources - INFO - 从新浪财经获取基金 025856 预估收益率成功
+2026-03-03 16:00:46,405 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:46,405 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:46,405 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:46,406 - app - INFO - 更新基金 025856 数据成功
+2026-03-03 16:00:46,455 - utils.data_sources - INFO - 从新浪财经获取基金 023638 最新净值成功
+2026-03-03 16:00:46,455 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:46,455 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:46,455 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:46,456 - app - INFO - 从新浪财经获取基金 023638 数据: 日期=2026-03-02, 净值=2.0409
+2026-03-03 16:00:49,630 - utils.data_sources - INFO - 东方财富API返回了 225 个数据点
+2026-03-03 16:00:49,631 - utils.data_sources - INFO - 从东方财富获取基金 023638 历史数据成功
+2026-03-03 16:00:49,903 - utils.data_sources - INFO - 从天天基金获取基金 023638 历史数据成功
+2026-03-03 16:00:49,904 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:49,904 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:00:49,904 - app - INFO - 从天天基金网获取基金 023638 历史数据，共 225 条记录
+2026-03-03 16:00:49,904 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=2.0409
+2026-03-03 16:00:49,904 - app - INFO - 获取基金 023638 数据成功，共 225 条记录
+2026-03-03 16:00:49,945 - utils.data_sources - INFO - 从新浪财经获取基金 023638 预估收益率成功
+2026-03-03 16:00:49,945 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:49,945 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:49,945 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:49,947 - app - INFO - 更新基金 023638 数据成功
+2026-03-03 16:00:50,037 - utils.data_sources - INFO - 从新浪财经获取基金 000619 最新净值成功
+2026-03-03 16:00:50,037 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:50,037 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:50,038 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:50,038 - app - INFO - 从新浪财经获取基金 000619 数据: 日期=2026-03-02, 净值=5.578
+2026-03-03 16:00:50,680 - utils.data_sources - INFO - 东方财富API返回了 225 个数据点
+2026-03-03 16:00:50,682 - utils.data_sources - INFO - 从东方财富获取基金 023638 历史数据成功
+2026-03-03 16:00:50,954 - utils.data_sources - INFO - 从天天基金获取基金 023638 历史数据成功
+2026-03-03 16:00:50,954 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:50,954 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:00:50,954 - app - INFO - 从天天基金网获取基金 023638 历史数据，共 225 条记录
+2026-03-03 16:00:50,954 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=2.0409
+2026-03-03 16:00:50,955 - app - INFO - 获取基金 023638 数据成功，共 225 条记录
+2026-03-03 16:00:50,997 - utils.data_sources - INFO - 从新浪财经获取基金 023638 预估收益率成功
+2026-03-03 16:00:50,997 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:50,997 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:50,997 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:50,999 - app - INFO - 更新基金 023638 数据成功
+2026-03-03 16:00:51,062 - utils.data_sources - INFO - 从新浪财经获取基金 000619 最新净值成功
+2026-03-03 16:00:51,063 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:51,063 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:51,063 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:51,063 - app - INFO - 从新浪财经获取基金 000619 数据: 日期=2026-03-02, 净值=5.578
+2026-03-03 16:00:52,360 - app - INFO - 获取基金持仓数据: 025856
+2026-03-03 16:00:52,361 - app - INFO - 从缓存获取基金持仓API数据: 025856
+2026-03-03 16:00:52,361 - app - INFO - get_fund_holdings_api 执行时间: 0.61ms
+2026-03-03 16:00:52,361 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:00:52] "GET /api/funds/025856/holdings HTTP/1.1" 200 -
+2026-03-03 16:00:56,988 - utils.data_sources - INFO - 东方财富API返回了 380 个数据点
+2026-03-03 16:00:56,990 - utils.data_sources - INFO - 从东方财富获取基金 000619 历史数据成功
+2026-03-03 16:00:57,131 - utils.data_sources - INFO - 从天天基金获取基金 000619 历史数据成功
+2026-03-03 16:00:57,132 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:57,132 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:00:57,132 - app - INFO - 从天天基金网获取基金 000619 历史数据，共 380 条记录
+2026-03-03 16:00:57,132 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=5.578
+2026-03-03 16:00:57,132 - app - INFO - 获取基金 000619 数据成功，共 380 条记录
+2026-03-03 16:00:57,170 - utils.data_sources - INFO - 从新浪财经获取基金 000619 预估收益率成功
+2026-03-03 16:00:57,170 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:57,170 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:57,170 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:57,174 - app - INFO - 更新基金 000619 数据成功
+2026-03-03 16:00:57,174 - app - INFO - 开始保存基金数据
+2026-03-03 16:00:57,181 - app - INFO - 成功保存 5 只基金
+2026-03-03 16:00:57,181 - app - INFO - 后台更新基金数据完成
+2026-03-03 16:00:58,086 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 16:00:58,089 - utils.data_sources - INFO - 从东方财富获取基金 000619 历史数据成功
+2026-03-03 16:00:58,344 - utils.data_sources - INFO - 从天天基金获取基金 000619 历史数据成功
+2026-03-03 16:00:58,344 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:58,344 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:00:58,344 - app - INFO - 从天天基金网获取基金 000619 历史数据，共 400 条记录
+2026-03-03 16:00:58,344 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=5.578
+2026-03-03 16:00:58,344 - app - INFO - 获取基金 000619 数据成功，共 400 条记录
+2026-03-03 16:00:58,383 - utils.data_sources - INFO - 从新浪财经获取基金 000619 预估收益率成功
+2026-03-03 16:00:58,383 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:00:58,384 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:00:58,384 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:00:58,388 - app - INFO - 更新基金 000619 数据成功
+2026-03-03 16:00:58,388 - app - INFO - 开始保存基金数据
+2026-03-03 16:00:58,395 - app - INFO - 成功保存 5 只基金
+2026-03-03 16:00:58,395 - app - INFO - 后台更新基金数据完成
+2026-03-03 16:01:10,957 - app - INFO - 获取基金列表
+2026-03-03 16:01:10,958 - app - INFO - 从缓存获取基金 020274 数据
+2026-03-03 16:01:10,962 - app - INFO - get_funds 执行时间: 4.48ms
+2026-03-03 16:01:10,963 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:01:10] "GET /api/funds HTTP/1.1" 200 -
+2026-03-03 16:01:10,972 - app - INFO - 获取基金持仓数据: 020274
+2026-03-03 16:01:10,972 - app - INFO - 从缓存获取基金持仓API数据: 020274
+2026-03-03 16:01:10,973 - app - INFO - 获取基金持仓数据: 008887
+2026-03-03 16:01:10,973 - app - INFO - get_fund_holdings_api 执行时间: 1.03ms
+2026-03-03 16:01:10,973 - app - INFO - 从缓存获取基金持仓API数据: 008887
+2026-03-03 16:01:10,974 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:01:10] "GET /api/funds/020274/holdings HTTP/1.1" 200 -
+2026-03-03 16:01:10,974 - app - INFO - 获取基金持仓数据: 025856
+2026-03-03 16:01:10,975 - app - INFO - get_fund_holdings_api 执行时间: 1.78ms
+2026-03-03 16:01:10,975 - app - INFO - 获取基金持仓数据: 023638
+2026-03-03 16:01:10,976 - app - INFO - 从缓存获取基金持仓API数据: 025856
+2026-03-03 16:01:10,976 - app - INFO - 获取基金持仓数据: 000619
+2026-03-03 16:01:10,976 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:01:10] "GET /api/funds/008887/holdings HTTP/1.1" 200 -
+2026-03-03 16:01:10,976 - app - INFO - 从缓存获取基金持仓API数据: 023638
+2026-03-03 16:01:10,977 - app - INFO - get_fund_holdings_api 执行时间: 2.25ms
+2026-03-03 16:01:10,977 - app - INFO - 从缓存获取基金持仓API数据: 000619
+2026-03-03 16:01:10,977 - app - INFO - get_fund_holdings_api 执行时间: 1.53ms
+2026-03-03 16:01:10,977 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:01:10] "GET /api/funds/025856/holdings HTTP/1.1" 200 -
+2026-03-03 16:01:10,977 - app - INFO - get_fund_holdings_api 执行时间: 1.52ms
+2026-03-03 16:01:10,978 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:01:10] "GET /api/funds/023638/holdings HTTP/1.1" 200 -
+2026-03-03 16:01:10,978 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:01:10] "GET /api/funds/000619/holdings HTTP/1.1" 200 -
+2026-03-03 16:01:11,004 - utils.data_sources - INFO - 从新浪财经获取基金 020274 预估收益率成功
+2026-03-03 16:01:11,005 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:01:11,005 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:01:11,005 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:01:11,008 - app - INFO - 更新基金 020274 数据成功
+2026-03-03 16:01:11,008 - app - INFO - 从缓存获取基金 008887 数据
+2026-03-03 16:01:11,048 - utils.data_sources - INFO - 从新浪财经获取基金 008887 预估收益率成功
+2026-03-03 16:01:11,048 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:01:11,048 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:01:11,048 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:01:11,052 - app - INFO - 更新基金 008887 数据成功
+2026-03-03 16:01:11,052 - app - INFO - 从缓存获取基金 025856 数据
+2026-03-03 16:01:11,114 - utils.data_sources - INFO - 从新浪财经获取基金 025856 预估收益率成功
+2026-03-03 16:01:11,115 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:01:11,115 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:01:11,115 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:01:11,116 - app - INFO - 更新基金 025856 数据成功
+2026-03-03 16:01:11,116 - app - INFO - 从缓存获取基金 023638 数据
+2026-03-03 16:01:11,159 - utils.data_sources - INFO - 从新浪财经获取基金 023638 预估收益率成功
+2026-03-03 16:01:11,159 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:01:11,160 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:01:11,160 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:01:11,162 - app - INFO - 更新基金 023638 数据成功
+2026-03-03 16:01:11,162 - app - INFO - 从缓存获取基金 000619 数据
+2026-03-03 16:01:11,207 - utils.data_sources - INFO - 从新浪财经获取基金 000619 预估收益率成功
+2026-03-03 16:01:11,207 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:01:11,207 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:01:11,207 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:01:11,210 - app - INFO - 更新基金 000619 数据成功
+2026-03-03 16:01:11,210 - app - INFO - 开始保存基金数据
+2026-03-03 16:01:11,215 - app - INFO - 成功保存 5 只基金
+2026-03-03 16:01:11,215 - app - INFO - 后台更新基金数据完成
+2026-03-03 16:01:22,151 - __main__ - INFO - 开始保存基金数据
+2026-03-03 16:01:22,158 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 16:01:25,844 - app - INFO - 获取基金列表
+2026-03-03 16:01:25,845 - app - INFO - 从缓存获取基金 020274 数据
+2026-03-03 16:01:25,849 - app - INFO - get_funds 执行时间: 4.75ms
+2026-03-03 16:01:25,851 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:01:25] "GET /api/funds HTTP/1.1" 200 -
+2026-03-03 16:01:25,900 - utils.data_sources - INFO - 从新浪财经获取基金 020274 预估收益率成功
+2026-03-03 16:01:25,900 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:01:25,900 - utils.data_sources - INFO - 尝试恢复数据源 alipay
+2026-03-03 16:01:26,152 - utils.data_sources - INFO - 支付宝基金预估收益率返回: <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtm...
+2026-03-03 16:01:26,154 - utils.data_sources - WARNING - 数据源 alipay 连续失败 5 次，标记为不健康
+2026-03-03 16:01:26,154 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:01:26,158 - app - INFO - 更新基金 020274 数据成功
+2026-03-03 16:01:26,158 - app - INFO - 从缓存获取基金 008887 数据
+2026-03-03 16:01:26,261 - utils.data_sources - INFO - 从新浪财经获取基金 008887 预估收益率成功
+2026-03-03 16:01:26,261 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:01:26,261 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:01:26,261 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:01:26,265 - app - INFO - 更新基金 008887 数据成功
+2026-03-03 16:01:26,266 - app - INFO - 从缓存获取基金 025856 数据
+2026-03-03 16:01:26,371 - utils.data_sources - INFO - 从新浪财经获取基金 025856 预估收益率成功
+2026-03-03 16:01:26,372 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:01:26,372 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:01:26,372 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:01:26,373 - app - INFO - 更新基金 025856 数据成功
+2026-03-03 16:01:26,374 - app - INFO - 从缓存获取基金 023638 数据
+2026-03-03 16:01:26,466 - utils.data_sources - INFO - 从新浪财经获取基金 023638 预估收益率成功
+2026-03-03 16:01:26,466 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:01:26,466 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:01:26,467 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:01:26,468 - app - INFO - 更新基金 023638 数据成功
+2026-03-03 16:01:26,469 - app - INFO - 从缓存获取基金 000619 数据
+2026-03-03 16:01:26,524 - utils.data_sources - INFO - 从新浪财经获取基金 000619 预估收益率成功
+2026-03-03 16:01:26,525 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:01:26,525 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:01:26,525 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:01:26,528 - app - INFO - 更新基金 000619 数据成功
+2026-03-03 16:01:26,528 - app - INFO - 开始保存基金数据
+2026-03-03 16:01:26,536 - app - INFO - 成功保存 5 只基金
+2026-03-03 16:01:26,536 - app - INFO - 后台更新基金数据完成
+2026-03-03 16:01:46,573 - app - INFO - 获取基金持仓数据: 020274
+2026-03-03 16:01:46,573 - app - INFO - 从缓存获取基金持仓API数据: 020274
+2026-03-03 16:01:46,573 - app - INFO - get_fund_holdings_api 执行时间: 0.36ms
+2026-03-03 16:01:46,573 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:01:46] "GET /api/funds/020274/holdings HTTP/1.1" 200 -
+2026-03-03 16:03:08,742 - __main__ - INFO - 开始保存基金数据
+2026-03-03 16:03:08,751 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 16:05:17,907 - app - INFO - 开始保存基金数据
+2026-03-03 16:05:17,917 - app - INFO - 成功保存 5 只基金
+2026-03-03 16:06:09,386 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:06:09] "GET / HTTP/1.1" 200 -
+2026-03-03 16:06:09,401 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:06:09] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2026-03-03 16:06:09,402 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:06:09] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2026-03-03 16:06:09,408 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:06:09] "[36mGET /static/js/technical-analysis.js HTTP/1.1[0m" 304 -
+2026-03-03 16:06:09,411 - app - INFO - 获取基金列表
+2026-03-03 16:06:09,413 - app - INFO - 获取实时快讯
+2026-03-03 16:06:09,415 - app - INFO - get_funds 执行时间: 3.88ms
+2026-03-03 16:06:09,415 - app - INFO - get_news 执行时间: 2.87ms
+2026-03-03 16:06:09,416 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:06:09] "GET /api/funds HTTP/1.1" 200 -
+2026-03-03 16:06:09,417 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:06:09] "GET /api/news HTTP/1.1" 200 -
+2026-03-03 16:06:09,446 - app - INFO - 获取市场数据
+2026-03-03 16:06:09,477 - app - INFO - get_market_data_api 执行时间: 30.70ms
+2026-03-03 16:06:09,477 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:06:09] "GET /api/market-data HTTP/1.1" 200 -
+2026-03-03 16:06:09,479 - app - INFO - 获取基金持仓数据: 020274
+2026-03-03 16:06:09,480 - app - INFO - 获取基金持仓数据: 008887
+2026-03-03 16:06:09,480 - app - INFO - 获取基金持仓数据: 025856
+2026-03-03 16:06:09,481 - app - INFO - 从缓存获取基金持仓API数据: 020274
+2026-03-03 16:06:09,481 - app - INFO - 从缓存获取基金持仓API数据: 008887
+2026-03-03 16:06:09,481 - app - INFO - 获取基金持仓数据: 023638
+2026-03-03 16:06:09,482 - app - INFO - 从缓存获取基金持仓API数据: 025856
+2026-03-03 16:06:09,482 - app - INFO - get_fund_holdings_api 执行时间: 2.91ms
+2026-03-03 16:06:09,483 - app - INFO - 获取基金持仓数据: 000619
+2026-03-03 16:06:09,483 - app - INFO - get_fund_holdings_api 执行时间: 3.35ms
+2026-03-03 16:06:09,483 - app - INFO - 从缓存获取基金持仓API数据: 023638
+2026-03-03 16:06:09,484 - app - INFO - get_fund_holdings_api 执行时间: 3.10ms
+2026-03-03 16:06:09,484 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:06:09] "GET /api/funds/020274/holdings HTTP/1.1" 200 -
+2026-03-03 16:06:09,484 - app - INFO - 从缓存获取基金持仓API数据: 000619
+2026-03-03 16:06:09,484 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:06:09] "GET /api/funds/008887/holdings HTTP/1.1" 200 -
+2026-03-03 16:06:09,484 - app - INFO - get_fund_holdings_api 执行时间: 3.02ms
+2026-03-03 16:06:09,485 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:06:09] "GET /api/funds/025856/holdings HTTP/1.1" 200 -
+2026-03-03 16:06:09,485 - app - INFO - get_fund_holdings_api 执行时间: 2.21ms
+2026-03-03 16:06:09,486 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:06:09] "GET /api/funds/023638/holdings HTTP/1.1" 200 -
+2026-03-03 16:06:09,486 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:06:09] "GET /api/funds/000619/holdings HTTP/1.1" 200 -
+2026-03-03 16:06:09,513 - utils.data_sources - INFO - 从新浪财经获取基金 020274 最新净值成功
+2026-03-03 16:06:09,513 - utils.data_sources - INFO - 尝试恢复数据源 tencent
+2026-03-03 16:06:09,572 - utils.data_sources - ERROR - 从腾讯财经获取基金最新净值失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=020274 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 16:06:09,572 - utils.data_sources - WARNING - 数据源 tencent 连续失败 4 次，标记为不健康
+2026-03-03 16:06:09,572 - utils.data_sources - INFO - 尝试恢复数据源 alipay
+2026-03-03 16:06:09,823 - utils.data_sources - INFO - 支付宝基金返回数据: <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtm...
+2026-03-03 16:06:09,825 - utils.data_sources - WARNING - 数据源 alipay 连续失败 6 次，标记为不健康
+2026-03-03 16:06:09,825 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:06:09,825 - app - INFO - 从新浪财经获取基金 020274 数据: 日期=2026-03-02, 净值=1.6667
+2026-03-03 16:06:10,573 - app - INFO - 获取基金持仓数据: 020274
+2026-03-03 16:06:10,573 - app - INFO - 从缓存获取基金持仓API数据: 020274
+2026-03-03 16:06:10,573 - app - INFO - get_fund_holdings_api 执行时间: 0.39ms
+2026-03-03 16:06:10,574 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:06:10] "GET /api/funds/020274/holdings HTTP/1.1" 200 -
+2026-03-03 16:06:15,828 - utils.data_sources - INFO - 东方财富API返回了 380 个数据点
+2026-03-03 16:06:15,830 - utils.data_sources - INFO - 从东方财富获取基金 020274 历史数据成功
+2026-03-03 16:06:15,972 - utils.data_sources - INFO - 从天天基金获取基金 020274 历史数据成功
+2026-03-03 16:06:15,973 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:06:15,973 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:06:15,973 - app - INFO - 从天天基金网获取基金 020274 历史数据，共 380 条记录
+2026-03-03 16:06:15,973 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.6667
+2026-03-03 16:06:15,973 - app - INFO - 获取基金 020274 数据成功，共 381 条记录
+2026-03-03 16:06:16,012 - utils.data_sources - INFO - 从新浪财经获取基金 020274 预估收益率成功
+2026-03-03 16:06:16,012 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:06:16,012 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:06:16,012 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:06:16,016 - app - INFO - 更新基金 020274 数据成功
+2026-03-03 16:06:16,066 - utils.data_sources - INFO - 从新浪财经获取基金 008887 最新净值成功
+2026-03-03 16:06:16,066 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:06:16,066 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:06:16,066 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:06:16,066 - app - INFO - 从新浪财经获取基金 008887 数据: 日期=2026-03-02, 净值=1.6859
+2026-03-03 16:06:22,165 - __main__ - INFO - 开始保存基金数据
+2026-03-03 16:06:22,173 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 16:06:22,907 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 16:06:22,909 - utils.data_sources - INFO - 从东方财富获取基金 008887 历史数据成功
+2026-03-03 16:06:23,083 - utils.data_sources - INFO - 从天天基金获取基金 008887 历史数据成功
+2026-03-03 16:06:23,083 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:06:23,083 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:06:23,083 - app - INFO - 从天天基金网获取基金 008887 历史数据，共 400 条记录
+2026-03-03 16:06:23,084 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.6859
+2026-03-03 16:06:23,084 - app - INFO - 获取基金 008887 数据成功，共 400 条记录
+2026-03-03 16:06:23,125 - utils.data_sources - INFO - 从新浪财经获取基金 008887 预估收益率成功
+2026-03-03 16:06:23,125 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:06:23,125 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:06:23,125 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:06:23,128 - app - INFO - 更新基金 008887 数据成功
+2026-03-03 16:06:23,199 - utils.data_sources - INFO - 从新浪财经获取基金 025856 最新净值成功
+2026-03-03 16:06:23,199 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:06:23,200 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:06:23,200 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:06:23,200 - app - INFO - 从新浪财经获取基金 025856 数据: 日期=2026-03-02, 净值=1.3782
+2026-03-03 16:06:24,483 - utils.data_sources - INFO - 东方财富API返回了 60 个数据点
+2026-03-03 16:06:24,485 - utils.data_sources - INFO - 从东方财富获取基金 025856 历史数据成功
+2026-03-03 16:06:24,657 - utils.data_sources - INFO - 从天天基金获取基金 025856 历史数据成功
+2026-03-03 16:06:24,658 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:06:24,658 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:06:24,658 - app - INFO - 从天天基金网获取基金 025856 历史数据，共 60 条记录
+2026-03-03 16:06:24,658 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.3782
+2026-03-03 16:06:24,658 - app - INFO - 获取基金 025856 数据成功，共 60 条记录
+2026-03-03 16:06:24,726 - utils.data_sources - INFO - 从新浪财经获取基金 025856 预估收益率成功
+2026-03-03 16:06:24,727 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:06:24,727 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:06:24,727 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:06:24,728 - app - INFO - 更新基金 025856 数据成功
+2026-03-03 16:06:24,793 - utils.data_sources - INFO - 从新浪财经获取基金 023638 最新净值成功
+2026-03-03 16:06:24,794 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:06:24,794 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:06:24,794 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:06:24,794 - app - INFO - 从新浪财经获取基金 023638 数据: 日期=2026-03-02, 净值=2.0409
+2026-03-03 16:06:29,177 - utils.data_sources - INFO - 东方财富API返回了 225 个数据点
+2026-03-03 16:06:29,179 - utils.data_sources - INFO - 从东方财富获取基金 023638 历史数据成功
+2026-03-03 16:06:29,360 - utils.data_sources - INFO - 从天天基金获取基金 023638 历史数据成功
+2026-03-03 16:06:29,360 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:06:29,360 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:06:29,361 - app - INFO - 从天天基金网获取基金 023638 历史数据，共 225 条记录
+2026-03-03 16:06:29,361 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=2.0409
+2026-03-03 16:06:29,361 - app - INFO - 获取基金 023638 数据成功，共 225 条记录
+2026-03-03 16:06:29,403 - utils.data_sources - INFO - 从新浪财经获取基金 023638 预估收益率成功
+2026-03-03 16:06:29,404 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:06:29,404 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:06:29,404 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:06:29,406 - app - INFO - 更新基金 023638 数据成功
+2026-03-03 16:06:29,501 - utils.data_sources - INFO - 从新浪财经获取基金 000619 最新净值成功
+2026-03-03 16:06:29,501 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:06:29,501 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:06:29,501 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:06:29,501 - app - INFO - 从新浪财经获取基金 000619 数据: 日期=2026-03-02, 净值=5.578
+2026-03-03 16:06:36,713 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 16:06:36,716 - utils.data_sources - INFO - 从东方财富获取基金 000619 历史数据成功
+2026-03-03 16:06:36,877 - utils.data_sources - INFO - 从天天基金获取基金 000619 历史数据成功
+2026-03-03 16:06:36,877 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:06:36,877 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:06:36,877 - app - INFO - 从天天基金网获取基金 000619 历史数据，共 400 条记录
+2026-03-03 16:06:36,878 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=5.578
+2026-03-03 16:06:36,878 - app - INFO - 获取基金 000619 数据成功，共 400 条记录
+2026-03-03 16:06:36,950 - utils.data_sources - INFO - 从新浪财经获取基金 000619 预估收益率成功
+2026-03-03 16:06:36,950 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:06:36,950 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:06:36,950 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:06:36,954 - app - INFO - 更新基金 000619 数据成功
+2026-03-03 16:06:36,954 - app - INFO - 开始保存基金数据
+2026-03-03 16:06:36,960 - app - INFO - 成功保存 5 只基金
+2026-03-03 16:06:36,960 - app - INFO - 后台更新基金数据完成
+2026-03-03 16:08:08,758 - __main__ - INFO - 开始保存基金数据
+2026-03-03 16:08:08,766 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 16:10:17,922 - app - INFO - 开始保存基金数据
+2026-03-03 16:10:17,934 - app - INFO - 成功保存 5 只基金
+2026-03-03 16:11:22,178 - __main__ - INFO - 开始保存基金数据
+2026-03-03 16:11:22,187 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 16:13:08,773 - __main__ - INFO - 开始保存基金数据
+2026-03-03 16:13:08,784 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 16:15:17,941 - app - INFO - 开始保存基金数据
+2026-03-03 16:15:17,953 - app - INFO - 成功保存 5 只基金
+2026-03-03 16:16:22,193 - __main__ - INFO - 开始保存基金数据
+2026-03-03 16:16:22,198 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 16:18:08,790 - __main__ - INFO - 开始保存基金数据
+2026-03-03 16:18:08,800 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 16:18:25,120 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:25] "GET / HTTP/1.1" 200 -
+2026-03-03 16:18:25,135 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:25] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2026-03-03 16:18:25,136 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:25] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2026-03-03 16:18:25,142 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:25] "[36mGET /static/js/technical-analysis.js HTTP/1.1[0m" 304 -
+2026-03-03 16:18:25,145 - app - INFO - 获取基金列表
+2026-03-03 16:18:25,146 - app - INFO - 获取实时快讯
+2026-03-03 16:18:25,149 - app - INFO - get_funds 执行时间: 3.58ms
+2026-03-03 16:18:25,149 - app - INFO - get_news 执行时间: 3.15ms
+2026-03-03 16:18:25,150 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:25] "GET /api/funds HTTP/1.1" 200 -
+2026-03-03 16:18:25,150 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:25] "GET /api/news HTTP/1.1" 200 -
+2026-03-03 16:18:25,181 - app - INFO - 获取市场数据
+2026-03-03 16:18:25,210 - app - INFO - get_market_data_api 执行时间: 29.18ms
+2026-03-03 16:18:25,211 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:25] "GET /api/market-data HTTP/1.1" 200 -
+2026-03-03 16:18:25,214 - app - INFO - 获取基金持仓数据: 020274
+2026-03-03 16:18:25,214 - app - INFO - 从缓存获取基金持仓API数据: 020274
+2026-03-03 16:18:25,214 - app - INFO - 获取基金持仓数据: 008887
+2026-03-03 16:18:25,214 - app - INFO - get_fund_holdings_api 执行时间: 0.92ms
+2026-03-03 16:18:25,215 - app - INFO - 从缓存获取基金持仓API数据: 008887
+2026-03-03 16:18:25,215 - app - INFO - 获取基金持仓数据: 025856
+2026-03-03 16:18:25,216 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:25] "GET /api/funds/020274/holdings HTTP/1.1" 200 -
+2026-03-03 16:18:25,216 - app - INFO - get_fund_holdings_api 执行时间: 2.12ms
+2026-03-03 16:18:25,218 - app - INFO - 获取基金持仓数据: 000619
+2026-03-03 16:18:25,219 - app - INFO - 获取基金持仓数据: 023638
+2026-03-03 16:18:25,219 - app - INFO - 从缓存获取基金持仓API数据: 025856
+2026-03-03 16:18:25,219 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:25] "GET /api/funds/008887/holdings HTTP/1.1" 200 -
+2026-03-03 16:18:25,219 - app - INFO - 从缓存获取基金持仓API数据: 000619
+2026-03-03 16:18:25,220 - app - INFO - 从缓存获取基金持仓API数据: 023638
+2026-03-03 16:18:25,220 - app - INFO - get_fund_holdings_api 执行时间: 4.58ms
+2026-03-03 16:18:25,220 - app - INFO - get_fund_holdings_api 执行时间: 1.65ms
+2026-03-03 16:18:25,220 - app - INFO - get_fund_holdings_api 执行时间: 1.55ms
+2026-03-03 16:18:25,221 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:25] "GET /api/funds/025856/holdings HTTP/1.1" 200 -
+2026-03-03 16:18:25,221 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:25] "GET /api/funds/000619/holdings HTTP/1.1" 200 -
+2026-03-03 16:18:25,221 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:25] "GET /api/funds/023638/holdings HTTP/1.1" 200 -
+2026-03-03 16:18:25,313 - utils.data_sources - INFO - 从新浪财经获取基金 020274 最新净值成功
+2026-03-03 16:18:25,314 - utils.data_sources - INFO - 尝试恢复数据源 tencent
+2026-03-03 16:18:25,341 - utils.data_sources - ERROR - 从腾讯财经获取基金最新净值失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=020274 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 16:18:25,341 - utils.data_sources - WARNING - 数据源 tencent 连续失败 5 次，标记为不健康
+2026-03-03 16:18:25,341 - utils.data_sources - INFO - 尝试恢复数据源 alipay
+2026-03-03 16:18:25,641 - utils.data_sources - INFO - 支付宝基金返回数据: <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtm...
+2026-03-03 16:18:25,643 - utils.data_sources - WARNING - 数据源 alipay 连续失败 7 次，标记为不健康
+2026-03-03 16:18:25,644 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:25,644 - app - INFO - 从新浪财经获取基金 020274 数据: 日期=2026-03-02, 净值=1.6667
+2026-03-03 16:18:31,902 - utils.data_sources - INFO - 东方财富API返回了 380 个数据点
+2026-03-03 16:18:31,904 - utils.data_sources - INFO - 从东方财富获取基金 020274 历史数据成功
+2026-03-03 16:18:32,118 - utils.data_sources - INFO - 从天天基金获取基金 020274 历史数据成功
+2026-03-03 16:18:32,119 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:32,119 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:18:32,119 - app - INFO - 从天天基金网获取基金 020274 历史数据，共 380 条记录
+2026-03-03 16:18:32,119 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.6667
+2026-03-03 16:18:32,119 - app - INFO - 获取基金 020274 数据成功，共 381 条记录
+2026-03-03 16:18:32,160 - utils.data_sources - INFO - 从新浪财经获取基金 020274 预估收益率成功
+2026-03-03 16:18:32,160 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:32,160 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:32,160 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:32,164 - app - INFO - 更新基金 020274 数据成功
+2026-03-03 16:18:32,205 - utils.data_sources - INFO - 从新浪财经获取基金 008887 最新净值成功
+2026-03-03 16:18:32,206 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:32,206 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:32,206 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:32,206 - app - INFO - 从新浪财经获取基金 008887 数据: 日期=2026-03-02, 净值=1.6859
+2026-03-03 16:18:38,963 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 16:18:38,966 - utils.data_sources - INFO - 从东方财富获取基金 008887 历史数据成功
+2026-03-03 16:18:39,132 - utils.data_sources - INFO - 从天天基金获取基金 008887 历史数据成功
+2026-03-03 16:18:39,132 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:39,132 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:18:39,132 - app - INFO - 从天天基金网获取基金 008887 历史数据，共 400 条记录
+2026-03-03 16:18:39,132 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.6859
+2026-03-03 16:18:39,132 - app - INFO - 获取基金 008887 数据成功，共 400 条记录
+2026-03-03 16:18:39,208 - utils.data_sources - INFO - 从新浪财经获取基金 008887 预估收益率成功
+2026-03-03 16:18:39,208 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:39,208 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:39,208 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:39,211 - app - INFO - 更新基金 008887 数据成功
+2026-03-03 16:18:39,294 - utils.data_sources - INFO - 从新浪财经获取基金 025856 最新净值成功
+2026-03-03 16:18:39,294 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:39,294 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:39,294 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:39,294 - app - INFO - 从新浪财经获取基金 025856 数据: 日期=2026-03-02, 净值=1.3782
+2026-03-03 16:18:39,785 - app - INFO - 添加基金: 005698
+2026-03-03 16:18:39,785 - app - INFO - 基金 005698 不存在，准备添加
+2026-03-03 16:18:39,861 - utils.data_sources - INFO - 从新浪财经获取基金 005698 预估收益率成功
+2026-03-03 16:18:39,861 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:39,861 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:39,861 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:39,890 - utils.data_sources - INFO - 从新浪财经获取基金 005698 最新净值成功
+2026-03-03 16:18:39,890 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:39,890 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:39,890 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:39,890 - app - INFO - 从新浪财经获取基金 005698 数据: 日期=2026-02-27, 净值=2.5031
+2026-03-03 16:18:40,638 - utils.data_sources - INFO - 东方财富API返回了 60 个数据点
+2026-03-03 16:18:40,640 - utils.data_sources - INFO - 从东方财富获取基金 025856 历史数据成功
+2026-03-03 16:18:40,987 - utils.data_sources - INFO - 从天天基金获取基金 025856 历史数据成功
+2026-03-03 16:18:40,987 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:40,987 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:18:40,987 - app - INFO - 从天天基金网获取基金 025856 历史数据，共 60 条记录
+2026-03-03 16:18:40,987 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.3782
+2026-03-03 16:18:40,988 - app - INFO - 获取基金 025856 数据成功，共 60 条记录
+2026-03-03 16:18:41,038 - utils.data_sources - INFO - 从新浪财经获取基金 025856 预估收益率成功
+2026-03-03 16:18:41,039 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:41,039 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:41,039 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:41,040 - app - INFO - 更新基金 025856 数据成功
+2026-03-03 16:18:41,080 - utils.data_sources - INFO - 从新浪财经获取基金 023638 最新净值成功
+2026-03-03 16:18:41,080 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:41,081 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:41,081 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:41,081 - app - INFO - 从新浪财经获取基金 023638 数据: 日期=2026-03-02, 净值=2.0409
+2026-03-03 16:18:45,453 - utils.data_sources - INFO - 东方财富API返回了 225 个数据点
+2026-03-03 16:18:45,455 - utils.data_sources - INFO - 从东方财富获取基金 023638 历史数据成功
+2026-03-03 16:18:45,659 - utils.data_sources - INFO - 从天天基金获取基金 023638 历史数据成功
+2026-03-03 16:18:45,659 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:45,659 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:18:45,660 - app - INFO - 从天天基金网获取基金 023638 历史数据，共 225 条记录
+2026-03-03 16:18:45,660 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=2.0409
+2026-03-03 16:18:45,660 - app - INFO - 获取基金 023638 数据成功，共 225 条记录
+2026-03-03 16:18:45,695 - utils.data_sources - INFO - 从新浪财经获取基金 023638 预估收益率成功
+2026-03-03 16:18:45,695 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:45,695 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:45,695 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:45,697 - app - INFO - 更新基金 023638 数据成功
+2026-03-03 16:18:45,796 - utils.data_sources - INFO - 从新浪财经获取基金 000619 最新净值成功
+2026-03-03 16:18:45,796 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:45,796 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:45,796 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:45,797 - app - INFO - 从新浪财经获取基金 000619 数据: 日期=2026-03-02, 净值=5.578
+2026-03-03 16:18:46,758 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 16:18:46,761 - utils.data_sources - INFO - 从东方财富获取基金 005698 历史数据成功
+2026-03-03 16:18:47,129 - utils.data_sources - INFO - 从天天基金获取基金 005698 历史数据成功
+2026-03-03 16:18:47,129 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:47,129 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:18:47,129 - app - INFO - 从天天基金网获取基金 005698 历史数据，共 400 条记录
+2026-03-03 16:18:47,129 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-02-27, 净值=2.5031
+2026-03-03 16:18:47,129 - app - INFO - 获取基金 005698 数据成功，共 400 条记录
+2026-03-03 16:18:47,133 - app - INFO - 开始保存基金数据
+2026-03-03 16:18:47,143 - app - INFO - 成功保存 6 只基金
+2026-03-03 16:18:47,143 - app - INFO - 基金添加成功: 005698
+2026-03-03 16:18:47,144 - app - INFO - add_fund 执行时间: 7359.54ms
+2026-03-03 16:18:47,144 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:47] "[35m[1mPOST /api/funds HTTP/1.1[0m" 201 -
+2026-03-03 16:18:47,151 - app - INFO - 获取基金列表
+2026-03-03 16:18:47,151 - app - INFO - 从缓存获取基金 020274 数据
+2026-03-03 16:18:47,154 - app - INFO - get_funds 执行时间: 2.79ms
+2026-03-03 16:18:47,154 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:47] "GET /api/funds HTTP/1.1" 200 -
+2026-03-03 16:18:47,161 - app - INFO - 获取基金持仓数据: 020274
+2026-03-03 16:18:47,161 - app - INFO - 从缓存获取基金持仓API数据: 020274
+2026-03-03 16:18:47,161 - app - INFO - 获取基金持仓数据: 008887
+2026-03-03 16:18:47,161 - app - INFO - 获取基金持仓数据: 025856
+2026-03-03 16:18:47,162 - app - INFO - 获取基金持仓数据: 023638
+2026-03-03 16:18:47,162 - app - INFO - get_fund_holdings_api 执行时间: 1.31ms
+2026-03-03 16:18:47,162 - app - INFO - 获取基金持仓数据: 000619
+2026-03-03 16:18:47,162 - app - INFO - 从缓存获取基金持仓API数据: 008887
+2026-03-03 16:18:47,163 - app - INFO - 从缓存获取基金持仓API数据: 025856
+2026-03-03 16:18:47,163 - app - INFO - 从缓存获取基金持仓API数据: 023638
+2026-03-03 16:18:47,163 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:47] "GET /api/funds/020274/holdings HTTP/1.1" 200 -
+2026-03-03 16:18:47,163 - app - INFO - 从缓存获取基金持仓API数据: 000619
+2026-03-03 16:18:47,163 - app - INFO - get_fund_holdings_api 执行时间: 2.12ms
+2026-03-03 16:18:47,163 - app - INFO - get_fund_holdings_api 执行时间: 2.02ms
+2026-03-03 16:18:47,164 - app - INFO - get_fund_holdings_api 执行时间: 1.81ms
+2026-03-03 16:18:47,164 - app - INFO - get_fund_holdings_api 执行时间: 1.48ms
+2026-03-03 16:18:47,164 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:47] "GET /api/funds/008887/holdings HTTP/1.1" 200 -
+2026-03-03 16:18:47,164 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:47] "GET /api/funds/025856/holdings HTTP/1.1" 200 -
+2026-03-03 16:18:47,164 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:47] "GET /api/funds/023638/holdings HTTP/1.1" 200 -
+2026-03-03 16:18:47,164 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:47] "GET /api/funds/000619/holdings HTTP/1.1" 200 -
+2026-03-03 16:18:47,194 - utils.data_sources - INFO - 从新浪财经获取基金 020274 预估收益率成功
+2026-03-03 16:18:47,194 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:47,194 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:47,194 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:47,196 - app - INFO - 更新基金 020274 数据成功
+2026-03-03 16:18:47,196 - app - INFO - 从缓存获取基金 008887 数据
+2026-03-03 16:18:47,244 - utils.data_sources - INFO - 从新浪财经获取基金 008887 预估收益率成功
+2026-03-03 16:18:47,244 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:47,244 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:47,244 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:47,247 - app - INFO - 更新基金 008887 数据成功
+2026-03-03 16:18:47,247 - app - INFO - 从缓存获取基金 025856 数据
+2026-03-03 16:18:47,284 - utils.data_sources - INFO - 从新浪财经获取基金 025856 预估收益率成功
+2026-03-03 16:18:47,284 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:47,284 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:47,284 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:47,285 - app - INFO - 更新基金 025856 数据成功
+2026-03-03 16:18:47,286 - app - INFO - 从缓存获取基金 023638 数据
+2026-03-03 16:18:47,376 - utils.data_sources - INFO - 从新浪财经获取基金 023638 预估收益率成功
+2026-03-03 16:18:47,377 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:47,377 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:47,377 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:47,379 - app - INFO - 更新基金 023638 数据成功
+2026-03-03 16:18:47,465 - utils.data_sources - INFO - 从新浪财经获取基金 000619 最新净值成功
+2026-03-03 16:18:47,466 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:47,466 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:47,466 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:47,466 - app - INFO - 从新浪财经获取基金 000619 数据: 日期=2026-03-02, 净值=5.578
+2026-03-03 16:18:47,473 - app - INFO - 获取基金持仓数据: 005698
+2026-03-03 16:18:47,474 - app - INFO - 获取基金持仓数据成功: 005698
+2026-03-03 16:18:47,474 - app - INFO - get_fund_holdings_api 执行时间: 0.66ms
+2026-03-03 16:18:47,474 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:47] "GET /api/funds/005698/holdings HTTP/1.1" 200 -
+2026-03-03 16:18:50,154 - app - INFO - 获取基金持仓数据: 005698
+2026-03-03 16:18:50,154 - app - INFO - 从缓存获取基金持仓API数据: 005698
+2026-03-03 16:18:50,154 - app - INFO - get_fund_holdings_api 执行时间: 0.32ms
+2026-03-03 16:18:50,154 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:18:50] "GET /api/funds/005698/holdings HTTP/1.1" 200 -
+2026-03-03 16:18:52,794 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 16:18:52,797 - utils.data_sources - INFO - 从东方财富获取基金 000619 历史数据成功
+2026-03-03 16:18:53,006 - utils.data_sources - INFO - 从天天基金获取基金 000619 历史数据成功
+2026-03-03 16:18:53,006 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:53,006 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:18:53,006 - app - INFO - 从天天基金网获取基金 000619 历史数据，共 400 条记录
+2026-03-03 16:18:53,007 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=5.578
+2026-03-03 16:18:53,007 - app - INFO - 获取基金 000619 数据成功，共 400 条记录
+2026-03-03 16:18:53,075 - utils.data_sources - INFO - 从新浪财经获取基金 000619 预估收益率成功
+2026-03-03 16:18:53,075 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:53,075 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:53,076 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:53,079 - app - INFO - 更新基金 000619 数据成功
+2026-03-03 16:18:53,079 - app - INFO - 从缓存获取基金 005698 数据
+2026-03-03 16:18:53,122 - utils.data_sources - INFO - 从新浪财经获取基金 005698 预估收益率成功
+2026-03-03 16:18:53,122 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:53,122 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:53,123 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:53,127 - app - INFO - 更新基金 005698 数据成功
+2026-03-03 16:18:53,127 - app - INFO - 开始保存基金数据
+2026-03-03 16:18:53,137 - app - INFO - 成功保存 6 只基金
+2026-03-03 16:18:53,137 - app - INFO - 后台更新基金数据完成
+2026-03-03 16:18:54,708 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 16:18:54,711 - utils.data_sources - INFO - 从东方财富获取基金 000619 历史数据成功
+2026-03-03 16:18:55,052 - utils.data_sources - INFO - 从天天基金获取基金 000619 历史数据成功
+2026-03-03 16:18:55,053 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:55,053 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:18:55,053 - app - INFO - 从天天基金网获取基金 000619 历史数据，共 400 条记录
+2026-03-03 16:18:55,053 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=5.578
+2026-03-03 16:18:55,053 - app - INFO - 获取基金 000619 数据成功，共 400 条记录
+2026-03-03 16:18:55,092 - utils.data_sources - INFO - 从新浪财经获取基金 000619 预估收益率成功
+2026-03-03 16:18:55,092 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:55,093 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:55,093 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:55,097 - app - INFO - 更新基金 000619 数据成功
+2026-03-03 16:18:55,097 - app - INFO - 从缓存获取基金 005698 数据
+2026-03-03 16:18:55,160 - utils.data_sources - INFO - 从新浪财经获取基金 005698 预估收益率成功
+2026-03-03 16:18:55,160 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:18:55,160 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:18:55,160 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:18:55,164 - app - INFO - 更新基金 005698 数据成功
+2026-03-03 16:18:55,164 - app - INFO - 开始保存基金数据
+2026-03-03 16:18:55,173 - app - INFO - 成功保存 6 只基金
+2026-03-03 16:18:55,173 - app - INFO - 后台更新基金数据完成
+2026-03-03 16:19:09,721 - app - INFO - 获取基金列表
+2026-03-03 16:19:09,722 - app - INFO - 从缓存获取基金 020274 数据
+2026-03-03 16:19:09,729 - app - INFO - get_funds 执行时间: 8.36ms
+2026-03-03 16:19:09,730 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:19:09] "GET /api/funds HTTP/1.1" 200 -
+2026-03-03 16:19:09,774 - utils.data_sources - INFO - 从新浪财经获取基金 020274 预估收益率成功
+2026-03-03 16:19:09,774 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:19:09,774 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:19:09,774 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:19:09,778 - app - INFO - 更新基金 020274 数据成功
+2026-03-03 16:19:09,778 - app - INFO - 从缓存获取基金 008887 数据
+2026-03-03 16:19:09,823 - utils.data_sources - INFO - 从新浪财经获取基金 008887 预估收益率成功
+2026-03-03 16:19:09,823 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:19:09,823 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:19:09,823 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:19:09,828 - app - INFO - 更新基金 008887 数据成功
+2026-03-03 16:19:09,828 - app - INFO - 从缓存获取基金 025856 数据
+2026-03-03 16:19:09,869 - utils.data_sources - INFO - 从新浪财经获取基金 025856 预估收益率成功
+2026-03-03 16:19:09,869 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:19:09,869 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:19:09,870 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:19:09,871 - app - INFO - 更新基金 025856 数据成功
+2026-03-03 16:19:09,871 - app - INFO - 从缓存获取基金 023638 数据
+2026-03-03 16:19:09,911 - utils.data_sources - INFO - 从新浪财经获取基金 023638 预估收益率成功
+2026-03-03 16:19:09,912 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:19:09,912 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:19:09,912 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:19:09,914 - app - INFO - 更新基金 023638 数据成功
+2026-03-03 16:19:09,914 - app - INFO - 从缓存获取基金 000619 数据
+2026-03-03 16:19:09,955 - utils.data_sources - INFO - 从新浪财经获取基金 000619 预估收益率成功
+2026-03-03 16:19:09,956 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:19:09,956 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:19:09,956 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:19:09,958 - app - INFO - 更新基金 000619 数据成功
+2026-03-03 16:19:09,958 - app - INFO - 从缓存获取基金 005698 数据
+2026-03-03 16:19:10,044 - utils.data_sources - INFO - 从新浪财经获取基金 005698 预估收益率成功
+2026-03-03 16:19:10,044 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:19:10,044 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:19:10,044 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:19:10,047 - app - INFO - 更新基金 005698 数据成功
+2026-03-03 16:19:10,047 - app - INFO - 开始保存基金数据
+2026-03-03 16:19:10,053 - app - INFO - 成功保存 6 只基金
+2026-03-03 16:19:10,053 - app - INFO - 后台更新基金数据完成
+2026-03-03 16:20:18,002 - app - INFO - 开始保存基金数据
+2026-03-03 16:20:18,012 - app - INFO - 成功保存 6 只基金
+2026-03-03 16:20:34,086 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:20:34] "GET / HTTP/1.1" 200 -
+2026-03-03 16:20:34,100 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:20:34] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2026-03-03 16:20:34,101 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:20:34] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2026-03-03 16:20:34,107 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:20:34] "[36mGET /static/js/technical-analysis.js HTTP/1.1[0m" 304 -
+2026-03-03 16:20:34,110 - app - INFO - 获取基金列表
+2026-03-03 16:20:34,114 - app - INFO - get_funds 执行时间: 3.01ms
+2026-03-03 16:20:34,114 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:20:34] "GET /api/funds HTTP/1.1" 200 -
+2026-03-03 16:20:34,114 - app - INFO - 获取实时快讯
+2026-03-03 16:20:34,115 - app - INFO - get_news 执行时间: 0.72ms
+2026-03-03 16:20:34,116 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:20:34] "GET /api/news HTTP/1.1" 200 -
+2026-03-03 16:20:34,124 - app - INFO - 获取市场数据
+2026-03-03 16:20:34,154 - app - INFO - get_market_data_api 执行时间: 30.48ms
+2026-03-03 16:20:34,156 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:20:34] "GET /api/market-data HTTP/1.1" 200 -
+2026-03-03 16:20:34,158 - app - INFO - 获取基金持仓数据: 020274
+2026-03-03 16:20:34,158 - app - INFO - 从缓存获取基金持仓API数据: 020274
+2026-03-03 16:20:34,159 - app - INFO - get_fund_holdings_api 执行时间: 0.57ms
+2026-03-03 16:20:34,159 - app - INFO - 获取基金持仓数据: 008887
+2026-03-03 16:20:34,159 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:20:34] "GET /api/funds/020274/holdings HTTP/1.1" 200 -
+2026-03-03 16:20:34,160 - app - INFO - 从缓存获取基金持仓API数据: 008887
+2026-03-03 16:20:34,160 - app - INFO - 获取基金持仓数据: 025856
+2026-03-03 16:20:34,160 - app - INFO - 获取基金持仓数据: 023638
+2026-03-03 16:20:34,160 - app - INFO - get_fund_holdings_api 执行时间: 1.26ms
+2026-03-03 16:20:34,161 - app - INFO - 从缓存获取基金持仓API数据: 025856
+2026-03-03 16:20:34,161 - app - INFO - 获取基金持仓数据: 000619
+2026-03-03 16:20:34,161 - app - INFO - 从缓存获取基金持仓API数据: 023638
+2026-03-03 16:20:34,161 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:20:34] "GET /api/funds/008887/holdings HTTP/1.1" 200 -
+2026-03-03 16:20:34,162 - app - INFO - get_fund_holdings_api 执行时间: 1.89ms
+2026-03-03 16:20:34,162 - app - INFO - 从缓存获取基金持仓API数据: 000619
+2026-03-03 16:20:34,162 - app - INFO - get_fund_holdings_api 执行时间: 1.72ms
+2026-03-03 16:20:34,162 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:20:34] "GET /api/funds/025856/holdings HTTP/1.1" 200 -
+2026-03-03 16:20:34,163 - app - INFO - get_fund_holdings_api 执行时间: 1.72ms
+2026-03-03 16:20:34,163 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:20:34] "GET /api/funds/023638/holdings HTTP/1.1" 200 -
+2026-03-03 16:20:34,163 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:20:34] "GET /api/funds/000619/holdings HTTP/1.1" 200 -
+2026-03-03 16:20:34,253 - utils.data_sources - INFO - 从新浪财经获取基金 020274 最新净值成功
+2026-03-03 16:20:34,253 - utils.data_sources - INFO - 尝试恢复数据源 tencent
+2026-03-03 16:20:34,312 - utils.data_sources - ERROR - 从腾讯财经获取基金最新净值失败: HTTPSConnectionPool(host='fund.qq.com', port=443): Max retries exceeded with url: /cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode=020274 (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1129)')))
+2026-03-03 16:20:34,312 - utils.data_sources - WARNING - 数据源 tencent 连续失败 6 次，标记为不健康
+2026-03-03 16:20:34,312 - utils.data_sources - INFO - 尝试恢复数据源 alipay
+2026-03-03 16:20:34,470 - app - INFO - 获取基金持仓数据: 005698
+2026-03-03 16:20:34,470 - app - INFO - 从缓存获取基金持仓API数据: 005698
+2026-03-03 16:20:34,471 - app - INFO - get_fund_holdings_api 执行时间: 0.76ms
+2026-03-03 16:20:34,471 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2026 16:20:34] "GET /api/funds/005698/holdings HTTP/1.1" 200 -
+2026-03-03 16:20:34,575 - utils.data_sources - INFO - 支付宝基金返回数据: <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtm...
+2026-03-03 16:20:34,577 - utils.data_sources - WARNING - 数据源 alipay 连续失败 8 次，标记为不健康
+2026-03-03 16:20:34,577 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:20:34,578 - app - INFO - 从新浪财经获取基金 020274 数据: 日期=2026-03-02, 净值=1.6667
+2026-03-03 16:20:40,718 - utils.data_sources - INFO - 东方财富API返回了 380 个数据点
+2026-03-03 16:20:40,721 - utils.data_sources - INFO - 从东方财富获取基金 020274 历史数据成功
+2026-03-03 16:20:40,898 - utils.data_sources - INFO - 从天天基金获取基金 020274 历史数据成功
+2026-03-03 16:20:40,898 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:20:40,898 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:20:40,898 - app - INFO - 从天天基金网获取基金 020274 历史数据，共 380 条记录
+2026-03-03 16:20:40,899 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.6667
+2026-03-03 16:20:40,899 - app - INFO - 获取基金 020274 数据成功，共 381 条记录
+2026-03-03 16:20:40,952 - utils.data_sources - INFO - 从新浪财经获取基金 020274 预估收益率成功
+2026-03-03 16:20:40,952 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:20:40,952 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:20:40,952 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:20:40,955 - app - INFO - 更新基金 020274 数据成功
+2026-03-03 16:20:41,014 - utils.data_sources - INFO - 从新浪财经获取基金 008887 最新净值成功
+2026-03-03 16:20:41,015 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:20:41,015 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:20:41,015 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:20:41,015 - app - INFO - 从新浪财经获取基金 008887 数据: 日期=2026-03-02, 净值=1.6859
+2026-03-03 16:20:47,442 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 16:20:47,445 - utils.data_sources - INFO - 从东方财富获取基金 008887 历史数据成功
+2026-03-03 16:20:47,623 - utils.data_sources - INFO - 从天天基金获取基金 008887 历史数据成功
+2026-03-03 16:20:47,623 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:20:47,623 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:20:47,623 - app - INFO - 从天天基金网获取基金 008887 历史数据，共 400 条记录
+2026-03-03 16:20:47,623 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.6859
+2026-03-03 16:20:47,623 - app - INFO - 获取基金 008887 数据成功，共 400 条记录
+2026-03-03 16:20:47,662 - utils.data_sources - INFO - 从新浪财经获取基金 008887 预估收益率成功
+2026-03-03 16:20:47,662 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:20:47,662 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:20:47,662 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:20:47,666 - app - INFO - 更新基金 008887 数据成功
+2026-03-03 16:20:47,745 - utils.data_sources - INFO - 从新浪财经获取基金 025856 最新净值成功
+2026-03-03 16:20:47,746 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:20:47,746 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:20:47,746 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:20:47,746 - app - INFO - 从新浪财经获取基金 025856 数据: 日期=2026-03-02, 净值=1.3782
+2026-03-03 16:20:48,907 - utils.data_sources - INFO - 东方财富API返回了 60 个数据点
+2026-03-03 16:20:48,909 - utils.data_sources - INFO - 从东方财富获取基金 025856 历史数据成功
+2026-03-03 16:20:49,184 - utils.data_sources - INFO - 从天天基金获取基金 025856 历史数据成功
+2026-03-03 16:20:49,184 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:20:49,184 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:20:49,184 - app - INFO - 从天天基金网获取基金 025856 历史数据，共 60 条记录
+2026-03-03 16:20:49,184 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=1.3782
+2026-03-03 16:20:49,185 - app - INFO - 获取基金 025856 数据成功，共 60 条记录
+2026-03-03 16:20:49,223 - utils.data_sources - INFO - 从新浪财经获取基金 025856 预估收益率成功
+2026-03-03 16:20:49,223 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:20:49,223 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:20:49,223 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:20:49,225 - app - INFO - 更新基金 025856 数据成功
+2026-03-03 16:20:49,264 - utils.data_sources - INFO - 从新浪财经获取基金 023638 最新净值成功
+2026-03-03 16:20:49,265 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:20:49,265 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:20:49,265 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:20:49,265 - app - INFO - 从新浪财经获取基金 023638 数据: 日期=2026-03-02, 净值=2.0409
+2026-03-03 16:20:53,911 - utils.data_sources - INFO - 东方财富API返回了 225 个数据点
+2026-03-03 16:20:53,913 - utils.data_sources - INFO - 从东方财富获取基金 023638 历史数据成功
+2026-03-03 16:20:54,170 - utils.data_sources - INFO - 从天天基金获取基金 023638 历史数据成功
+2026-03-03 16:20:54,171 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:20:54,171 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:20:54,171 - app - INFO - 从天天基金网获取基金 023638 历史数据，共 225 条记录
+2026-03-03 16:20:54,171 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=2.0409
+2026-03-03 16:20:54,171 - app - INFO - 获取基金 023638 数据成功，共 225 条记录
+2026-03-03 16:20:54,214 - utils.data_sources - INFO - 从新浪财经获取基金 023638 预估收益率成功
+2026-03-03 16:20:54,215 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:20:54,215 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:20:54,215 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:20:54,217 - app - INFO - 更新基金 023638 数据成功
+2026-03-03 16:20:54,323 - utils.data_sources - INFO - 从新浪财经获取基金 000619 最新净值成功
+2026-03-03 16:20:54,323 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:20:54,323 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:20:54,323 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:20:54,323 - app - INFO - 从新浪财经获取基金 000619 数据: 日期=2026-03-02, 净值=5.578
+2026-03-03 16:21:00,943 - utils.data_sources - INFO - 东方财富API返回了 400 个数据点
+2026-03-03 16:21:00,946 - utils.data_sources - INFO - 从东方财富获取基金 000619 历史数据成功
+2026-03-03 16:21:01,167 - utils.data_sources - INFO - 从天天基金获取基金 000619 历史数据成功
+2026-03-03 16:21:01,167 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:21:01,167 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:21:01,167 - app - INFO - 从天天基金网获取基金 000619 历史数据，共 400 条记录
+2026-03-03 16:21:01,168 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-03-02, 净值=5.578
+2026-03-03 16:21:01,168 - app - INFO - 获取基金 000619 数据成功，共 400 条记录
+2026-03-03 16:21:01,211 - utils.data_sources - INFO - 从新浪财经获取基金 000619 预估收益率成功
+2026-03-03 16:21:01,212 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:21:01,212 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:21:01,212 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:21:01,215 - app - INFO - 更新基金 000619 数据成功
+2026-03-03 16:21:01,297 - utils.data_sources - INFO - 从新浪财经获取基金 005698 最新净值成功
+2026-03-03 16:21:01,298 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:21:01,298 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:21:01,298 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:21:01,298 - app - INFO - 从新浪财经获取基金 005698 数据: 日期=2026-02-27, 净值=2.5031
+2026-03-03 16:21:07,889 - utils.data_sources - INFO - 东方财富API返回了 380 个数据点
+2026-03-03 16:21:07,891 - utils.data_sources - INFO - 从东方财富获取基金 005698 历史数据成功
+2026-03-03 16:21:08,324 - utils.data_sources - INFO - 从天天基金获取基金 005698 历史数据成功
+2026-03-03 16:21:08,324 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:21:08,325 - utils.data_sources - INFO - 选择最佳数据源: 东方财富
+2026-03-03 16:21:08,325 - app - INFO - 从天天基金网获取基金 005698 历史数据，共 380 条记录
+2026-03-03 16:21:08,325 - app - INFO - 确保新浪财经最新数据被保留: 日期=2026-02-27, 净值=2.5031
+2026-03-03 16:21:08,325 - app - INFO - 获取基金 005698 数据成功，共 380 条记录
+2026-03-03 16:21:08,380 - utils.data_sources - INFO - 从新浪财经获取基金 005698 预估收益率成功
+2026-03-03 16:21:08,380 - utils.data_sources - WARNING - 数据源 tencent 不可用，跳过
+2026-03-03 16:21:08,381 - utils.data_sources - WARNING - 数据源 alipay 不可用，跳过
+2026-03-03 16:21:08,381 - utils.data_sources - INFO - 选择最佳数据源: 新浪财经
+2026-03-03 16:21:08,384 - app - INFO - 更新基金 005698 数据成功
+2026-03-03 16:21:08,384 - app - INFO - 开始保存基金数据
+2026-03-03 16:21:08,393 - app - INFO - 成功保存 6 只基金
+2026-03-03 16:21:08,393 - app - INFO - 后台更新基金数据完成
+2026-03-03 16:21:22,248 - __main__ - INFO - 开始保存基金数据
+2026-03-03 16:21:22,259 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 16:23:08,848 - __main__ - INFO - 开始保存基金数据
+2026-03-03 16:23:08,859 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 16:25:18,020 - app - INFO - 开始保存基金数据
+2026-03-03 16:25:18,033 - app - INFO - 成功保存 6 只基金
+2026-03-03 16:26:22,263 - __main__ - INFO - 开始保存基金数据
+2026-03-03 16:26:22,267 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 16:28:08,864 - __main__ - INFO - 开始保存基金数据
+2026-03-03 16:28:08,874 - __main__ - INFO - 成功保存 5 只基金
+2026-03-03 16:30:18,039 - app - INFO - 开始保存基金数据
+2026-03-03 16:30:18,053 - app - INFO - 成功保存 6 只基金
+2026-03-03 16:31:22,277 - __main__ - INFO - 开始保存基金数据
+2026-03-03 16:31:22,287 - __main__ - INFO - 成功保存 5 只基金

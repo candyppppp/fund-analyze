@@ -1016,6 +1016,16 @@ def get_funds():
         # 这样可以快速响应前端请求
         current_funds = [fund.to_dict() for fund in funds]
         
+        # 确保返回的数据不为空，即使网络不好
+        if not current_funds:
+            # 尝试从文件加载数据
+            try:
+                load_funds()
+                current_funds = [fund.to_dict() for fund in funds]
+                logger.info('从文件加载基金数据')
+            except Exception as e:
+                logger.error(f'加载基金数据失败: {e}')
+        
         # 后台异步更新基金数据
         def update_funds_async():
             try:
@@ -1048,23 +1058,32 @@ def get_funds():
                         logger.info(f'更新基金 {fund.code} 数据成功')
                     except Exception as e:
                         logger.error(f'更新基金 {fund.code} 数据失败: {e}')
-                        # 继续处理下一个基金
+                        # 继续处理下一个基金，不影响其他基金
                         continue
                 # 保存更新后的数据
                 save_funds()
                 logger.info('后台更新基金数据完成')
             except Exception as e:
                 logger.error(f'后台更新基金数据失败: {e}')
+                # 后台更新失败不影响返回数据
         
         # 启动后台更新线程
         import threading
         update_thread = threading.Thread(target=update_funds_async, daemon=True)
         update_thread.start()
         
-        # 立即返回当前数据
+        # 立即返回当前数据，确保即使网络不好也能返回基金列表
         return jsonify(current_funds)
     except Exception as e:
         logger.error(f'获取基金列表失败: {e}')
+        # 即使出现异常，也尝试返回已存储的基金数据
+        try:
+            current_funds = [fund.to_dict() for fund in funds]
+            if current_funds:
+                return jsonify(current_funds)
+        except:
+            pass
+        # 最后才返回空数组
         return jsonify([]), 500
 
 @app.route('/api/funds', methods=['POST'])
