@@ -1387,6 +1387,8 @@ def get_fund_holdings_api(code):
         return jsonify({'stocks': [], 'stock_ratio': 0, 'market_data': {'indices': {}, 'sectors': {}}})
 
 if __name__ == '__main__':
-    print('Starting Flask server...')
-    print('Server will run on http://localhost:8002')
-    app.run(debug=True, port=8002, host='0.0.0.0')
+    import os
+    port = int(os.environ.get('PORT', 8002))
+    print(f'Starting Flask server on port {port}...')
+    print(f'Server will run on http://localhost:{port}')
+    app.run(debug=False, port=port, host='0.0.0.0')
