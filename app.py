@@ -23,7 +23,15 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+import os
+
+# 获取应用根目录
+base_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 显式配置Flask应用
+app = Flask(__name__,
+            static_folder=os.path.join(base_dir, 'static'),
+            template_folder=os.path.join(base_dir, 'templates'))
 CORS(app)
 
 # 数据文件路径
