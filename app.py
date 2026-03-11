@@ -86,6 +86,7 @@ def load_funds():
                         fund.volume_ratio = data.get('volume_ratio', 0)
                         fund.predicted_return = data.get('predicted_return', 0)
                         fund.prediction_confidence = data.get('prediction_confidence', 0.5)
+                        fund.previous_day_return = data.get('previous_day_return', 0)
                         funds.append(fund)
                     except Exception as e:
                         logger.error(f"重建基金对象失败: {e}")
@@ -174,6 +175,60 @@ def scheduled_update_funds():
             logger.error(f"定时更新任务失败: {e}")
             # 继续执行，不中断定时任务
 
+# 定时生成每日预测任务
+def scheduled_daily_prediction():
+    """每天2点启动新的一天预测，基于历史数据和持仓股票表现"""
+    while True:
+        try:
+            # 获取当前时间
+            now = datetime.now()
+            # 检查是否是2点
+            if now.hour == 2 and now.minute == 0:
+                logger.info('开始生成新一天的基金预测')
+                # 获取市场数据
+                market_data = get_market_data()
+                # 为每个基金生成预测
+                for fund in funds:
+                    try:
+                        # 获取基金数据
+                        name, prices, dates, returns = get_fund_data(fund.code)
+                        # 获取持仓数据
+                        holdings = get_fund_holdings(fund.code)
+                        
+                        # 获取持仓股票的前一天表现数据
+                        if holdings and holdings.get('stocks'):
+                            stock_codes = [stock['code'] for stock in holdings['stocks']]
+                            if stock_codes:
+                                # 获取股票实时数据（包含前一天的表现）
+                                stock_data = get_batch_stock_real_time_data(stock_codes)
+                                # 将股票涨跌幅数据添加到持仓数据中
+                                for stock in holdings['stocks']:
+                                    stock_code = stock['code']
+                                    if stock_code in stock_data:
+                                        stock['change_ratio'] = stock_data[stock_code].get('change_ratio', 0)
+                        
+                        # 基于历史数据和持仓股票表现生成预测
+                        fund.predicted_return = fund.calculate_predicted_return(
+                            stock_holdings=holdings,
+                            market_data=market_data,
+                            real_time_estimated_return=None  # 非交易时间，使用历史数据预测
+                        )
+                        fund.prediction_confidence = fund.calculate_prediction_confidence()
+                        logger.info(f'生成基金 {fund.code} 预测成功')
+                    except Exception as e:
+                        logger.error(f'生成基金 {fund.code} 预测失败: {e}')
+                # 保存更新后的数据
+                save_funds()
+                logger.info('每日预测生成完成')
+                # 避免重复执行，等待61秒
+                time.sleep(61)
+            else:
+                # 每分钟检查一次
+                time.sleep(60)
+        except Exception as e:
+            logger.error(f"定时预测任务失败: {e}")
+            # 继续执行，不中断定时任务
+
 # 初始化加载数据
 try:
     load_funds()
@@ -197,6 +252,14 @@ try:
     logger.info("定时更新基金数据线程已启动")
 except Exception as e:
     logger.error(f'启动定时更新基金数据线程失败: {e}')
+
+# 启动定时生成每日预测线程
+try:
+    prediction_thread = threading.Thread(target=scheduled_daily_prediction, daemon=True)
+    prediction_thread.start()
+    logger.info("定时生成每日预测线程已启动")
+except Exception as e:
+    logger.error(f'启动定时生成每日预测线程失败: {e}')
 
 # 统一缓存管理类
 class CacheManager:
@@ -938,6 +1001,31 @@ def get_fund_data(code):
                     returns.append(0)
             returns.insert(0, 0)
         
+        # 如果没有足够的数据点，尝试从缓存获取旧数据来补充
+        if len(sorted_prices) < 2:
+            old_data = cache_manager.get('fund_data', cache_key)
+            if old_data and len(old_data['prices']) >= 2:
+                # 使用缓存中的历史数据来补充
+                for i, (date, price) in enumerate(zip(old_data['dates'], old_data['prices'])):
+                    if date not in unique_data:
+                        unique_data[date] = price
+                
+                # 重新排序
+                sorted_dates = sorted(unique_data.keys())
+                sorted_prices = [unique_data[date] for date in sorted_dates]
+                
+                # 重新计算收益率
+                if len(sorted_prices) > 1:
+                    returns = []
+                    for i in range(1, len(sorted_prices)):
+                        try:
+                            daily_return = (sorted_prices[i] - sorted_prices[i-1]) / sorted_prices[i-1]
+                            returns.append(daily_return)
+                        except (ZeroDivisionError, TypeError):
+                            returns.append(0)
+                    returns.insert(0, 0)
+                logger.info(f"使用缓存数据补充后，共 {len(sorted_prices)} 条记录")
+        
         # 存储到缓存
         fund_data = {
             'name': name,
@@ -951,7 +1039,12 @@ def get_fund_data(code):
         return name, sorted_prices, sorted_dates, returns
     except Exception as e:
         logger.error(f"获取基金数据失败: {e}")
-        # 如果API调用失败，返回空数据
+        # 如果API调用失败，尝试从缓存获取旧数据
+        old_data = cache_manager.get('fund_data', cache_key)
+        if old_data:
+            logger.info(f"API调用失败，使用缓存中的旧数据")
+            return old_data['name'], old_data['prices'], old_data['dates'], old_data['returns']
+        # 如果缓存也没有数据，返回空数据
         return f'基金{code}', [], [], []
 
 @app.route('/')
@@ -1012,68 +1105,72 @@ def get_funds():
     try:
         logger.info('获取基金列表')
         
-        # 立即返回当前基金数据，不等待更新完成
-        # 这样可以快速响应前端请求
-        current_funds = [fund.to_dict() for fund in funds]
-        
-        # 确保返回的数据不为空，即使网络不好
-        if not current_funds:
-            # 尝试从文件加载数据
-            try:
-                load_funds()
-                current_funds = [fund.to_dict() for fund in funds]
-                logger.info('从文件加载基金数据')
-            except Exception as e:
-                logger.error(f'加载基金数据失败: {e}')
-        
-        # 后台异步更新基金数据
-        def update_funds_async():
-            try:
-                # 只获取一次市场数据，避免重复请求
-                market_data = get_market_data()
-                
-                # 更新每个基金的最新数据
-                for fund in funds:
-                    try:
-                        # 获取最新的基金数据
-                        name, prices, dates, returns = get_fund_data(fund.code)
-                        
-                        # 获取实时预估收益率数据
-                        real_time_estimated_return = data_source_manager.get_fund_estimated_return(fund.code)
-                        
-                        # 获取持仓数据
-                        holdings = get_fund_holdings(fund.code)
-                        
-                        # 更新基金数据，包括实时预估收益率
-                        fund.update_prices(prices, dates, returns, market_data=market_data)
-                        
-                        # 更新预测收益率，使用实时预估数据
+        # 立即更新基金数据，确保返回最新数据
+        # 这样可以保证首页和趋势图显示的是相同的数据
+        updated_funds = []
+        try:
+            # 只获取一次市场数据，避免重复请求
+            market_data = get_market_data()
+            
+            # 更新每个基金的最新数据
+            for fund in funds:
+                try:
+                    # 获取最新的基金数据
+                    name, prices, dates, returns = get_fund_data(fund.code)
+                    
+                    # 获取实时预估收益率数据
+                    real_time_estimated_return = data_source_manager.get_fund_estimated_return(fund.code)
+                    
+                    # 获取持仓数据
+                    holdings = get_fund_holdings(fund.code)
+                    
+                    # 更新基金数据，包括实时预估收益率
+                    fund.update_prices(prices, dates, returns, market_data=market_data)
+                    
+                    # 计算预测收益率，使用实时预估数据
+                    # 如果没有实时预估数据，使用昨天的预估值作为昨天的收益率
+                    if real_time_estimated_return:
                         fund.predicted_return = fund.calculate_predicted_return(
                             stock_holdings=holdings,
                             market_data=market_data,
                             real_time_estimated_return=real_time_estimated_return
                         )
-                        fund.prediction_confidence = fund.calculate_prediction_confidence()
-                        
-                        logger.info(f'更新基金 {fund.code} 数据成功')
-                    except Exception as e:
-                        logger.error(f'更新基金 {fund.code} 数据失败: {e}')
-                        # 继续处理下一个基金，不影响其他基金
-                        continue
-                # 保存更新后的数据
-                save_funds()
-                logger.info('后台更新基金数据完成')
+                    else:
+                        # 没有实时数据，使用昨天的预估值作为昨天的收益率
+                        # 这里我们使用基金当前的预测收益率作为临时值
+                        # 当有任何一个源更新了最新的净值，会及时更新过来
+                        logger.info(f'基金 {fund.code} 没有实时预估数据，使用当前预测值')
+                    
+                    fund.prediction_confidence = fund.calculate_prediction_confidence()
+                    
+                    updated_funds.append(fund.to_dict())
+                    logger.info(f'更新基金 {fund.code} 数据成功')
+                except Exception as e:
+                    logger.error(f'更新基金 {fund.code} 数据失败: {e}')
+                    # 如果更新失败，使用旧数据
+                    updated_funds.append(fund.to_dict())
+                    continue
+            
+            # 保存更新后的数据
+            save_funds()
+            logger.info('更新基金数据完成')
+        except Exception as e:
+            logger.error(f'更新基金数据失败: {e}')
+            # 如果更新失败，使用旧数据
+            updated_funds = [fund.to_dict() for fund in funds]
+        
+        # 确保返回的数据不为空，即使网络不好
+        if not updated_funds:
+            # 尝试从文件加载数据
+            try:
+                load_funds()
+                updated_funds = [fund.to_dict() for fund in funds]
+                logger.info('从文件加载基金数据')
             except Exception as e:
-                logger.error(f'后台更新基金数据失败: {e}')
-                # 后台更新失败不影响返回数据
+                logger.error(f'加载基金数据失败: {e}')
         
-        # 启动后台更新线程
-        import threading
-        update_thread = threading.Thread(target=update_funds_async, daemon=True)
-        update_thread.start()
-        
-        # 立即返回当前数据，确保即使网络不好也能返回基金列表
-        return jsonify(current_funds)
+        # 返回更新后的数据
+        return jsonify(updated_funds)
     except Exception as e:
         logger.error(f'获取基金列表失败: {e}')
         # 即使出现异常，也尝试返回已存储的基金数据
@@ -1422,7 +1519,7 @@ def get_fund_holdings_api(code):
 
 if __name__ == '__main__':
     import os
-    port = int(os.environ.get('PORT', 8002))
+    port = int(os.environ.get('PORT', 8003))
     print(f'Starting Flask server on port {port}...')
     print(f'Server will run on http://localhost:{port}')
     app.run(debug=False, port=port, host='0.0.0.0')

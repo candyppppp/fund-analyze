@@ -14,18 +14,16 @@ class DataSourceManager:
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
-        # 数据源配置
+        # 数据源配置 - 只保留稳定可用的数据源
         self.data_sources = {
-            'latest_nav': ['sina', 'tencent', 'alipay'],  # 最新净值数据源优先级
-            'historical_data': ['eastmoney', '天天基金', 'tencent'],  # 历史数据数据源优先级
+            'latest_nav': ['sina', 'eastmoney'],  # 最新净值数据源优先级
+            'historical_data': ['sina', '天天基金', 'eastmoney'],  # 历史数据数据源优先级，优先使用新浪财经和天天基金
             'holdings': ['eastmoney', '天天基金'],  # 持仓数据数据源优先级
-            'estimated_return': ['sina', 'tencent', 'alipay']  # 预估收益率数据源优先级
+            'estimated_return': ['sina', 'eastmoney']  # 预估收益率数据源优先级
         }
-        # 数据源健康状态
+        # 数据源健康状态 - 只保留稳定可用的数据源
         self.source_health = {
             'sina': {'status': 'healthy', 'last_checked': datetime.now(), 'fail_count': 0},
-            'tencent': {'status': 'healthy', 'last_checked': datetime.now(), 'fail_count': 0},
-            'alipay': {'status': 'healthy', 'last_checked': datetime.now(), 'fail_count': 0},
             'eastmoney': {'status': 'healthy', 'last_checked': datetime.now(), 'fail_count': 0},
             '天天基金': {'status': 'healthy', 'last_checked': datetime.now(), 'fail_count': 0}
         }
@@ -49,18 +47,12 @@ class DataSourceManager:
                 if result:
                     data_list.append(result)
                     logger.info(f"从新浪财经获取基金 {code} 最新净值成功")
-            elif source == 'tencent':
-                result = self._get_fund_latest_nav_tencent(code)
+            elif source == 'eastmoney':
+                result = self._get_fund_latest_nav_eastmoney(code)
                 self._update_source_health(source, result is not None)
                 if result:
                     data_list.append(result)
-                    logger.info(f"从腾讯财经获取基金 {code} 最新净值成功")
-            elif source == 'alipay':
-                result = self._get_fund_latest_nav_alipay(code)
-                self._update_source_health(source, result is not None)
-                if result:
-                    data_list.append(result)
-                    logger.info(f"从支付宝基金获取基金 {code} 最新净值成功")
+                    logger.info(f"从东方财富获取基金 {code} 最新净值成功")
         
         # 验证数据一致性并选择最佳数据
         best_data = self.validate_data_consistency('latest_nav', data_list)
@@ -94,40 +86,45 @@ class DataSourceManager:
             logger.error(f"从新浪财经获取基金最新净值失败: {e}")
         return None
     
-    def _get_fund_latest_nav_tencent(self, code):
-        """获取基金最新净值（腾讯财经API）"""
+    def _get_fund_latest_nav_eastmoney(self, code):
+        """获取基金最新净值（东方财富API）"""
         try:
-            fund_url = f"https://fund.qq.com/cgi-bin/fundquery/FundInfoGet?vname=jjsqjz&fundcode={code}"
+            fund_url = f"https://fund.eastmoney.com/pingzhongdata/{code}.js"
             response = requests.get(fund_url, headers=self.headers, timeout=3)
             response.encoding = 'utf-8'
             
             if response.status_code == 200:
-                # 解析腾讯财经返回的数据
                 data_str = response.text
-                # 腾讯财经的返回格式可能需要特殊处理
-                # 这里只是一个示例，实际需要根据腾讯财经的API格式进行调整
-                logger.info(f"腾讯财经返回数据: {data_str[:100]}...")
-                # 由于腾讯财经API格式可能变化，这里暂时返回None
-                # 实际使用时需要根据具体API格式进行解析
+                # 提取基金基本信息
+                name_match = re.search(r'var fund_name = "(.*?)";', data_str)
+                jzrq_match = re.search(r'var Data_1y = \[(.*?)\];', data_str)
+                dwjz_match = re.search(r'var Data_netWorthTrend = \[(.*?)\];', data_str)
+                
+                name = name_match.group(1) if name_match else f'基金{code}'
+                
+                # 提取最新净值和日期
+                if dwjz_match:
+                    networth_data = dwjz_match.group(1)
+                    # 解析净值数据
+                    networth_list = re.findall(r'\{.*?\}', networth_data)
+                    if networth_list:
+                        latest_data = networth_list[-1]
+                        date_match = re.search(r'date":"(.*?)"', latest_data)
+                        value_match = re.search(r'value":(.*?),', latest_data)
+                        if date_match and value_match:
+                            date_str = date_match.group(1)
+                            nav = float(value_match.group(1))
+                            return {
+                                'name': name,
+                                'jzrq': date_str,
+                                'dwjz': nav,
+                                'gsz': nav,  # 东方财富API可能没有实时估值
+                                'gszzl': 0,  # 东方财富API可能没有实时估值
+                                'gztime': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                                'source': '东方财富'
+                            }
         except Exception as e:
-            logger.error(f"从腾讯财经获取基金最新净值失败: {e}")
-        return None
-    
-    def _get_fund_latest_nav_alipay(self, code):
-        """获取基金最新净值（支付宝基金API）"""
-        try:
-            # 支付宝基金API可能需要特定的请求格式和参数
-            # 这里只是一个示例，实际需要根据支付宝的API格式进行调整
-            fund_url = f"https://openapi.alipay.com/gateway.do?service=alipay.fund.fundinfo.query&fund_code={code}"
-            response = requests.get(fund_url, headers=self.headers, timeout=3)
-            response.encoding = 'utf-8'
-            
-            if response.status_code == 200:
-                logger.info(f"支付宝基金返回数据: {response.text[:100]}...")
-                # 由于支付宝API可能需要认证，这里暂时返回None
-                # 实际使用时需要根据具体API格式进行解析
-        except Exception as e:
-            logger.error(f"从支付宝基金获取最新净值失败: {e}")
+            logger.error(f"从东方财富获取基金最新净值失败: {e}")
         return None
     
     def get_fund_historical_data(self, code):
@@ -152,6 +149,12 @@ class DataSourceManager:
                 if result:
                     data_list.append(result)
                     logger.info(f"从天天基金获取基金 {code} 历史数据成功")
+            elif source == 'sina':
+                result = self._get_fund_historical_data_sina(code)
+                self._update_source_health(source, result is not None)
+                if result:
+                    data_list.append(result)
+                    logger.info(f"从新浪财经获取基金 {code} 历史数据成功")
             elif source == 'tencent':
                 result = self._get_fund_historical_data_tencent(code)
                 self._update_source_health(source, result is not None)
@@ -370,6 +373,81 @@ class DataSourceManager:
             logger.error(f"从天天基金网获取基金历史数据失败: {e}")
         return None
     
+    def _get_fund_historical_data_sina(self, code):
+        """获取基金历史净值数据（新浪财经API）"""
+        try:
+            # 首先获取最新净值数据
+            fund_url = f"http://fundgz.1234567.com.cn/js/{code}.js"
+            response = requests.get(fund_url, headers=self.headers, timeout=5)
+            response.encoding = 'utf-8'
+            
+            if response.status_code == 200:
+                # 解析新浪财经返回的数据
+                data_str = response.text.strip().replace('jsonpgz(', '').replace(');', '')
+                data = json.loads(data_str)
+                
+                # 构建历史数据
+                prices = []
+                dates = []
+                returns = []
+                
+                # 添加最新数据
+                if data.get('jzrq') and data.get('dwjz'):
+                    dates.append(data['jzrq'])
+                    prices.append(float(data['dwjz']))
+                
+                # 尝试从新浪财经的历史数据API获取更多数据
+                # 新浪财经历史数据API
+                history_url = f"http://finance.sina.com.cn/fund/quotes/{code}/history.shtml"
+                response_history = requests.get(history_url, headers=self.headers, timeout=5)
+                
+                if response_history.status_code == 200:
+                    # 尝试解析历史数据页面
+                    # 这里使用简单的正则表达式提取数据
+                    # 注意：这种方法可能会因为页面结构变化而失效
+                    import re
+                    # 尝试匹配历史净值数据
+                    nav_pattern = re.compile(r'([0-9]{4}-[0-9]{2}-[0-9]{2})[^0-9]*([0-9]+\.[0-9]+)', re.DOTALL)
+                    matches = nav_pattern.findall(response_history.text)
+                    
+                    # 处理匹配到的数据
+                    history_data = {}
+                    for date_str, nav_str in matches:
+                        try:
+                            nav = float(nav_str)
+                            history_data[date_str] = nav
+                        except ValueError:
+                            pass
+                    
+                    # 将历史数据添加到列表中
+                    for date_str, nav in sorted(history_data.items()):
+                        if date_str not in dates:
+                            dates.append(date_str)
+                            prices.append(nav)
+                
+                # 计算收益率
+                if len(prices) > 1:
+                    for i in range(1, len(prices)):
+                        try:
+                            daily_return = (prices[i] - prices[i-1]) / prices[i-1]
+                            returns.append(daily_return)
+                        except (ZeroDivisionError, TypeError):
+                            returns.append(0)
+                    returns.insert(0, 0)
+                
+                # 即使只有一条数据，也返回，确保至少有最新净值
+                if len(prices) > 0:
+                    logger.info(f"新浪财经API返回了 {len(prices)} 个历史数据点")
+                    return {
+                        'prices': prices,
+                        'dates': dates,
+                        'returns': returns,
+                        'source': '新浪财经'
+                    }
+        except Exception as e:
+            logger.error(f"从新浪财经获取基金历史数据失败: {e}")
+        return None
+    
     def _get_fund_historical_data_tencent(self, code):
         """获取基金历史净值数据（腾讯财经API）"""
         try:
@@ -578,18 +656,12 @@ class DataSourceManager:
                 if result:
                     data_list.append(result)
                     logger.info(f"从新浪财经获取基金 {code} 预估收益率成功")
-            elif source == 'tencent':
-                result = self._get_fund_estimated_return_tencent(code)
+            elif source == 'eastmoney':
+                result = self._get_fund_estimated_return_eastmoney(code)
                 self._update_source_health(source, result is not None)
                 if result:
                     data_list.append(result)
-                    logger.info(f"从腾讯财经获取基金 {code} 预估收益率成功")
-            elif source == 'alipay':
-                result = self._get_fund_estimated_return_alipay(code)
-                self._update_source_health(source, result is not None)
-                if result:
-                    data_list.append(result)
-                    logger.info(f"从支付宝基金获取基金 {code} 预估收益率成功")
+                    logger.info(f"从东方财富获取基金 {code} 预估收益率成功")
         
         # 验证数据一致性并选择最佳数据
         best_data = self.validate_data_consistency('estimated_return', data_list)
@@ -638,34 +710,49 @@ class DataSourceManager:
             logger.error(f"从腾讯财经获取基金预估收益率失败: {e}")
         return None
     
-    def _get_fund_estimated_return_alipay(self, code):
-        """获取基金当日预估收益率（支付宝基金API）"""
+    def _get_fund_estimated_return_eastmoney(self, code):
+        """获取基金当日预估收益率（东方财富API）"""
         try:
-            # 支付宝基金API可能需要特定的请求格式和参数
-            # 这里只是一个示例，实际需要根据支付宝的API格式进行调整
-            fund_url = f"https://openapi.alipay.com/gateway.do?service=alipay.fund.estimated.return.query&fund_code={code}"
+            fund_url = f"https://fund.eastmoney.com/pingzhongdata/{code}.js"
             response = requests.get(fund_url, headers=self.headers, timeout=3)
             response.encoding = 'utf-8'
             
             if response.status_code == 200:
-                logger.info(f"支付宝基金预估收益率返回: {response.text[:100]}...")
-                # 由于支付宝API可能需要认证，这里暂时返回None
-                # 实际使用时需要根据具体API格式进行解析
+                data_str = response.text
+                # 提取基金预估收益率相关数据
+                gsz_match = re.search(r'var gsz = (.*?);', data_str)
+                gszzl_match = re.search(r'var gszzl = (.*?);', data_str)
+                gztime_match = re.search(r'var gztime = "(.*?)";', data_str)
+                
+                if gsz_match and gszzl_match:
+                    gsz = float(gsz_match.group(1))
+                    gszzl = float(gszzl_match.group(1)) / 100  # 转换为小数
+                    gztime = gztime_match.group(1) if gztime_match else datetime.now().strftime('%Y-%m-%d %H:%M')
+                    
+                    return {
+                        'gsz': gsz,
+                        'gszzl': gszzl,
+                        'gztime': gztime,
+                        'source': '东方财富'
+                    }
         except Exception as e:
-            logger.error(f"从支付宝基金获取预估收益率失败: {e}")
+            logger.error(f"从东方财富获取基金预估收益率失败: {e}")
         return None
     
     def _update_source_health(self, source, success):
         """更新数据源健康状态"""
         self.source_health[source]['last_checked'] = datetime.now()
         if success:
+            if self.source_health[source]['status'] == 'unhealthy':
+                logger.info(f"数据源 {source} 已恢复健康状态")
             self.source_health[source]['status'] = 'healthy'
             self.source_health[source]['fail_count'] = 0
         else:
             self.source_health[source]['fail_count'] += 1
             if self.source_health[source]['fail_count'] >= self.health_threshold:
+                if self.source_health[source]['status'] != 'unhealthy':
+                    logger.warning(f"数据源 {source} 连续失败 {self.source_health[source]['fail_count']} 次，标记为不健康")
                 self.source_health[source]['status'] = 'unhealthy'
-                logger.warning(f"数据源 {source} 连续失败 {self.source_health[source]['fail_count']} 次，标记为不健康")
     
     def _is_source_available(self, source):
         """检查数据源是否可用"""
@@ -681,6 +768,17 @@ class DataSourceManager:
                 return True
             else:
                 return False
+    
+    def get_source_health_status(self):
+        """获取所有数据源的健康状态"""
+        status = {}
+        for source, health in self.source_health.items():
+            status[source] = {
+                'status': health['status'],
+                'fail_count': health['fail_count'],
+                'last_checked': health['last_checked'].strftime('%Y-%m-%d %H:%M:%S')
+            }
+        return status
     
     def validate_data_consistency(self, data_type, data_list):
         """验证数据一致性"""
