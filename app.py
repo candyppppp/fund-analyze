@@ -1,8 +1,16 @@
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, session, redirect, url_for
 from flask_cors import CORS
+
 from models.fund import Fund
+
+from models.user import user_manager
+
 from utils.indicators import calculate_rsi, calculate_volatility
+
 from utils.data_sources import data_source_manager
+
+from utils.fund_recommender import get_recommended_funds as get_recommended_funds_engine
+
 import time
 import requests
 import json
@@ -10,6 +18,17 @@ import re
 from datetime import datetime, timedelta
 import os
 import logging
+
+# Supabase 配置
+from supabase import create_client, Client
+
+# 从环境变量获取 Supabase 配置
+SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://your-supabase-url.supabase.co')
+SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', 'your-supabase-anon-key')
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', 'your-supabase-service-role-key')
+
+# 创建 Supabase 客户端
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 # 配置日志
 import os
@@ -41,31 +60,109 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__,
             static_folder=os.path.join(base_dir, 'static'),
             template_folder=os.path.join(base_dir, 'templates'))
-CORS(app)
+import os as _os
+_cors_origins = _os.environ.get('CORS_ORIGINS', '').split(',')
+_cors_origins = [o.strip() for o in _cors_origins if o.strip()] or ['*']
+
+import secrets as _secrets
+
+def generate_csrf_token():
+    """生成并存储 CSRF token 到 session"""
+    if '_csrf_token' not in session:
+        session['_csrf_token'] = _secrets.token_hex(32)
+    return session['_csrf_token']
+
+def validate_csrf_token():
+    """验证 POST 请求的 CSRF token"""
+    token = request.form.get('_csrf_token') or request.headers.get('X-CSRF-Token')
+    return token and token == session.get('_csrf_token')
+
+app.jinja_env.globals['csrf_token'] = generate_csrf_token
+
+CORS(app, supports_credentials=True, origins=_cors_origins)
+
+# 添加密钥用于会话管理
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'your-secret-key-here')
+app.config['PERMANENT_SESSION_LIFETIME'] = __import__('datetime').timedelta(hours=24)
 
 # 数据文件路径
 DATA_FILE = 'funds_data.json'
+# 用户数据目录
+USER_DATA_DIR = 'user_data'
+
+# 确保用户数据目录存在
+if not os.path.exists(USER_DATA_DIR):
+    os.makedirs(USER_DATA_DIR)
 
 # 加载基金数据
 funds = []
-
-# 定时保存间隔（秒）
-SAVE_INTERVAL = 300  # 5分钟
-
-# 上次保存时间
 last_save_time = 0
 
-def load_funds():
-    """从文件加载基金数据"""
+
+def get_user_data_file(username):
+    """获取用户数据文件路径"""
+    return os.path.join(USER_DATA_DIR, f"{username}_funds.json")
+
+
+def load_funds(username=None):
+    """从 Supabase 或本地文件加载基金数据"""
     global funds
     logger.info('开始加载基金数据')
-    if os.path.exists(DATA_FILE):
+
+    try:
+        # 从 Supabase 加载基金数据
+        if username:
+            response = supabase.table('funds').select('*').eq('username', username).execute()
+        else:
+            response = supabase.table('funds').select('*').execute()
+
+        fund_data = response.data
+        funds = []
+
+        for data in fund_data:
+            # 重建Fund对象
+            try:
+                fund = Fund(
+                    data['name'],
+                    data['code'],
+                    data['prices'],
+                    data['dates'],
+                    data['returns'],
+                    data.get('volumes', [])
+                )
+                # 恢复其他属性
+                fund.id = data['id']
+                fund.rsi = data.get('rsi', 0)
+                fund.volatility = data.get('volatility', 0)
+                fund.macd = data.get('macd', [0, 0, 0])
+                fund.kdj = data.get('kdj', [0, 0, 0])
+                fund.bollinger_bands = data.get('bollinger_bands', [0, 0, 0])
+                fund.atr = data.get('atr', 0)
+                fund.volume_ratio = data.get('volume_ratio', 0)
+                fund.predicted_return = data.get('predicted_return', 0)
+                fund.prediction_confidence = data.get('prediction_confidence', 0.5)
+                fund.previous_day_return = data.get('previous_day_return', 0)
+                fund.username = data.get('username', username)
+                fund.nav_updated_at = data.get('nav_updated_at', None)
+                funds.append(fund)
+            except Exception as e:
+                logger.error(f"重建基金对象失败: {e}")
+                continue
+
+        # 更新ID计数器
+        if funds:
+            Fund.id_counter = max(fund.id for fund in funds) + 1
+        logger.info(f"成功加载 {len(funds)} 只基金")
+    except Exception as e:
+        logger.error(f"从 Supabase 加载基金数据失败: {e}")
+        # 从本地文件加载数据
         try:
-            with open(DATA_FILE, 'r', encoding='utf-8') as f:
-                fund_data = json.load(f)
+            data_file = get_user_data_file(username or 'default')
+            if os.path.exists(data_file):
+                with open(data_file, 'r', encoding='utf-8') as f:
+                    fund_data = json.load(f)
                 funds = []
                 for data in fund_data:
-                    # 重建Fund对象
                     try:
                         fund = Fund(
                             data['name'],
@@ -87,147 +184,51 @@ def load_funds():
                         fund.predicted_return = data.get('predicted_return', 0)
                         fund.prediction_confidence = data.get('prediction_confidence', 0.5)
                         fund.previous_day_return = data.get('previous_day_return', 0)
+                        fund.username = data.get('username', username)
+                        fund.nav_updated_at = data.get('nav_updated_at', None)
                         funds.append(fund)
                     except Exception as e:
-                        logger.error(f"重建基金对象失败: {e}")
+                        logger.error(f"从本地文件重建基金对象失败: {e}")
                         continue
                 # 更新ID计数器
                 if funds:
                     Fund.id_counter = max(fund.id for fund in funds) + 1
-                logger.info(f"成功加载 {len(funds)} 只基金")
+                logger.info(f"从本地文件成功加载 {len(funds)} 只基金")
+            else:
+                logger.warning(f"本地数据文件不存在: {data_file}")
+                funds = []
         except Exception as e:
-            logger.error(f"加载基金数据失败: {e}")
+            logger.error(f"从本地文件加载基金数据失败: {e}")
             funds = []
-    else:
-        logger.info("基金数据文件不存在，初始化空列表")
-        funds = []
 
 
-def save_funds():
-    """保存基金数据到文件"""
+def save_funds(username=None):
+    """保存基金数据到 Supabase（upsert，60秒节流）"""
     global funds, last_save_time
-    logger.info('开始保存基金数据')
+
+    # 节流：60 秒内不重复写，避免每次 GET /api/funds 都触发写库
+    now = time.time()
+    if now - last_save_time < 60:
+        logger.debug('save_funds 节流跳过（距上次写入 %.0f 秒）', now - last_save_time)
+        return
+    last_save_time = now
+
+    logger.info('开始保存基金数据到 Supabase')
     try:
-        # 创建临时文件
-        temp_file = DATA_FILE + '.tmp'
-        fund_data = [fund.to_dict() for fund in funds]
-        # 确保目录存在
-        os.makedirs(os.path.dirname(DATA_FILE) if os.path.dirname(DATA_FILE) else '.', exist_ok=True)
-        
-        # 先写入临时文件
-        with open(temp_file, 'w', encoding='utf-8') as f:
-            json.dump(fund_data, f, ensure_ascii=False, indent=2)
-        
-        # 原子操作替换文件
-        os.replace(temp_file, DATA_FILE)
-        
-        last_save_time = time.time()
-        logger.info(f"成功保存 {len(funds)} 只基金")
+        rows = []
+        for fund in funds:
+            fund_data = fund.to_dict()
+            fund_data['username'] = username or fund.username
+            rows.append(fund_data)
+        if rows:
+            supabase.table('funds').upsert(rows).execute()
+            logger.info(f'成功 upsert {len(rows)} 只基金')
+        logger.info(f"成功保存 {len(funds)} 只基金到 Supabase")
     except Exception as e:
-        logger.error(f"保存基金数据失败: {e}")
-        # 清理临时文件
-        try:
-            if os.path.exists(DATA_FILE + '.tmp'):
-                os.remove(DATA_FILE + '.tmp')
-        except:
-            pass
+        logger.error(f"保存基金数据到 Supabase 失败: {e}")
 
-# 定时保存任务
-def scheduled_save():
-    """定时保存基金数据"""
-    while True:
-        try:
-            time.sleep(SAVE_INTERVAL)
-            save_funds()
-        except Exception as e:
-            logger.error(f"定时保存任务失败: {e}")
-            # 继续执行，不中断定时任务
+    # Vercel 无持久文件系统，仅用 Supabase 持久化
 
-# 定时更新基金数据任务
-def scheduled_update_funds():
-    """定时更新基金数据，每天0点更新前一天的真实数据"""
-    while True:
-        try:
-            # 获取当前时间
-            now = datetime.now()
-            # 检查是否是0点
-            if now.hour == 0 and now.minute == 0:
-                logger.info('开始更新基金数据')
-                # 更新所有基金数据
-                for fund in funds:
-                    try:
-                        # 获取最新的基金数据
-                        name, prices, dates, returns = get_fund_data(fund.code)
-                        # 更新基金数据
-                        fund.update_prices(prices, dates, returns)
-                        logger.info(f'更新基金 {fund.code} 数据成功')
-                    except Exception as e:
-                        logger.error(f'更新基金 {fund.code} 数据失败: {e}')
-                # 保存更新后的数据
-                save_funds()
-                logger.info('基金数据更新完成')
-                # 避免重复执行，等待61秒
-                time.sleep(61)
-            else:
-                # 每分钟检查一次
-                time.sleep(60)
-        except Exception as e:
-            logger.error(f"定时更新任务失败: {e}")
-            # 继续执行，不中断定时任务
-
-# 定时生成每日预测任务
-def scheduled_daily_prediction():
-    """每天2点启动新的一天预测，基于历史数据和持仓股票表现"""
-    while True:
-        try:
-            # 获取当前时间
-            now = datetime.now()
-            # 检查是否是2点
-            if now.hour == 2 and now.minute == 0:
-                logger.info('开始生成新一天的基金预测')
-                # 获取市场数据
-                market_data = get_market_data()
-                # 为每个基金生成预测
-                for fund in funds:
-                    try:
-                        # 获取基金数据
-                        name, prices, dates, returns = get_fund_data(fund.code)
-                        # 获取持仓数据
-                        holdings = get_fund_holdings(fund.code)
-                        
-                        # 获取持仓股票的前一天表现数据
-                        if holdings and holdings.get('stocks'):
-                            stock_codes = [stock['code'] for stock in holdings['stocks']]
-                            if stock_codes:
-                                # 获取股票实时数据（包含前一天的表现）
-                                stock_data = get_batch_stock_real_time_data(stock_codes)
-                                # 将股票涨跌幅数据添加到持仓数据中
-                                for stock in holdings['stocks']:
-                                    stock_code = stock['code']
-                                    if stock_code in stock_data:
-                                        stock['change_ratio'] = stock_data[stock_code].get('change_ratio', 0)
-                        
-                        # 基于历史数据和持仓股票表现生成预测
-                        fund.predicted_return = fund.calculate_predicted_return(
-                            stock_holdings=holdings,
-                            market_data=market_data,
-                            real_time_estimated_return=None  # 非交易时间，使用历史数据预测
-                        )
-                        fund.prediction_confidence = fund.calculate_prediction_confidence()
-                        logger.info(f'生成基金 {fund.code} 预测成功')
-                    except Exception as e:
-                        logger.error(f'生成基金 {fund.code} 预测失败: {e}')
-                # 保存更新后的数据
-                save_funds()
-                logger.info('每日预测生成完成')
-                # 避免重复执行，等待61秒
-                time.sleep(61)
-            else:
-                # 每分钟检查一次
-                time.sleep(60)
-        except Exception as e:
-            logger.error(f"定时预测任务失败: {e}")
-            # 继续执行，不中断定时任务
 
 # 初始化加载数据
 try:
@@ -236,403 +237,145 @@ except Exception as e:
     logger.error(f'初始化加载数据失败: {e}')
     funds = []
 
-# 启动定时保存线程
-try:
-    import threading
-    save_thread = threading.Thread(target=scheduled_save, daemon=True)
-    save_thread.start()
-    logger.info("定时保存线程已启动")
-except Exception as e:
-    logger.error(f'启动定时保存线程失败: {e}')
-
-# 启动定时更新基金数据线程
-try:
-    update_thread = threading.Thread(target=scheduled_update_funds, daemon=True)
-    update_thread.start()
-    logger.info("定时更新基金数据线程已启动")
-except Exception as e:
-    logger.error(f'启动定时更新基金数据线程失败: {e}')
-
-# 启动定时生成每日预测线程
-try:
-    prediction_thread = threading.Thread(target=scheduled_daily_prediction, daemon=True)
-    prediction_thread.start()
-    logger.info("定时生成每日预测线程已启动")
-except Exception as e:
-    logger.error(f'启动定时生成每日预测线程失败: {e}')
-
-# 统一缓存管理类
-class CacheManager:
-    def __init__(self):
-        # 基础缓存配置
-        self.caches = {
-            'stock': {'data': {}, 'expiry': 300, 'trading_expiry': 15},  # 股票数据：非交易时间5分钟，交易时间15秒
-            'fund_holdings': {'data': {}, 'expiry': 28800, 'trading_expiry': 15},  # 基金持仓：非交易时间8小时，交易时间15秒
-            'market_data': {'data': {}, 'expiry': 120, 'trading_expiry': 10},  # 市场数据：非交易时间2分钟，交易时间10秒
-            'fund_data': {'data': {}, 'expiry': 60, 'trading_expiry': 30}  # 基金数据：非交易时间1分钟，交易时间30秒，确保能及时获取最新数据
-        }
-        self.hits = 0
-        self.misses = 0
-    
-    def is_trading_time(self):
-        """判断是否为交易时间"""
-        now = datetime.now()
-        is_trading_day = now.weekday() < 5  # 周一到周五
-        hour = now.hour
-        minute = now.minute
-        # 9:30-11:30 和 13:00-15:00 为交易时间
-        is_trading_hours = ((hour == 9 and minute >= 30) or (hour == 10) or (hour == 11 and minute < 30) or
-                           (hour == 13) or (hour == 14) or (hour == 15 and minute == 0))
-        return is_trading_day and is_trading_hours
-    
-    def get_expiry(self, cache_name):
-        """根据交易时间获取缓存过期时间"""
-        cache = self.caches.get(cache_name)
-        if not cache:
-            return 300  # 默认5分钟
-        
-        if self.is_trading_time():
-            return cache.get('trading_expiry', cache['expiry'])
-        else:
-            return cache['expiry']
-    
-    def get(self, cache_name, key):
-        """获取缓存数据"""
-        cache = self.caches.get(cache_name)
-        if not cache:
-            self.misses += 1
-            return None
-        
-        item = cache['data'].get(key)
-        if not item:
-            self.misses += 1
-            return None
-        
-        # 检查缓存是否过期
-        current_time = time.time()
-        expiry = self.get_expiry(cache_name)
-        if current_time - item['timestamp'] < expiry:
-            self.hits += 1
-            return item['data']
-        else:
-            # 缓存过期，删除
-            del cache['data'][key]
-            self.misses += 1
-            return None
-    
-    def set(self, cache_name, key, data):
-        """设置缓存数据"""
-        cache = self.caches.get(cache_name)
-        if not cache:
-            return
-        
-        cache['data'][key] = {
-            'timestamp': time.time(),
-            'data': data
-        }
-        
-        # 限制缓存大小，防止内存溢出
-        max_items = 1000  # 每个缓存最多存储1000个项目
-        if len(cache['data']) > max_items:
-            # 删除最旧的项目
-            sorted_items = sorted(cache['data'].items(), key=lambda x: x[1]['timestamp'])
-            items_to_delete = len(cache['data']) - max_items
-            for item_key, _ in sorted_items[:items_to_delete]:
-                del cache['data'][item_key]
-    
-    def clear(self, cache_name=None):
-        """清除缓存"""
-        if cache_name:
-            if cache_name in self.caches:
-                self.caches[cache_name]['data'] = {}
-                logger.info(f"清除缓存: {cache_name}")
-        else:
-            for cache_name in self.caches:
-                self.caches[cache_name]['data'] = {}
-            logger.info("清除所有缓存")
-    
-    def get_stats(self):
-        """获取缓存统计信息"""
-        stats = {
-            'hits': self.hits,
-            'misses': self.misses,
-            'hit_rate': self.hits / (self.hits + self.misses) * 100 if (self.hits + self.misses) > 0 else 0,
-            'cache_sizes': {}
-        }
-        for cache_name, cache in self.caches.items():
-            stats['cache_sizes'][cache_name] = len(cache['data'])
-        return stats
-
-# 创建缓存管理器实例
-cache_manager = CacheManager()
 
 # 获取基金持仓数据
+_holdings_cache = {}   # {code: (timestamp, holdings_data)}
+_HOLDINGS_TTL = 7 * 24 * 3600  # 7天，持仓数据按季度更新
+
 def get_fund_holdings(code):
-    """获取基金的持仓数据"""
-    # 检查缓存
-    cache_key = f"fund_holdings_{code}"
-    cached_data = cache_manager.get('fund_holdings', cache_key)
-    
-    if cached_data:
-        return cached_data
-    
-    holdings = {
-        'stocks': [],
-        'stock_ratio': 0
-    }
-    
+    """获取基金的持仓数据
+
+    东方财富 pingzhongdata 接口在 2025 年后移除了 Data_holdStock / Data_holdStockNew，
+    现在改用 stockCodesNew（格式：市场号.股票代码，如 "0.002384"）和 stockCodes。
+    权重数据已被接口移除，改为从 Data_fundSharesPositions 取最新总仓位，
+    各股票按等权分配（总仓位 / 持仓数量）。
+    """
+    # 内存缓存：持仓按季度公告，7天内直接返回缓存
+    _now = time.time()
+    if code in _holdings_cache:
+        _ts, _cached = _holdings_cache[code]
+        if _now - _ts < _HOLDINGS_TTL:
+            logger.debug(f'持仓缓存命中: {code}')
+            return _cached
+
+    holdings = {'stocks': [], 'stock_ratio': 0}
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://fund.eastmoney.com/",
     }
-    
-    data_obtained = False
-    
-    # 优先从东方财富JS数据获取（响应速度快，数据结构清晰）
+
     try:
-        fund_data_url = f"https://fund.eastmoney.com/pingzhongdata/{code}.js"
-        response = requests.get(fund_data_url, headers=headers, timeout=5)
-        
-        if response.status_code == 200:
-            data_str = response.text
-            
-            # 尝试提取 Data_holdStock 变量（优先使用，包含真实持仓数据）
-            data_hold_stock_match = re.search(r'var Data_holdStock = \[(.*?)\];', data_str, re.DOTALL)
-            if data_hold_stock_match:
-                data_hold_stock_str = data_hold_stock_match.group(1)
+        url = f"https://fund.eastmoney.com/pingzhongdata/{code}.js"
+        resp = requests.get(url, headers=headers, timeout=8)
+        if resp.status_code != 200:
+            logger.warning(f"持仓接口 {code}: HTTP {resp.status_code}")
+            return holdings
+
+        text = resp.text
+        stock_codes = []
+
+        # ── 优先：stockCodesNew，格式 "市场号.股票代码"，如 "0.002384" ──────────
+        m = re.search(r'var stockCodesNew\s*=\s*\[(.*?)\];', text)
+        if m:
+            try:
+                raw = json.loads('[' + m.group(1) + ']')
+                for item in raw:
+                    # 取小数点后的部分作为股票代码
+                    parts = str(item).split('.')
+                    if len(parts) == 2:
+                        c = parts[1].zfill(6)  # 补齐6位
+                        if len(c) == 6 and c.isdigit():
+                            stock_codes.append(c)
+                logger.info(f"持仓 {code}: stockCodesNew 解析到 {len(stock_codes)} 只股票")
+            except Exception as e:
+                logger.warning(f"持仓 {code}: stockCodesNew 解析失败 {e}")
+
+        # ── 回退：stockCodes，格式 "0023840"（7位，去掉首位市场号）────────────
+        if not stock_codes:
+            m = re.search(r'var stockCodes\s*=\s*\[(.*?)\];', text)
+            if m:
                 try:
-                    data_hold_stock = json.loads('[' + data_hold_stock_str + ']')
-                    
-                    for stock in data_hold_stock:  # 显示全部股票
-                        try:
-                            stock_code = stock.get('code', '')
-                            stock_name = stock.get('name', '')
-                            weight = stock.get('percent', 0) * 100  # 转换为百分比
-                            
-                            if stock_code and stock_name and weight > 0:
-                                # 清理股票代码
-                                clean_code = stock_code.split('.')[0]
-                                if clean_code.isdigit() and len(clean_code) == 6:
-                                    stock_info = {
-                                        'code': clean_code,
-                                        'name': stock_name,
-                                        'weight': weight
-                                    }
-                                    holdings['stocks'].append(stock_info)
-                        except Exception:
-                            pass
-                    if holdings['stocks']:
-                        data_obtained = True
-                except Exception:
-                    pass
-            
-            # 如果 Data_holdStock 为空，尝试提取其他变量
-            if not data_obtained:
-                # 尝试提取 Data_holdStockNew 变量
-                data_hold_stock_new_match = re.search(r'var Data_holdStockNew = \[(.*?)\];', data_str, re.DOTALL)
-                if data_hold_stock_new_match:
-                    data_hold_stock_new_str = data_hold_stock_new_match.group(1)
-                    try:
-                        data_hold_stock_new = json.loads('[' + data_hold_stock_new_str + ']')
-                        
-                        for stock in data_hold_stock_new:  # 显示全部股票
-                            try:
-                                stock_code = stock.get('code', '')
-                                stock_name = stock.get('name', '')
-                                weight = stock.get('percent', 0) * 100  # 转换为百分比
-                                
-                                if stock_code and stock_name and weight > 0:
-                                    # 清理股票代码
-                                    clean_code = stock_code.split('.')[0]
-                                    if clean_code.isdigit() and len(clean_code) == 6:
-                                        stock_info = {
-                                            'code': clean_code,
-                                            'name': stock_name,
-                                            'weight': weight
-                                        }
-                                        holdings['stocks'].append(stock_info)
-                            except Exception:
-                                pass
-                        if holdings['stocks']:
-                            data_obtained = True
-                    except Exception:
-                        pass
-            
-            # 如果仍然没有数据，尝试提取 stockCodes 和 stockNames 变量
-            if not data_obtained:
-                # 尝试提取 stockCodes 变量
-                stock_codes_match = re.search(r'var stockCodes\s*=\s*\[(.*?)\];', data_str)
-                if stock_codes_match:
-                    stock_codes_str = stock_codes_match.group(1)
-                    try:
-                        stock_codes = json.loads('[' + stock_codes_str + ']')
-                        
-                        # 尝试提取 stockNames 变量
-                        stock_names_match = re.search(r'var stockNames\s*=\s*\[(.*?)\];', data_str)
-                        stock_names = []
-                        if stock_names_match:
-                            try:
-                                stock_names_str = stock_names_match.group(1)
-                                stock_names = json.loads('[' + stock_names_str + ']')
-                            except Exception:
-                                pass
-                        
-                        # 为每只股票创建默认数据
-                        for i, code in enumerate(stock_codes):  # 显示全部股票
-                            # 移除可能的市场代码后缀（如.SH, .SZ）
-                            clean_code = code.split('.')[0]
-                            
-                            # 处理特殊格式的股票代码，如6005191（可能是带市场标识的格式）
-                            # 提取前6位数字作为股票代码
-                            if len(clean_code) >= 6:
-                                # 提取前6位数字
-                                clean_code = ''.join(filter(str.isdigit, clean_code))[:6]
-                            elif len(clean_code) < 6:
-                                # 不足6位的代码可能是无效的，跳过
-                                continue
-                            
-                            # 确保股票代码是有效的6位数字
-                            if not clean_code.isdigit() or len(clean_code) != 6:
-                                continue
-                            
-                            # 过滤掉非A股代码（只保留沪市6开头、深市0或3开头、科创板688开头的股票）
-                            if not (clean_code.startswith('6') or clean_code.startswith('0') or clean_code.startswith('3')):
-                                continue
-                            
-                            # 过滤掉可能的非股票代码（如基金代码等）
-                            # 简单判断：只保留常见的A股代码范围
-                            if clean_code.startswith('6'):
-                                # 沪市股票：600000-699999
-                                if not (600000 <= int(clean_code) <= 699999):
-                                    continue
-                            elif clean_code.startswith('0'):
-                                # 深市主板：000001-001999
-                                if not (1 <= int(clean_code) <= 1999):
-                                    continue
-                            elif clean_code.startswith('3'):
-                                # 创业板：300000-300999
-                                if not (300000 <= int(clean_code) <= 300999):
-                                    continue
-                            
-                            # 生成默认权重
-                            weight = 10.0 - i * 0.5  # 模拟权重递减
-                            # 尝试获取股票名称
-                            stock_name = f"股票{clean_code}"
-                            if i < len(stock_names):
-                                stock_name = stock_names[i]
-                            
-                            stock_info = {
-                                'code': clean_code,
-                                'name': stock_name,
-                                'weight': weight
-                            }
-                            holdings['stocks'].append(stock_info)
-                        if holdings['stocks']:
-                            data_obtained = True
-                    except Exception:
-                        pass
-            
-            # 尝试提取资产配置数据
-            asset_match = re.search(r'var Data_assetAllocation = \[(.*?)\];', data_str, re.DOTALL)
-            if asset_match:
+                    raw = json.loads('[' + m.group(1) + ']')
+                    for item in raw:
+                        s = str(item)
+                        # 格式通常是7位："0023840" → 去掉第一位市场标识
+                        if len(s) == 7:
+                            c = s[1:]
+                        elif len(s) == 6:
+                            c = s
+                        else:
+                            c = re.sub(r'\D', '', s)[-6:]
+                        if len(c) == 6 and c.isdigit():
+                            stock_codes.append(c)
+                    logger.info(f"持仓 {code}: stockCodes 解析到 {len(stock_codes)} 只股票")
+                except Exception as e:
+                    logger.warning(f"持仓 {code}: stockCodes 解析失败 {e}")
+
+        if not stock_codes:
+            logger.warning(f"持仓 {code}: 未找到任何股票代码")
+            return holdings
+
+        # ── 获取总仓位：从 Data_fundSharesPositions 取最新一条 ────────────────
+        stock_ratio = 0.0
+        m_pos = re.search(r'var Data_fundSharesPositions\s*=\s*\[(.*?)\];', text, re.DOTALL)
+        if m_pos:
+            try:
+                positions = json.loads('[' + m_pos.group(1) + ']')
+                if positions:
+                    # 每项格式 [时间戳, 仓位百分比]，取最后一条
+                    latest = positions[-1]
+                    if isinstance(latest, list) and len(latest) >= 2:
+                        stock_ratio = float(latest[1])
+            except Exception as e:
+                logger.warning(f"持仓 {code}: Data_fundSharesPositions 解析失败 {e}")
+
+        # ── 回退总仓位：Data_assetAllocation ─────────────────────────────────
+        if stock_ratio == 0:
+            m_asset = re.search(r'var Data_assetAllocation\s*=\s*\[(.*?)\];', text, re.DOTALL)
+            if m_asset:
                 try:
-                    asset_data = asset_match.group(1)
-                    # 尝试解析资产配置数据
-                    if '{' in asset_data:
-                        # 尝试解析为JSON
-                        try:
-                            asset_json = json.loads('[' + asset_data + ']')
-                            for item in asset_json:
-                                if item.get('assetType') == '股票' or item.get('name') == '股票':
-                                    holdings['stock_ratio'] = float(item.get('ratio', 0)) * 100
-                                    break
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-            
-            # 如果没有提取到资产配置数据，尝试从其他地方获取
-            if holdings['stock_ratio'] == 0 and holdings['stocks']:
-                # 计算股票总权重作为股票占比
-                total_weight = sum(stock['weight'] for stock in holdings['stocks'])
-                if total_weight > 0:
-                    holdings['stock_ratio'] = min(total_weight, 100.0)
+                    for item in json.loads('[' + m_asset.group(1) + ']'):
+                        if item.get('assetType') == '股票' or item.get('name') == '股票':
+                            stock_ratio = float(item.get('ratio', 0)) * 100
+                            break
+                except Exception as _e:
+
+                    logger.warning(f"caught exception: {_e}")
+
+        # ── 等权分配：总仓位 / 持仓股票数 ────────────────────────────────────
+        n = len(stock_codes)
+        weight_each = round(stock_ratio / n, 2) if stock_ratio > 0 and n > 0 else 0.0
+
+        for c in stock_codes:
+            holdings['stocks'].append({
+                'code': c,
+                'name': get_stock_name(c),  # 通过新浪财经查名称
+                'weight': weight_each,
+            })
+
+        holdings['stock_ratio'] = stock_ratio
+        logger.info(f"持仓 {code}: 共 {n} 只股票，总仓位 {stock_ratio}%，等权 {weight_each}%/只")
+
     except Exception as e:
-        print(f"获取基金持仓数据失败: {e}")
-    
-    # 如果从JS数据获取失败，尝试从HTML页面获取
-    if not data_obtained:
-        try:
-            fund_url = f"http://fund.eastmoney.com/{code}.html"
-            response = requests.get(fund_url, headers=headers, timeout=5)
-            
-            if response.status_code == 200:
-                data_str = response.text
-                
-                # 尝试提取股票持仓
-                stock_matches = re.findall(r'class="fundStockList".*?<table.*?>(.*?)</table>', data_str, re.DOTALL)
-                if stock_matches:
-                    table_html = stock_matches[0]
-                    row_matches = re.findall(r'<tr.*?>(.*?)</tr>', table_html, re.DOTALL)
-                    for row in row_matches[1:]:  # 跳过表头，显示全部股票
-                        name_match = re.search(r'<a.*?>(.*?)</a>', row)
-                        code_match = re.search(r'\((\d{6})\)', row)
-                        weight_match = re.search(r'<td.*?>(\d+\.?\d*)%</td>', row)
-                        
-                        if name_match and code_match and weight_match:
-                            stock_info = {
-                                'name': name_match.group(1),
-                                'code': code_match.group(1),
-                                'weight': float(weight_match.group(1))
-                            }
-                            holdings['stocks'].append(stock_info)
-                    if holdings['stocks']:
-                        data_obtained = True
-                
-                # 尝试提取资产配置数据
-                asset_match = re.search(r'资产配置.*?<table.*?>(.*?)</table>', data_str, re.DOTALL)
-                if asset_match:
-                    asset_html = asset_match[1]
-                    stock_ratio_match = re.search(r'股票.*?<td.*?>(\d+\.?\d*)%</td>', asset_html)
-                    if stock_ratio_match:
-                        holdings['stock_ratio'] = float(stock_ratio_match.group(1))
-        except Exception as e:
-            print(f"从HTML获取基金持仓数据失败: {e}")
-    
-    # 清理无效的股票代码并获取股票名称
-    valid_stocks = []
-    for stock in holdings['stocks']:
-        code = stock['code']
-        if code.isdigit() and len(code) == 6:
-            # 只有在股票名称为空时才尝试获取
-            if not stock.get('name') or stock['name'] == f"股票{code}":
-                stock['name'] = get_stock_name(code)
-            valid_stocks.append(stock)
-    holdings['stocks'] = valid_stocks
-    
-    # 如果获取数据失败，尝试使用缓存中的旧数据
-    if not data_obtained:
-        # 尝试从缓存获取旧数据
-        old_data = cache_manager.get('fund_holdings', cache_key)
-        if old_data:
-            return old_data
-    
-    # 存储到缓存
-    cache_manager.set('fund_holdings', cache_key, holdings)
-    
+        logger.error(f"获取基金 {code} 持仓数据失败: {e}")
+
+    _holdings_cache[code] = (time.time(), holdings)
     return holdings
+
 
 # 获取股票名称
 def get_stock_name(stock_code):
     """从多个数据源获取股票名称"""
     # 不再使用硬编码的股票列表，直接从API获取
-    
+
     # 数据源1: 东方财富API (优先使用，更稳定)
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "Referer": "https://fund.eastmoney.com/"
         }
-        
+
         # 为东方财富API添加市场前缀
         if stock_code.startswith('6'):
             full_code = f"sh{stock_code}"
@@ -642,10 +385,10 @@ def get_stock_name(stock_code):
             full_code = f"sh{stock_code}"
         else:
             full_code = stock_code
-        
+
         stock_url = f"https://emweb.securities.eastmoney.com/PC_HSF10/StockStructure/Index?type=web&code={full_code}"
         response = requests.get(stock_url, headers=headers, timeout=3)
-        
+
         if response.status_code == 200:
             stock_data = response.text
             # 提取股票名称
@@ -654,25 +397,26 @@ def get_stock_name(stock_code):
                 stock_name = name_match.group(1)
                 if stock_name and stock_name != '' and '股本结构' not in stock_name:
                     return stock_name
-    except Exception:
-        pass
-    
+    except Exception as _e:
+
+        logger.warning(f"caught exception: {_e}")
+
     # 数据源2: 新浪财经API
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "Referer": "https://finance.sina.com.cn/"
         }
-        
+
         # 对于沪市股票，需要添加sh前缀；深市股票添加sz前缀
         if stock_code.startswith('6'):
             full_code = f"sh{stock_code}"
         else:
             full_code = f"sz{stock_code}"
-        
+
         stock_url = f"http://hq.sinajs.cn/list={full_code}"
         response = requests.get(stock_url, headers=headers, timeout=3)
-        
+
         if response.status_code == 200:
             stock_data = response.text
             # 解析股票数据
@@ -681,18 +425,19 @@ def get_stock_name(stock_code):
                 stock_name = name_match.group(1)
                 if stock_name and stock_name != '' and stock_name != 'null':
                     return stock_name
-    except Exception:
-        pass
-    
+    except Exception as _e:
+
+        logger.warning(f"caught exception: {_e}")
+
     # 数据源3: 百度股票API
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
-        
+
         stock_url = f"https://gupiao.baidu.com/stock/{stock_code}.html"
         response = requests.get(stock_url, headers=headers, timeout=3)
-        
+
         if response.status_code == 200:
             stock_data = response.text
             # 提取股票名称
@@ -701,18 +446,19 @@ def get_stock_name(stock_code):
                 stock_name = name_match.group(1)
                 if stock_name and stock_name != '' and '股票行情' not in stock_name:
                     return stock_name
-    except Exception:
-        pass
-    
+    except Exception as _e:
+
+        logger.warning(f"caught exception: {_e}")
+
     # 数据源4: 同花顺API
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
-        
+
         stock_url = f"https://basic.10jqka.com.cn/{stock_code}/"
         response = requests.get(stock_url, headers=headers, timeout=3)
-        
+
         if response.status_code == 200:
             stock_data = response.text
             # 提取股票名称
@@ -721,41 +467,31 @@ def get_stock_name(stock_code):
                 stock_name = name_match.group(1)
                 if stock_name and stock_name != '' and '同花顺' not in stock_name:
                     return stock_name
-    except Exception:
-        pass
-    
+    except Exception as _e:
+
+        logger.warning(f"caught exception: {_e}")
+
     # 如果所有数据源都失败，返回默认名称
     return f'股票{stock_code}'
+
 
 # 批量获取股票实时数据
 def get_batch_stock_real_time_data(stock_codes):
     """批量获取股票的实时数据，减少API调用次数"""
     results = {}
-    cached_stocks = []
-    uncached_stocks = []
-    
-    # 检查缓存
-    for stock_code in stock_codes:
-        cache_key = f"stock_{stock_code}"
-        cached_data = cache_manager.get('stock', cache_key)
-        if cached_data:
-            results[stock_code] = cached_data
-            cached_stocks.append(stock_code)
-        else:
-            uncached_stocks.append(stock_code)
-    
-    # 批量获取未缓存的股票数据
-    if uncached_stocks:
+
+    # 批量获取股票数据
+    if stock_codes:
         # 限制批量请求数量，避免API限制
         batch_size = 10
-        for i in range(0, len(uncached_stocks), batch_size):
-            batch_codes = uncached_stocks[i:i+batch_size]
+        for i in range(0, len(stock_codes), batch_size):
+            batch_codes = stock_codes[i:i + batch_size]
             try:
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
                     "Referer": "https://finance.sina.com.cn/"
                 }
-                
+
                 # 构建批量API URL
                 full_codes = []
                 for stock_code in batch_codes:
@@ -763,14 +499,14 @@ def get_batch_stock_real_time_data(stock_codes):
                         full_codes.append(f"sh{stock_code}")
                     else:
                         full_codes.append(f"sz{stock_code}")
-                
+
                 code_str = ",".join(full_codes)
                 stock_url = f"http://hq.sinajs.cn/list={code_str}"
                 response = requests.get(stock_url, headers=headers, timeout=3)  # 减少超时时间
-                
+
                 if response.status_code == 200:
                     stock_data = response.text
-                    
+
                     # 解析数据
                     lines = stock_data.strip().split('\n')
                     for line in lines:
@@ -796,11 +532,8 @@ def get_batch_stock_real_time_data(stock_codes):
                                                 'change_ratio': change
                                             }
                                             results[stock_code] = stock_data
-                                            # 存储到缓存
-                                            cache_key = f"stock_{stock_code}"
-                                            cache_manager.set('stock', cache_key, stock_data)
                             except Exception as e:
-                                print(f"解析股票数据失败: {e}")
+                                logger.debug(f"解析股票数据失败: {e}")
                 else:
                     for stock_code in batch_codes:
                         results[stock_code] = {
@@ -809,25 +542,20 @@ def get_batch_stock_real_time_data(stock_codes):
                             'change_ratio': 0
                         }
             except Exception as e:
-                print(f"获取批量股票数据失败: {e}")
+                logger.debug(f"获取批量股票数据失败: {e}")
                 for stock_code in batch_codes:
                     results[stock_code] = {
                         'current_price': 0,
                         'change_amount': 0,
                         'change_ratio': 0
                     }
-    
+
     return results
+
 
 # 获取股票实时数据
 def get_stock_real_time_data(stock_code):
     """获取股票的实时数据，包括当前价格、涨跌金额和涨跌比例"""
-    # 检查缓存
-    cache_key = f"stock_{stock_code}"
-    cached_data = cache_manager.get('stock', cache_key)
-    if cached_data:
-        return cached_data
-    
     # 调用批量获取函数
     results = get_batch_stock_real_time_data([stock_code])
     return results.get(stock_code, {
@@ -836,21 +564,16 @@ def get_stock_real_time_data(stock_code):
         'change_ratio': 0
     })
 
+
 # 获取市场数据（大盘指数和行业板块）
 def get_market_data():
     """获取市场数据，包括主要大盘指数和行业板块的实时数据"""
-    # 检查缓存
-    cache_key = "market_data"
-    cached_data = cache_manager.get('market_data', cache_key)
-    if cached_data:
-        return cached_data
-    
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "Referer": "https://finance.sina.com.cn/"
         }
-        
+
         # 主要大盘指数
         index_codes = {
             'sh000001': '上证指数',
@@ -858,7 +581,7 @@ def get_market_data():
             'sz399006': '创业板指',
             'sh000300': '沪深300'
         }
-        
+
         # 主要行业板块
         sector_codes = {
             'sh000037': '医药制造',
@@ -881,37 +604,37 @@ def get_market_data():
             'sh000053': '机械',
             'sh000054': '汽车'
         }
-        
+
         # 构建API URL
         all_codes = list(index_codes.keys()) + list(sector_codes.keys())
         code_str = ",".join(all_codes)
         market_url = f"http://hq.sinajs.cn/list={code_str}"
         response = requests.get(market_url, headers=headers, timeout=5)
-        
+
         if response.status_code == 200:
             market_data = response.text
-            
+
             # 解析数据
             lines = market_data.strip().split('\n')
             result = {
                 'indices': {},
                 'sectors': {}
             }
-            
+
             for line in lines:
                 if '=' in line:
                     try:
                         code_part, data_part = line.split('=', 1)
                         code = code_part.split('_')[-1]
                         data = data_part.strip('"').split(',')
-                        
+
                         if len(data) > 3:
                             current_price = float(data[3])
                             previous_close = float(data[2])
                             if previous_close > 0:
                                 change = (current_price - previous_close) / previous_close
                                 change_amount = current_price - previous_close
-                                
+
                                 if code in index_codes:
                                     result['indices'][index_codes[code]] = {
                                         'code': code,
@@ -927,136 +650,191 @@ def get_market_data():
                                         'change_ratio': change
                                     }
                     except Exception as e:
-                        print(f"解析市场数据失败: {e}")
-            
-            # 存储到缓存
-            cache_manager.set('market_data', cache_key, result)
-            
+                        logger.debug(f"解析市场数据失败: {e}")
+
             return result
         else:
             return {'indices': {}, 'sectors': {}}
     except Exception as e:
-        print(f"获取市场数据失败: {e}")
+        logger.debug(f"获取市场数据失败: {e}")
         return {'indices': {}, 'sectors': {}}
+
 
 # 获取基金数据
 def get_fund_data(code):
-    # 检查缓存
-    cache_key = f"fund_data_{code}"
-    cached_data = cache_manager.get('fund_data', cache_key)
-    if cached_data:
-        logger.info(f"从缓存获取基金 {code} 数据")
-        return cached_data['name'], cached_data['prices'], cached_data['dates'], cached_data['returns']
-    
     try:
         # 初始化变量
         name = f'基金{code}'
         prices = []
         dates = []
         returns = []
-        
+
         # 从新浪财经API获取最新净值
         latest_nav_data = data_source_manager.get_fund_latest_nav(code)
         if latest_nav_data:
             name = latest_nav_data['name']
-            if latest_nav_data['jzrq'] and latest_nav_data['dwjz']:
-                date_str = latest_nav_data['jzrq']
-                nav = latest_nav_data['dwjz']
-                prices.append(nav)
-                dates.append(date_str)
-                logger.info(f"从新浪财经获取基金 {code} 数据: 日期={date_str}, 净值={nav}")
-        
-        # 从天天基金网API获取历史数据
+
+        # 从数据源获取历史数据（包含最新净值）
         historical_data = data_source_manager.get_fund_historical_data(code)
         if historical_data:
-            prices.extend(historical_data['prices'])
-            dates.extend(historical_data['dates'])
+            prices = historical_data['prices']
+            dates = historical_data['dates']
             returns = historical_data['returns']
-            logger.info(f"从天天基金网获取基金 {code} 历史数据，共 {len(historical_data['prices'])} 条记录")
-        
-        # 去重处理，避免重复数据
-        unique_data = {}
-        for date, price in zip(dates, prices):
-            unique_data[date] = price
-        
-        # 确保新浪财经API返回的最新数据被保留
-        if latest_nav_data and latest_nav_data['jzrq'] and latest_nav_data['dwjz']:
+            logger.info(f"从 {historical_data['source']} 获取基金 {code} 历史数据，共 {len(prices)} 条记录")
+
+        # 如果没有历史数据，使用新浪财经的最新净值
+        if not prices and latest_nav_data and latest_nav_data['jzrq'] and latest_nav_data['dwjz']:
             date_str = latest_nav_data['jzrq']
             nav = latest_nav_data['dwjz']
-            unique_data[date_str] = nav
-            logger.info(f"确保新浪财经最新数据被保留: 日期={date_str}, 净值={nav}")
-        
-        # 按日期排序
-        sorted_dates = sorted(unique_data.keys())
-        sorted_prices = [unique_data[date] for date in sorted_dates]
-        
-        # 计算收益率数据
-        if len(sorted_prices) > 1 and not returns:
-            returns = []
-            for i in range(1, len(sorted_prices)):
-                try:
-                    daily_return = (sorted_prices[i] - sorted_prices[i-1]) / sorted_prices[i-1]
-                    returns.append(daily_return)
-                except (ZeroDivisionError, TypeError):
-                    returns.append(0)
-            returns.insert(0, 0)
-        
-        # 如果没有足够的数据点，尝试从缓存获取旧数据来补充
-        if len(sorted_prices) < 2:
-            old_data = cache_manager.get('fund_data', cache_key)
-            if old_data and len(old_data['prices']) >= 2:
-                # 使用缓存中的历史数据来补充
-                for i, (date, price) in enumerate(zip(old_data['dates'], old_data['prices'])):
-                    if date not in unique_data:
-                        unique_data[date] = price
-                
-                # 重新排序
-                sorted_dates = sorted(unique_data.keys())
-                sorted_prices = [unique_data[date] for date in sorted_dates]
-                
-                # 重新计算收益率
-                if len(sorted_prices) > 1:
-                    returns = []
-                    for i in range(1, len(sorted_prices)):
-                        try:
-                            daily_return = (sorted_prices[i] - sorted_prices[i-1]) / sorted_prices[i-1]
-                            returns.append(daily_return)
-                        except (ZeroDivisionError, TypeError):
-                            returns.append(0)
-                    returns.insert(0, 0)
-                logger.info(f"使用缓存数据补充后，共 {len(sorted_prices)} 条记录")
-        
-        # 存储到缓存
-        fund_data = {
-            'name': name,
-            'prices': sorted_prices,
-            'dates': sorted_dates,
-            'returns': returns
-        }
-        cache_manager.set('fund_data', cache_key, fund_data)
-        
-        logger.info(f"获取基金 {code} 数据成功，共 {len(sorted_prices)} 条记录")
-        return name, sorted_prices, sorted_dates, returns
+            prices.append(nav)
+            dates.append(date_str)
+            returns.append(0)
+            logger.info(f"从新浪财经获取基金 {code} 最新数据: 日期={date_str}, 净值={nav}")
+
+        logger.info(f"获取基金 {code} 数据成功，共 {len(prices)} 条记录")
+        return name, prices, dates, returns
     except Exception as e:
         logger.error(f"获取基金数据失败: {e}")
-        # 如果API调用失败，尝试从缓存获取旧数据
-        old_data = cache_manager.get('fund_data', cache_key)
-        if old_data:
-            logger.info(f"API调用失败，使用缓存中的旧数据")
-            return old_data['name'], old_data['prices'], old_data['dates'], old_data['returns']
-        # 如果缓存也没有数据，返回空数据
+        # 如果所有尝试都失败，返回空数据
         return f'基金{code}', [], [], []
+
 
 @app.route('/')
 def index():
+    # 检查用户是否已登录
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    # 加载用户的基金数据
+    load_funds(session['username'])
     return render_template('index.html')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        if request.method == 'POST' and not validate_csrf_token():
+            return jsonify({'error': 'CSRF 验证失败'}), 403
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        # 验证用户身份
+        user = user_manager.authenticate(username, password)
+        if user:
+            # 设置会话
+            session['username'] = user.username
+            session['is_admin'] = (username == 'candyp')  # candyp 作为管理员
+            session.permanent = True  # 使会话持久化
+
+            # 加载用户的基金数据
+            load_funds(user.username)
+
+            return redirect(url_for('index'))
+        else:
+            return render_template('login.html', error='用户名或密码错误')
+
+    return render_template('login.html')
+
+
+# 移除注册路由，因为不需要用户自行注册
+# @app.route('/register', methods=['GET', 'POST'])
+# def register():
+#     if request.method == 'POST':
+#         username = request.form.get('username')
+#         password = request.form.get('password')
+#
+#         # 创建新用户
+#         user = user_manager.create_user(username, password)
+#         if user:
+#             # 自动登录
+#             session['username'] = user.username
+#             session.permanent = True
+#
+#             # 初始化用户的基金数据
+#             load_funds(user.username)
+#
+#             return redirect(url_for('index'))
+#         else:
+#             return render_template('register.html', error='用户名已存在')
+#
+#     return render_template('register.html')
+
+@app.route('/logout')
+def logout():
+    # 清除会话
+    session.clear()
+    return redirect(url_for('login'))
+
+
+@app.route('/api/check-admin', methods=['GET'])
+def check_admin():
+    # 检查用户是否为管理员
+    is_admin = session.get('is_admin', False)
+    return jsonify({'is_admin': is_admin})
+
+
+@app.route('/account-management', methods=['GET', 'POST'])
+def account_management():
+    # 检查用户是否已登录且是管理员
+    if 'username' not in session or session.get('is_admin') is not True:
+        return redirect(url_for('login'))
+
+    error = None
+    success = None
+
+    if request.method == 'POST' and not validate_csrf_token():
+        return jsonify({'error': 'CSRF 验证失败'}), 403
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        if action == 'add':
+            # 新增账户
+            new_username = request.form.get('new_username')
+            new_password = request.form.get('new_password')
+            permissions = request.form.getlist('permissions')
+
+            if new_username and new_password:
+                # 创建新用户
+                user = user_manager.create_user(new_username, new_password, permissions)
+                if user:
+                    success = '账户添加成功'
+                else:
+                    error = '用户名已存在'
+            else:
+                error = '请填写完整的账户信息'
+
+        elif action == 'delete':
+            # 删除账户
+            username = request.form.get('username')
+            if username and username != 'candyp':  # 不允许删除管理员账户
+                # 找到用户并删除
+                user_to_delete = None
+                for user_id, user in user_manager.users.items():
+                    if user.username == username:
+                        user_to_delete = user_id
+                        break
+
+                if user_to_delete:
+                    user_manager.delete_user(user_to_delete)
+                    success = '账户删除成功'
+                else:
+                    error = '账户不存在'
+            else:
+                error = '无法删除管理员账户'
+
+    # 获取所有用户
+    users = list(user_manager.users.values())
+
+    return render_template('account_management.html', users=users, error=error, success=success)
+
 
 # 性能监控装饰器
 import time
 from functools import wraps
 
+
 def performance_monitor(func):
     """性能监控装饰器"""
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         start_time = time.time()
@@ -1065,7 +843,9 @@ def performance_monitor(func):
         execution_time = (end_time - start_time) * 1000
         logger.info(f"{func.__name__} 执行时间: {execution_time:.2f}ms")
         return result
+
     return wrapper
+
 
 # 请求限流
 from flask import request, jsonify
@@ -1075,13 +855,15 @@ request_counts = {}
 RATE_LIMIT = 60  # 每分钟最大请求数
 RATE_LIMIT_WINDOW = 60  # 时间窗口（秒）
 
+
 def rate_limit(func):
     """请求限流装饰器"""
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         ip = request.remote_addr
         now = time.time()
-        
+
         # 清理过期的请求记录
         if ip in request_counts:
             # 过滤出时间窗口内的请求
@@ -1092,193 +874,263 @@ def rate_limit(func):
                 return jsonify({'error': '请求过于频繁，请稍后再试'}), 429
         else:
             request_counts[ip] = []
-        
+
         # 记录本次请求
         request_counts[ip].append(now)
         return func(*args, **kwargs)
+
     return wrapper
+
 
 @app.route('/api/funds', methods=['GET'])
 @performance_monitor
 @rate_limit
 def get_funds():
     try:
+        if 'username' not in session:
+            return jsonify({'error': '未登录'}), 401
+
+        basic_only = request.args.get('basic', 'false').lower() == 'true'
+
+        if basic_only:
+            basic_funds = [{'id': f.id, 'code': f.code, 'name': f.name} for f in funds]
+            return jsonify(basic_funds)
+
         logger.info('获取基金列表')
-        
-        # 立即更新基金数据，确保返回最新数据
-        # 这样可以保证首页和趋势图显示的是相同的数据
+        today = datetime.now().strftime('%Y-%m-%d')
         updated_funds = []
+
         try:
-            # 只获取一次市场数据，避免重复请求
             market_data = get_market_data()
-            
-            # 更新每个基金的最新数据
+
             for fund in funds:
                 try:
-                    # 获取最新的基金数据
-                    name, prices, dates, returns = get_fund_data(fund.code)
-                    
-                    # 获取实时预估收益率数据
-                    real_time_estimated_return = data_source_manager.get_fund_estimated_return(fund.code)
-                    
-                    # 获取持仓数据
+                    # ── 判断是否需要更新历史净值 ──────────────────────────────
+                    # nav_updated_at 记录上次拉取历史数据的日期
+                    # 如果今天已经更新过，直接用缓存；否则做增量更新
+                    already_updated_today = (
+                            fund.nav_updated_at is not None and
+                            str(fund.nav_updated_at)[:10] == today
+                    )
+
+                    if already_updated_today:
+                        # ── 缓存命中：只拉实时预估收益率，不重新拉历史 ──────
+                        logger.info(f'基金 {fund.code} 今日已更新历史净值，跳过重拉')
+                        real_time_estimated_return = data_source_manager.get_fund_estimated_return(fund.code)
+                    else:
+                        # ── 缓存未命中：增量拉取今日新净值，追加到历史数据 ──
+                        logger.info(f'基金 {fund.code} 开始增量更新净值')
+                        name, new_prices, new_dates, new_returns = get_fund_data(fund.code)
+                        real_time_estimated_return = data_source_manager.get_fund_estimated_return(fund.code)
+
+                        if new_prices and new_dates:
+                            # 只追加缓存中没有的新日期，不替换历史数据
+                            existing_dates = set(fund.dates)
+                            appended = 0
+                            for d, p, r in zip(new_dates, new_prices, new_returns):
+                                if d not in existing_dates:
+                                    fund.dates.append(d)
+                                    fund.prices.append(p)
+                                    fund.returns.append(r)
+                                    existing_dates.add(d)
+                                    appended += 1
+
+                            # 重新按日期排序（保证顺序正确）
+                            if appended > 0:
+                                combined = sorted(zip(fund.dates, fund.prices, fund.returns))
+                                fund.dates = [x[0] for x in combined]
+                                fund.prices = [x[1] for x in combined]
+                                fund.returns = [x[2] for x in combined]
+                                logger.info(f'基金 {fund.code}: 追加 {appended} 条新净值，'
+                                            f'共 {len(fund.prices)} 条')
+                            else:
+                                logger.info(f'基金 {fund.code}: 无新净值（已是最新）')
+
+                        # 更新技术指标
+                        fund.update_prices(fund.prices, fund.dates, fund.returns,
+                                           market_data=market_data)
+                        # 标记今日已更新
+                        fund.nav_updated_at = today
+
+                    # ── 实时预估收益率 + 预测（每次都更新，不缓存） ──────────
                     holdings = get_fund_holdings(fund.code)
-                    
-                    # 更新基金数据，包括实时预估收益率
-                    fund.update_prices(prices, dates, returns, market_data=market_data)
-                    
-                    # 计算预测收益率，使用实时预估数据
-                    # 如果没有实时预估数据，使用昨天的预估值作为昨天的收益率
                     if real_time_estimated_return:
                         fund.predicted_return = fund.calculate_predicted_return(
                             stock_holdings=holdings,
                             market_data=market_data,
-                            real_time_estimated_return=real_time_estimated_return
+                            real_time_estimated_return=real_time_estimated_return,
                         )
+                        # 缓存原始估值字段，投资建议接口直接读，避免重复请求
+                        fund.gszzl = real_time_estimated_return.get('gszzl')
+                        fund.gsz = real_time_estimated_return.get('gsz')
+                        fund.gztime = real_time_estimated_return.get('gztime')
+                        fund.est_source = real_time_estimated_return.get('source', '')
+                        fund.has_realtime = True
                     else:
-                        # 没有实时数据，使用昨天的预估值作为昨天的收益率
-                        # 这里我们使用基金当前的预测收益率作为临时值
-                        # 当有任何一个源更新了最新的净值，会及时更新过来
-                        logger.info(f'基金 {fund.code} 没有实时预估数据，使用当前预测值')
-                    
+                        fund.predicted_return = fund.calculate_predicted_return(
+                            stock_holdings=holdings, market_data=market_data,
+                        )
+                        fund.gszzl = None
+                        fund.gsz = None
+                        fund.gztime = None
+                        fund.est_source = ''
+                        fund.has_realtime = False
                     fund.prediction_confidence = fund.calculate_prediction_confidence()
-                    
                     updated_funds.append(fund.to_dict())
-                    logger.info(f'更新基金 {fund.code} 数据成功')
+
                 except Exception as e:
-                    logger.error(f'更新基金 {fund.code} 数据失败: {e}')
-                    # 如果更新失败，使用旧数据
+                    logger.error(f'更新基金 {fund.code} 失败: {e}')
                     updated_funds.append(fund.to_dict())
-                    continue
-            
-            # 保存更新后的数据
-            save_funds()
-            logger.info('更新基金数据完成')
+
+            save_funds(session['username'])
+            logger.info('基金数据更新完成')
+
         except Exception as e:
-            logger.error(f'更新基金数据失败: {e}')
-            # 如果更新失败，使用旧数据
-            updated_funds = [fund.to_dict() for fund in funds]
-        
-        # 确保返回的数据不为空，即使网络不好
+            logger.error(f'批量更新基金失败: {e}')
+            updated_funds = [f.to_dict() for f in funds]
+
         if not updated_funds:
-            # 尝试从文件加载数据
             try:
-                load_funds()
-                updated_funds = [fund.to_dict() for fund in funds]
-                logger.info('从文件加载基金数据')
+                load_funds(session['username'])
+                updated_funds = [f.to_dict() for f in funds]
             except Exception as e:
                 logger.error(f'加载基金数据失败: {e}')
-        
-        # 返回更新后的数据
-        return jsonify(updated_funds)
+
+        return jsonify(updated_funds or [])
+
     except Exception as e:
         logger.error(f'获取基金列表失败: {e}')
-        # 即使出现异常，也尝试返回已存储的基金数据
         try:
-            current_funds = [fund.to_dict() for fund in funds]
+            current_funds = [f.to_dict() for f in funds]
             if current_funds:
                 return jsonify(current_funds)
-        except:
-            pass
-        # 最后才返回空数组
+        except Exception as _e:
+
+            logger.warning(f"caught exception: {_e}")
         return jsonify([]), 500
+
 
 @app.route('/api/funds', methods=['POST'])
 @performance_monitor
 @rate_limit
 def add_fund():
     try:
+        # 检查用户是否已登录
+        if 'username' not in session:
+            return jsonify({'error': '未登录'}), 401
+
         data = request.get_json()
         if not data or 'code' not in data:
             logger.error('添加基金失败: 缺少基金代码')
             return jsonify({'error': '缺少基金代码'}), 400
-        
+
         code = data['code']
         logger.info(f'添加基金: {code}')
-        
+
+        # 确保funds列表不为空
+        if not funds:
+            try:
+                load_funds(session['username'])
+            except Exception as e:
+                logger.error(f'加载基金数据失败: {e}')
+
         # 检查基金是否已经存在
         for existing_fund in funds:
             if existing_fund.code == code:
                 logger.warning(f'基金已经存在: {code}')
                 return jsonify({'error': '基金已经存在'}), 400
-        
-        # 额外的安全检查，确保不会重复添加
+
         logger.info(f'基金 {code} 不存在，准备添加')
-        
-        # 异步获取基金数据，提高响应速度
+
+        # 四路数据并发拉取，总超时 20 秒
         import threading
-        result = {}
-        error = None
-        
-        def fetch_data():
-            nonlocal result, error
+        results = {'nav': None, 'market': None, 'holdings': None, 'rt': None}
+        errors = []
+
+        def _fetch_nav():
             try:
-                # 优先使用新浪财经API，减少对其他数据源的依赖
-                # 获取基金基本数据
-                name, prices, dates, returns = get_fund_data(code)
-                
-                # 获取市场数据
-                market_data = get_market_data()
-                
-                # 获取持仓数据
-                holdings = get_fund_holdings(code)
-                
-                # 获取实时预估收益率
-                real_time_estimated_return = data_source_manager.get_fund_estimated_return(code)
-                
-                result = {
-                    'name': name,
-                    'prices': prices,
-                    'dates': dates,
-                    'returns': returns,
-                    'holdings': holdings,
-                    'market_data': market_data,
-                    'real_time_estimated_return': real_time_estimated_return
-                }
+                results['nav'] = get_fund_data(code)
             except Exception as e:
-                nonlocal error
-                error = str(e)
-                logger.error(f'获取基金数据失败: {e}')
-        
-        # 启动线程获取数据
-        thread = threading.Thread(target=fetch_data)
-        thread.start()
-        thread.join(timeout=8)  # 减少超时时间，避免请求超时
-        
-        if error:
-            return jsonify({'error': error}), 500
-        
-        if not result:
-            return jsonify({'error': '获取基金数据超时'}), 504
-        
-        # 检查数据是否有效
-        if not result['prices']:
-            logger.warning(f'基金数据无效: {code}')
-            # 仍然创建基金对象，但数据为空
-            pass
-        
-        fund = Fund(result['name'], code, result['prices'], result['dates'], result['returns'])
-        # 使用市场数据、持仓数据和实时预估收益率更新预测
+                errors.append(f'历史净值: {e}')
+
+        def _fetch_market():
+            try:
+                results['market'] = get_market_data()
+            except Exception as e:
+                errors.append(f'市场数据: {e}')
+
+        def _fetch_holdings():
+            try:
+                results['holdings'] = get_fund_holdings(code)
+            except Exception as e:
+                errors.append(f'持仓数据: {e}')
+
+        def _fetch_rt():
+            try:
+                results['rt'] = data_source_manager.get_fund_estimated_return(code)
+            except Exception as e:
+                errors.append(f'预估收益率: {e}')
+
+        threads = [
+            threading.Thread(target=_fetch_nav, daemon=True),
+            threading.Thread(target=_fetch_market, daemon=True),
+            threading.Thread(target=_fetch_holdings, daemon=True),
+            threading.Thread(target=_fetch_rt, daemon=True),
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=20)
+
+        # 历史净值是最关键的，拿不到才报错
+        if results['nav'] is None:
+            msg = '；'.join(errors) if errors else '获取基金数据超时，请稍后重试'
+            logger.error(f'添加基金 {code} 失败: {msg}')
+            return jsonify({'error': msg}), 504
+
+        name, prices, dates, returns = results['nav']
+        market_data = results['market'] or {'indices': {}, 'sectors': {}}
+        holdings = results['holdings'] or {}
+        rt = results['rt']
+
+        if errors:
+            logger.warning(f'添加基金 {code} 部分数据获取失败: {errors}')
+
+        fund = Fund(name, code, prices, dates, returns)
         fund.predicted_return = fund.calculate_predicted_return(
-            stock_holdings=result['holdings'], 
-            market_data=result['market_data'],
-            real_time_estimated_return=result['real_time_estimated_return']
+            stock_holdings=holdings,
+            market_data=market_data,
+            real_time_estimated_return=rt,
         )
+        if rt:
+            fund.gszzl = rt.get('gszzl')
+            fund.gsz = rt.get('gsz')
+            fund.gztime = rt.get('gztime')
+            fund.est_source = rt.get('source', '')
+            fund.has_realtime = True
+        else:
+            fund.gszzl = fund.gsz = fund.gztime = None
+            fund.est_source = ''
+            fund.has_realtime = False
         fund.prediction_confidence = fund.calculate_prediction_confidence()
         funds.append(fund)
-        # 保存数据到文件
-        save_funds()
-        logger.info(f'基金添加成功: {code}')
+        save_funds(session['username'])
+        logger.info(f'基金添加成功: {code}，历史净值 {len(prices)} 条')
         return jsonify(fund.to_dict()), 201
     except Exception as e:
         logger.error(f'添加基金失败: {e}')
         return jsonify({'error': str(e)}), 400
+
 
 @app.route('/api/funds/<int:fund_id>', methods=['DELETE'])
 @performance_monitor
 @rate_limit
 def delete_fund(fund_id):
     try:
+        # 检查用户是否已登录
+        if 'username' not in session:
+            return jsonify({'error': '未登录'}), 401
+
         logger.info(f'删除基金: {fund_id}')
         global funds
         original_length = len(funds)
@@ -1287,12 +1139,13 @@ def delete_fund(fund_id):
             logger.warning(f'基金不存在: {fund_id}')
             return jsonify({'error': '基金不存在'}), 404
         # 保存数据到文件
-        save_funds()
+        save_funds(session['username'])
         logger.info(f'基金删除成功: {fund_id}')
         return jsonify({'message': 'Fund deleted'})
     except Exception as e:
         logger.error(f'删除基金失败: {e}')
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/funds/<string:code>/details', methods=['GET'])
 @performance_monitor
@@ -1303,17 +1156,17 @@ def get_fund_details(code):
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
-        
+
         # 使用东方财富API获取基金详情
         fund_data_url = f"https://fund.eastmoney.com/pingzhongdata/{code}.js"
         response = requests.get(fund_data_url, headers=headers, timeout=3)  # 减少超时时间
-        
+
         if response.status_code == 200:
             try:
                 # 解析JS格式数据
                 data_str = response.text
                 import re
-                
+
                 # 提取基金基本信息
                 fund_details = {
                     'establishmentDate': '',
@@ -1321,7 +1174,7 @@ def get_fund_details(code):
                     'composition': [],
                     'relatedStocks': []
                 }
-                
+
                 # 提取基金类型（所属领域）
                 # 尝试从不同的变量中提取基金类型
                 type_match = re.search(r'var fundType = "(.*?)";', data_str)
@@ -1335,7 +1188,7 @@ def get_fund_details(code):
                         fund_details['field'] = "混合基金"  # 默认类型
                 if type_match:
                     fund_details['field'] = type_match.group(1)
-                
+
                 # 提取基金成立时间
                 # 尝试从不同的变量中提取成立时间
                 establish_match = re.search(r'var establishDate = "(.*?)";', data_str)
@@ -1353,11 +1206,11 @@ def get_fund_details(code):
                             fund_details['establishmentDate'] = dates[0]
                 if establish_match:
                     fund_details['establishmentDate'] = establish_match.group(1)
-                
+
                 # 清空composition和relatedStocks数组，因为我们不再使用这些数据
                 fund_details['composition'] = []
                 fund_details['relatedStocks'] = []
-                
+
                 logger.info(f'获取基金详情成功: {code}')
                 return jsonify(fund_details)
             except Exception as e:
@@ -1366,7 +1219,7 @@ def get_fund_details(code):
     except Exception as e:
         logger.error(f'获取基金详情失败: {e}')
         pass
-    
+
     # 如果API调用失败，返回空数据
     return jsonify({
         'establishmentDate': '',
@@ -1374,6 +1227,7 @@ def get_fund_details(code):
         'composition': [],
         'relatedStocks': []
     })
+
 
 @app.route('/api/news', methods=['GET'])
 @performance_monitor
@@ -1389,6 +1243,314 @@ def get_news():
         # 如果API调用失败，返回空数组
         return jsonify([])
 
+
+@app.route('/api/prediction', methods=['GET'])
+@performance_monitor
+@rate_limit
+def get_prediction():
+    try:
+        # 检查用户是否已登录
+        if 'username' not in session:
+            return jsonify({'error': '未登录'}), 401
+
+        logger.info('获取基金预测数据')
+
+        # 基于当前基金数据生成预测
+        predictions = []
+        for fund in funds:
+            prediction = {
+                'name': fund.name,
+                'code': fund.code,
+                'predicted_return': fund.predicted_return,
+                'prediction_confidence': fund.prediction_confidence,
+                'prediction_time': datetime.now().isoformat(),
+                'prediction_reason': '基于历史数据和技术指标分析'
+            }
+            predictions.append(prediction)
+
+        return jsonify(predictions)
+    except Exception as e:
+        logger.error(f'获取基金预测数据失败: {e}')
+        # 如果API调用失败，返回空数组
+        return jsonify([])
+
+
+@app.route('/api/investment-advice', methods=['GET'])
+@performance_monitor
+@rate_limit
+def get_investment_advice():
+    try:
+        if 'username' not in session:
+            return jsonify({'error': '未登录'}), 401
+
+        logger.info('获取投资建议')
+        market_data = get_market_data()
+
+        holdingsAdvice = []
+        for fund in funds:
+            pr = getattr(fund, 'predicted_return', 0)
+
+            # 预估净值（供前端换算份额用）
+            gszzl = getattr(fund, 'gszzl', None)
+            _prices = fund.prices or []
+            nav = _prices[-1] if _prices else 0
+            est_nav_add = round(nav * (1 + gszzl), 4) if gszzl is not None and nav else nav
+
+            if pr > 0.02:
+                action = '补仓'
+                # 金额梯度（最高500元）
+                if pr > 0.05:
+                    suggest_amount = 500
+                elif pr > 0.035:
+                    suggest_amount = 300
+                elif pr > 0.025:
+                    suggest_amount = 200
+                else:
+                    suggest_amount = 100
+            elif pr < -0.02:
+                action = '减仓'
+                suggest_amount = 0
+            else:
+                action = '持有'
+                suggest_amount = 0
+
+            reason = generate_holding_reason(fund, action, market_data)
+
+            prices = fund.prices or []
+            dates = fund.dates or []
+            kdj = list(getattr(fund, 'kdj', [0, 0, 0]))
+            bb = list(getattr(fund, 'bollinger_bands', [0, 0, 0]))
+            macd = list(getattr(fund, 'macd', [0, 0, 0]))
+
+            # 近1/2/4周净值变化率
+            def chg(n):
+                if len(prices) > n:
+                    return round((prices[-1] / prices[-1 - n] - 1) * 100, 2)
+                return None
+
+            # 直接读 get_funds 已缓存的 gszzl，不再重复请求
+            has_realtime = getattr(fund, 'has_realtime', False)
+            gszzl = getattr(fund, 'gszzl', None)
+            gztime = getattr(fund, 'gztime', None)
+            est_source = getattr(fund, 'est_source', '')
+            est_nav = None
+            est_return = None
+            if has_realtime and gszzl is not None:
+                est_return = round(gszzl * 100, 2)
+                if prices:
+                    est_nav = round(prices[-1] * (1 + gszzl), 4)
+            elif prices and pr:
+                est_return = round(pr * 100, 2)
+                est_nav = round(prices[-1] * (1 + pr), 4)
+
+            holdingsAdvice.append({
+                'fundName': fund.name,
+                'fundCode': fund.code,
+                'action': action,
+                'suggest_amount': suggest_amount,
+                'est_nav_add': round(est_nav_add, 4) if est_nav_add else None,
+                'reason': reason,
+                'indicators': {
+                    # 行1
+                    'nav': round(prices[-1], 4) if prices else None,
+                    'est_nav': est_nav,
+                    'est_return': est_return,
+                    'chg_1w': chg(5),  # 近1周（5交易日）
+                    'chg_2w': chg(10),  # 近2周
+                    'chg_4w': chg(20),  # 近4周
+                    # 行2
+                    'rsi': round(getattr(fund, 'rsi', 50), 1),
+                    'kdj_k': round(kdj[0], 1) if kdj else None,
+                    'kdj_d': round(kdj[1], 1) if kdj else None,
+                    'kdj_j': round(kdj[2], 1) if kdj else None,
+                    'bb_pos': round((prices[-1] - bb[2]) / (bb[0] - bb[2]) * 100, 1)
+                    if bb and bb[0] != bb[2] and prices else None,
+                    'volatility': round(getattr(fund, 'volatility', 0) * 100, 2),
+                    # 附加（原因文字用）
+                    'macd': macd,
+                    'bollinger_bands': bb,
+                    'previous_day_return': round(getattr(fund, 'previous_day_return', 0), 2),
+                    'prediction_confidence': round(getattr(fund, 'prediction_confidence', 0.5) * 100, 0),
+                    'nav_date': dates[-1] if dates else '',
+                    'has_realtime': getattr(fund, 'has_realtime', False),
+                    'gztime': getattr(fund, 'gztime', None),
+                    'est_source': getattr(fund, 'est_source', ''),
+                }
+            })
+
+        try:
+            recommendedFunds = get_recommended_funds_engine(market_snapshot=market_data, top_per_tier=5)
+            logger.info(f'推荐引擎返回 {len(recommendedFunds)} 只基金')
+        except Exception as e:
+            logger.error(f'推荐引擎异常: {e}')
+            recommendedFunds = []
+
+        return jsonify({'holdingsAdvice': holdingsAdvice, 'recommendedFunds': recommendedFunds})
+    except Exception as e:
+        logger.error(f'获取投资建议失败: {e}')
+        return jsonify({'holdingsAdvice': [], 'recommendedFunds': []})
+
+
+def generate_holding_reason(fund, action: str, market_data: dict) -> str:
+    """
+    基于基金实际指标数据生成结构化分析原因。
+    涵盖：净值趋势、近期变化率、RSI、KDJ、布林带、MACD、波动率、市场环境。
+    """
+    parts = []
+    prices = getattr(fund, 'prices', [])
+    dates = getattr(fund, 'dates', [])
+    pr = getattr(fund, 'predicted_return', 0)
+
+    # ── 1. 最新净值 & 近期变化率 ─────────────────────────────────────────────
+    if prices and dates:
+        nav = prices[-1]
+        prev = getattr(fund, 'previous_day_return', 0)
+        sign = '+' if prev >= 0 else ''
+        parts.append(f"最新净值 {nav:.4f}（{dates[-1]}），前一日{sign}{prev:.2f}%")
+
+    def chg_str(n, label):
+        if len(prices) > n:
+            r = (prices[-1] / prices[-1 - n] - 1) * 100
+            s = '+' if r >= 0 else ''
+            return f"{label}{s}{r:.2f}%"
+        return None
+
+    trend_parts = [x for x in [chg_str(5, '近1周'), chg_str(10, '近2周'), chg_str(20, '近4周')] if x]
+    if trend_parts:
+        parts.append('、'.join(trend_parts))
+
+    # ── 2. RSI ───────────────────────────────────────────────────────────────
+    rsi = getattr(fund, 'rsi', 50)
+    if rsi < 30:
+        parts.append(f"RSI={rsi:.1f}，深度超卖，技术面存在较强反弹动能，历史上此区间往往为阶段性低点")
+    elif rsi < 45:
+        parts.append(f"RSI={rsi:.1f}，弱势区间，短期仍承压，建议等待企稳信号")
+    elif rsi > 70:
+        parts.append(f"RSI={rsi:.1f}，超买区间，短线存在回调风险，建议谨慎追高")
+    elif rsi > 55:
+        parts.append(f"RSI={rsi:.1f}，技术面偏强，上行动能尚存，趋势仍在延续")
+    else:
+        parts.append(f"RSI={rsi:.1f}，指标中性，多空分歧，方向待明确")
+
+    # ── 3. KDJ ───────────────────────────────────────────────────────────────
+    kdj = getattr(fund, 'kdj', None)
+    if kdj and len(kdj) == 3:
+        k, d, j = kdj[0], kdj[1], kdj[2]
+        if j < 20:
+            parts.append(f"KDJ（K={k:.1f} D={d:.1f} J={j:.1f}）：J值超卖，短期底部信号较强")
+        elif j > 80:
+            parts.append(f"KDJ（K={k:.1f} D={d:.1f} J={j:.1f}）：J值超买，短线或有回落压力")
+        elif k > d:
+            parts.append(f"KDJ（K={k:.1f} D={d:.1f} J={j:.1f}）：K线上穿D线，形成多头交叉信号")
+        elif k < d:
+            parts.append(f"KDJ（K={k:.1f} D={d:.1f} J={j:.1f}）：K线下穿D线，形成空头交叉信号")
+        else:
+            parts.append(f"KDJ（K={k:.1f} D={d:.1f} J={j:.1f}）：三线趋于粘合，突破方向待确认")
+
+    # ── 4. 布林带 ────────────────────────────────────────────────────────────
+    bb = getattr(fund, 'bollinger_bands', None)
+    if bb and len(bb) == 3 and prices:
+        upper, mid, lower = bb[0], bb[1], bb[2]
+        nav = prices[-1]
+        if upper > lower:
+            pct = (nav - lower) / (upper - lower) * 100
+            if nav > upper:
+                parts.append(f"布林带：净值突破上轨（上轨{upper:.4f}），强势信号，但短期注意超买回踩")
+            elif nav < lower:
+                parts.append(f"布林带：净值跌破下轨（下轨{lower:.4f}），超卖特征明显，可关注反弹时机")
+            elif pct > 70:
+                parts.append(f"布林带位置{pct:.0f}%，运行于上轨附近（上轨{upper:.4f} 中轨{mid:.4f}），多头占优")
+            elif pct < 30:
+                parts.append(f"布林带位置{pct:.0f}%，运行于下轨附近（下轨{lower:.4f} 中轨{mid:.4f}），具备支撑")
+            else:
+                parts.append(f"布林带位置{pct:.0f}%，中轨{mid:.4f}附近震荡，等待方向选择")
+
+    # ── 5. MACD ──────────────────────────────────────────────────────────────
+    macd = getattr(fund, 'macd', None)
+    if macd and len(macd) == 3:
+        ml, sl, hist = macd[0], macd[1], macd[2]
+        if ml > sl and hist > 0:
+            parts.append(f"MACD金叉（DIF={ml:.4f} DEA={sl:.4f} 柱={hist:.4f}），红柱扩张，上涨动能持续增强")
+        elif ml > sl and hist <= 0:
+            parts.append(f"MACD多头（DIF={ml:.4f} > DEA={sl:.4f}），红柱收缩中，上攻动能有所减弱")
+        elif ml < sl and hist < 0:
+            parts.append(f"MACD死叉（DIF={ml:.4f} DEA={sl:.4f} 柱={hist:.4f}），绿柱扩张，下行压力持续增大")
+        else:
+            parts.append(f"MACD空头（DIF={ml:.4f} < DEA={sl:.4f}），绿柱收缩，跌势或趋于缓和")
+
+    # ── 6. 波动率 ────────────────────────────────────────────────────────────
+    vol = getattr(fund, 'volatility', 0) * 100
+    if vol < 3:
+        parts.append(f"年化波动率{vol:.1f}%，基金走势平稳，适合稳健持有")
+    elif vol < 8:
+        parts.append(f"年化波动率{vol:.1f}%，波动适中，风险收益比较为均衡")
+    elif vol < 15:
+        parts.append(f"年化波动率{vol:.1f}%，波动偏高，建议控制单笔仓位")
+    else:
+        parts.append(f"年化波动率{vol:.1f}%，波动显著偏高，需严格控制风险敞口")
+
+    # ── 7. 大盘环境 ──────────────────────────────────────────────────────────
+    if market_data:
+        indices = market_data.get('indices', {})
+        if indices:
+            changes = [v.get('change_ratio', 0) * 100 for v in indices.values()]
+            avg = sum(changes) / len(changes)
+            names = '、'.join(
+                f"{n}{'↑' if v.get('change_ratio', 0) >= 0 else '↓'}{abs(v.get('change_ratio', 0) * 100):.2f}%"
+                for n, v in list(indices.items())[:3]
+            )
+            if avg > 0.5:
+                parts.append(f"当前大盘偏强（{names}），整体风险偏好上升，有助于基金净值修复")
+            elif avg < -0.5:
+                parts.append(f"当前大盘偏弱（{names}），市场情绪谨慎，短期压制基金表现")
+            else:
+                parts.append(f"大盘震荡（{names}），整体方向仍不明朗，需密切跟踪")
+
+    # ── 8. 综合结论 ──────────────────────────────────────────────────────────
+    conf = getattr(fund, 'prediction_confidence', 0.5)
+    conf_desc = '高' if conf >= 0.7 else ('中' if conf >= 0.5 else '低')
+    pr_pct = pr * 100
+    sign = '+' if pr_pct >= 0 else ''
+    parts.append(
+        f"综合以上技术指标与市场环境，模型预测今日收益率{sign}{pr_pct:.2f}%"
+        f"（置信度{conf_desc} {conf * 100:.0f}%），综合判断建议{action}"
+    )
+
+    return '；'.join(parts) + '。'
+
+
+def get_detailed_analysis(fund):
+    """尝试调用本地ollama获取详细的基金分析"""
+    try:
+        import requests
+        import json
+
+        # 构建请求数据
+        prompt = f"请对基金 {fund.name} ({fund.code}) 进行详细分析，包括：1. 基金表现分析 2. 风险评估 3. 投资建议 4. 未来展望。基于以下数据：预测收益率 {fund.predicted_return:.4f}，预测置信度 {fund.prediction_confidence:.2f}，RSI {fund.rsi:.2f}，波动率 {fund.volatility:.4f}。请提供专业、科学、准确的分析，不要使用任何引导性短语，直接给出分析内容。"
+
+        # 调用本地ollama API
+        response = requests.post(
+            'http://localhost:11434/api/generate',
+            json={
+                'model': 'llama3',
+                'prompt': prompt,
+                'max_tokens': 500,
+                'temperature': 0.7
+            },
+            timeout=5
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('response', '').strip()
+        else:
+            logger.warning('调用ollama API失败，使用默认分析')
+            return None
+    except Exception as e:
+        logger.warning(f'调用ollama失败: {e}，使用默认分析')
+        return None
+
+
 @app.route('/api/market-data', methods=['GET'])
 @performance_monitor
 @rate_limit
@@ -1402,6 +1564,7 @@ def get_market_data_api():
         logger.error(f'获取市场数据失败: {e}')
         return jsonify({'indices': {}, 'sectors': {}})
 
+
 @app.route('/api/funds/<string:code>/nav', methods=['GET'])
 @performance_monitor
 @rate_limit
@@ -1413,30 +1576,30 @@ def get_fund_nav(code):
         if not re.match(r'^\d{6}$', code):
             logger.warning(f'无效的基金代码格式: {code}')
             return jsonify({'error': '无效的基金代码格式'}), 400
-        
+
         # 获取日期参数
         date = request.args.get('date')
         if not date:
             logger.warning('缺少日期参数')
             return jsonify({'error': '缺少日期参数'}), 400
-        
+
         # 验证日期格式
         try:
             datetime.strptime(date, '%Y-%m-%d')
         except ValueError:
             logger.warning(f'无效的日期格式: {date}')
             return jsonify({'error': '无效的日期格式，应为YYYY-MM-DD'}), 400
-        
+
         # 获取基金数据
         name, prices, dates, returns = get_fund_data(code)
-        
+
         # 查找指定日期的净值
         nav = None
         for i, fund_date in enumerate(dates):
             if fund_date == date:
                 nav = prices[i]
                 break
-        
+
         if nav:
             logger.info(f'获取基金净值成功: {code}, {date}, {nav}')
             return jsonify({'nav': nav})
@@ -1446,6 +1609,7 @@ def get_fund_nav(code):
     except Exception as e:
         logger.error(f'获取基金净值失败: {e}')
         return jsonify({'nav': None, 'error': str(e)})
+
 
 @app.route('/api/funds/<string:code>/holdings', methods=['GET'])
 @performance_monitor
@@ -1458,20 +1622,13 @@ def get_fund_holdings_api(code):
         if not re.match(r'^\d{6}$', code):
             logger.warning(f'无效的基金代码格式: {code}')
             return jsonify({'error': '无效的基金代码格式'}), 400
-        
-        # 检查缓存
-        cache_key = f"fund_holdings_api_{code}"
-        cached_data = cache_manager.get('fund_holdings', cache_key)
-        if cached_data:
-            logger.info(f'从缓存获取基金持仓API数据: {code}')
-            return jsonify(cached_data)
-        
+
         # 获取基金持仓数据
         holdings = get_fund_holdings(code)
         if not holdings:
             logger.warning(f'未获取到基金持仓数据: {code}')
             return jsonify({'stocks': [], 'stock_ratio': 0, 'market_data': {'indices': {}, 'sectors': {}}})
-        
+
         # 批量获取股票实时数据
         stocks_with_data = []
         stock_codes = [stock['code'] for stock in holdings.get('stocks', [])]
@@ -1494,32 +1651,31 @@ def get_fund_holdings_api(code):
                 stocks_with_data.append(stock_info)
         else:
             stocks_with_data = []
-        
+
         # 获取市场数据
         market_data = get_market_data()
-        
+
         # 构建完整的持仓数据
         holdings_data = {
             'stocks': stocks_with_data,
             'stock_ratio': holdings.get('stock_ratio', 0),
             'market_data': market_data
         }
-        
+
         # 不再使用持仓数据更新基金的预测，避免数据波动
         # 基金预测数据由get_funds接口统一更新
-        
-        # 缓存响应数据
-        cache_manager.set('fund_holdings', cache_key, holdings_data)
-        
+
         logger.info(f'获取基金持仓数据成功: {code}')
         return jsonify(holdings_data)
     except Exception as e:
         logger.error(f'获取基金持仓数据失败: {e}')
         return jsonify({'stocks': [], 'stock_ratio': 0, 'market_data': {'indices': {}, 'sectors': {}}})
 
+
 if __name__ == '__main__':
     import os
+
     port = int(os.environ.get('PORT', 8003))
-    print(f'Starting Flask server on port {port}...')
-    print(f'Server will run on http://localhost:{port}')
+    logger.debug(f'Starting Flask server on port {port}...')
+    logger.debug(f'Server will run on http://localhost:{port}')
     app.run(debug=False, port=port, host='0.0.0.0')

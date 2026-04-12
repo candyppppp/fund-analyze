@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>账户管理 - FundTracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            min-height: 100vh;
+        }
+        .header {
+            background-color: #1e1e1e;
+            padding: 20px 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #007bff;
+        }
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .header-buttons button {
+            padding: 8px 16px;
+            background-color: #2a2a2a;
+            color: #ffffff;
+            border: 1px solid #3a3a3a;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .header-buttons button:hover {
+            background-color: #3a3a3a;
+        }
+        .container {
+            padding: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .page-title {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 30px;
+            color: #ffffff;
+        }
+        .card {
+            background-color: #1e1e1e;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .card-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #007bff;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #b0b0b0;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px 15px;
+            background-color: #2a2a2a;
+            color: #ffffff;
+            border: 1px solid #3a3a3a;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        .permissions-group {
+            margin-bottom: 20px;
+        }
+        .permissions-group label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 500;
+            color: #b0b0b0;
+        }
+        .permission-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .permission-item input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0069d9;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #3a3a3a;
+        }
+        th {
+            background-color: #2a2a2a;
+            font-weight: 600;
+            color: #007bff;
+        }
+        tr:hover {
+            background-color: rgba(255,255,255,0.05);
+        }
+        .error-message {
+            color: #ff4444;
+            margin-bottom: 20px;
+        }
+        .success-message {
+            color: #28a745;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>FundTracker</h1>
+        <div class="header-buttons">
+            <button onclick="window.location.href='{{ url_for('index') }}'">返回首页</button>
+            <button onclick="window.location.href='{{ url_for('logout') }}'">退出登录</button>
+        </div>
+    </div>
+    <div class="container">
+        <h2 class="page-title">账户管理</h2>
+
+        <!-- 新增账户 -->
+        <div class="card">
+            <h3 class="card-title">新增账户</h3>
+            {% if error %}
+            <div class="error-message">{{ error }}</div>
+            {% endif %}
+            {% if success %}
+            <div class="success-message">{{ success }}</div>
+            {% endif %}
+            <form method="POST" action="{{ url_for('account_management') }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="add">
+                <div class="form-group">
+                    <label for="new_username">用户名</label>
+                    <input type="text" id="new_username" name="new_username" required>
+                </div>
+                <div class="form-group">
+                    <label for="new_password">密码</label>
+                    <input type="password" id="new_password" name="new_password" required>
+                </div>
+                <div class="permissions-group">
+                    <label>权限设置</label>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm_add_fund" name="permissions" value="add_fund" checked>
+                        <label for="perm_add_fund">添加基金</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm_delete_fund" name="permissions" value="delete_fund" checked>
+                        <label for="perm_delete_fund">删除基金</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm_buy_sell" name="permissions" value="buy_sell" checked>
+                        <label for="perm_buy_sell">买卖记录</label>
+                    </div>
+                    <div class="permission-item">
+                        <input type="checkbox" id="perm_view_advice" name="permissions" value="view_advice" checked>
+                        <label for="perm_view_advice">查看投资建议</label>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">添加账户</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 账户列表 -->
+        <div class="card">
+            <h3 class="card-title">账户列表</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>用户名</th>
+                            <th>创建时间</th>
+                            <th>权限</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.created_at }}</td>
+                            <td>
+                                {% if user.permissions %}
+                                    {% if 'add_fund' in user.permissions %}添加基金 {% endif %}
+                                    {% if 'delete_fund' in user.permissions %}删除基金 {% endif %}
+                                    {% if 'buy_sell' in user.permissions %}买卖记录 {% endif %}
+                                    {% if 'view_advice' in user.permissions %}查看投资建议{% endif %}
+                                {% else %}
+                                    无权限
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.username != 'candyp' %} <!-- 不允许删除管理员账户 -->
+                                <form method="POST" action="{{ url_for('account_management') }}" style="display: inline;">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="username" value="{{ user.username }}">
+                                    <button type="submit" class="btn btn-danger" onclick="return confirm('确定要删除这个账户吗？');">删除</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

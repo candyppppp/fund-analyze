@@ -2,14 +2,15 @@
   "version": 2,
   "builds": [
     {
-      "src": "wsgi.py",
+      "src": "app.py",
       "use": "@vercel/python"
-    },
-    {
-      "src": "static/**/*",
-      "use": "@vercel/static"
     }
   ],
+  "functions": {
+    "app.py": {
+      "maxDuration": 60
+    }
+  },
   "routes": [
     {
       "src": "/static/(.*)",
@@ -17,7 +18,13 @@
     },
     {
       "src": "/(.*)",
-      "dest": "wsgi.py"
+      "dest": "app.py"
     }
-  ]
+  ],
+  "env": {
+    "FLASK_SECRET_KEY": "${FLASK_SECRET_KEY}",
+    "SUPABASE_URL": "${SUPABASE_URL}",
+    "SUPABASE_ANON_KEY": "${SUPABASE_ANON_KEY}",
+    "SUPABASE_SERVICE_ROLE_KEY": "${SUPABASE_SERVICE_ROLE_KEY}"
+  }
 }

@@ -10,33 +10,29 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>FundTracker</h1>
+            <h1><span class="fund-part">Fund</span><span class="tracker-part">Tracker</span></h1>
             <div class="header-buttons">
                 <button>设置</button>
             </div>
         </div>
-        
+
         <div class="tabs">
-            <button class="tab active">实时快讯</button>
+            <button class="tab active">基金自选</button>
+            <button class="tab">基金投资</button>
         </div>
-        
+
         <div class="search-container">
             <form id="add-fund-form">
                 <input type="text" id="fund-code" class="search-input" placeholder="输入基金代码" required autocomplete="off">
                 <button type="submit" class="add-button">+ Add</button>
             </form>
         </div>
-        
-        <div class="group-info">
-            <h2>Group Count</h2>
-            <span class="group-count" id="group-count">0</span>
-        </div>
-        
+
         <div class="fund-list">
             <div id="funds-container"></div>
         </div>
     </div>
-    
+
     <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
