@@ -23,9 +23,9 @@ import logging
 from supabase import create_client, Client
 
 # 从环境变量获取 Supabase 配置
-SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://your-supabase-url.supabase.co')
-SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', 'your-supabase-anon-key')
-SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', 'your-supabase-service-role-key')
+SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
+SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', '')
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
 
 # 创建 Supabase 客户端
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
