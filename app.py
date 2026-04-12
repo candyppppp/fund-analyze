@@ -28,7 +28,7 @@ SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', '')
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
 
 # 创建 Supabase 客户端
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY) if SUPABASE_URL and SUPABASE_ANON_KEY else None
 
 # 配置日志
 import os
