@@ -16,21 +16,9 @@ import requests
 import json
 import re
 from datetime import datetime, timedelta
-import os
 import logging
 
-# Supabase 配置
-from supabase import create_client, Client
-
-# 从环境变量获取 Supabase 配置
-SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
-SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', '')
-SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
-
-# 创建 Supabase 客户端
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY) if SUPABASE_URL and SUPABASE_ANON_KEY else None
-
-# 配置日志
+from db import supabase, supabase_admin
 import os
 
 # 检查是否在 Vercel 环境中
