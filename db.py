@@ -1,4 +1,5 @@
 import os
+print(f"🔥 DEBUG: SUPABASE_URL = {os.environ.get('SUPABASE_URL', '❌ NOT SET')}")
 import logging
 from urllib.parse import urlparse
 from supabase import create_client, Client
