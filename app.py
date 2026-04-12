@@ -79,8 +79,8 @@ DATA_FILE = 'funds_data.json'
 USER_DATA_DIR = 'user_data'
 
 # 确保用户数据目录存在
-if not os.path.exists(USER_DATA_DIR):
-    os.makedirs(USER_DATA_DIR)
+if not is_vercel:
+    os.makedirs(USER_DATA_DIR, exist_ok=True)
 
 # 加载基金数据
 funds = []
