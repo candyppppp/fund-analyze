@@ -1115,19 +1115,19 @@ def add_fund():
 @rate_limit
 def delete_fund(fund_id):
     try:
-        # 检查用户是否已登录
         if 'username' not in session:
             return jsonify({'error': '未登录'}), 401
 
+        username = session['username']
         logger.info(f'删除基金: {fund_id}')
+
+        # 直接从 Supabase 删除
+        result = supabase.table('funds').delete().eq('id', fund_id).eq('username', username).execute()
+
+        # 同步删内存
         global funds
-        original_length = len(funds)
-        funds = [fund for fund in funds if fund.id != fund_id]
-        if len(funds) == original_length:
-            logger.warning(f'基金不存在: {fund_id}')
-            return jsonify({'error': '基金不存在'}), 404
-        # 保存数据到文件
-        save_funds(session['username'])
+        funds = [f for f in funds if f.id != fund_id]
+
         logger.info(f'基金删除成功: {fund_id}')
         return jsonify({'message': 'Fund deleted'})
     except Exception as e:
