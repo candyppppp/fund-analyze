@@ -1145,15 +1145,15 @@ function showFundDetails(fund) {
 
     // 弹框HTML
     modalContent.innerHTML = `
-        <div style="padding: 12px 16px; border-bottom: 1px solid #333; background:#121212;">
-            <h2 style="color:white; margin:0 0 4px 0; font-size:15px; line-height:1.3;">${fund.name}</h2>
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                <div style="font-size:12px; color:#aaa;">${fund.code} NAV: ${fund.prices[fund.prices.length - 1]}</div>
-                <div style="display:flex; background-color:#1e1e1e; border-radius:4px; overflow:hidden; border:1px solid #333; flex-shrink:0;">
-                    <button class="tab-btn active" data-tab="details" style="padding:6px 12px; border:none; background:transparent; color:#007bff; cursor:pointer; font-size:12px; font-weight:bold;">详情</button>
-                    <button class="tab-btn" data-tab="decision" style="padding:6px 12px; border:none; background:transparent; color:#e0e0e0; cursor:pointer; font-size:12px;">决策</button>
-                    <button class="tab-btn" data-tab="holding" style="padding:6px 12px; border:none; background:transparent; color:#e0e0e0; cursor:pointer; font-size:12px;">持仓</button>
-                </div>
+        <div style="background:#1a1a1a; border-bottom:1px solid #2a2a2a;">
+            <div style="padding:14px 18px 0;">
+                <div style="font-size:11px;color:#555;margin-bottom:3px;">${fund.code} &nbsp;·&nbsp; NAV ${fund.prices[fund.prices.length - 1]}</div>
+                <div style="font-size:16px;font-weight:600;color:#fff;line-height:1.3;margin-bottom:14px;">${fund.name}</div>
+            </div>
+            <div style="display:flex; border-top:1px solid #2a2a2a;">
+                <button class="tab-btn active" data-tab="details" style="flex:1;padding:10px 0;border:none;background:transparent;color:#4a9eff;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid #4a9eff;letter-spacing:.5px;">详情</button>
+                <button class="tab-btn" data-tab="decision" style="flex:1;padding:10px 0;border:none;background:transparent;color:#666;cursor:pointer;font-size:13px;border-bottom:2px solid transparent;letter-spacing:.5px;">决策</button>
+                <button class="tab-btn" data-tab="holding" style="flex:1;padding:10px 0;border:none;background:transparent;color:#666;cursor:pointer;font-size:13px;border-bottom:2px solid transparent;letter-spacing:.5px;">持仓</button>
             </div>
         </div>
         
@@ -1710,11 +1710,13 @@ function showFundDetails(fund) {
 
             // 更新标签按钮样式
             tabBtns.forEach(b => {
-                b.style.color = '#e0e0e0';
+                b.style.color = '#666';
                 b.style.fontWeight = 'normal';
+                b.style.borderBottom = '2px solid transparent';
             });
-            this.style.color = '#007bff';
-            this.style.fontWeight = 'bold';
+            this.style.color = '#4a9eff';
+            this.style.fontWeight = '600';
+            this.style.borderBottom = '2px solid #4a9eff';
 
             // 隐藏所有内容
             tabContents.forEach(content => {
