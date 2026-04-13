@@ -408,3 +408,151 @@ body {
 }
 .sort-btn:hover { border-color: #555; color: #bbb; }
 .sort-btn.sort-active { border-color: #4a9eff; color: #4a9eff; background: rgba(74,158,255,.08); }
+
+/* 暂未买入标签 */
+.fund-no-holding {
+    border-color: #444 !important;
+    color: #555 !important;
+}
+.fund-no-holding span {
+    color: #555;
+    font-size: 12px;
+}
+
+/* ── 移动端响应式适配 ─────────────────────────────────── */
+@media (max-width: 600px) {
+    body { font-size: 14px; }
+
+    .header { padding: 10px 14px; }
+    .header h1 { font-size: 16px; }
+
+    .tabs { padding: 8px 14px; gap: 8px; }
+    .tab { padding: 7px 12px; font-size: 12px; }
+
+    .search-container { padding: 10px 14px; gap: 8px; }
+    .search-input { font-size: 13px; padding: 8px 10px; }
+    .add-button { padding: 8px 14px; font-size: 13px; white-space: nowrap; }
+
+    #fund-list-header { padding: 6px 14px 4px; }
+
+    .fund-list { padding: 10px 14px; }
+
+    /* 卡片改为上下两行布局 */
+    .fund-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .fund-name { font-size: 13px; margin-bottom: 6px; }
+
+    .fund-details {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .fund-detail-box {
+        padding: 3px 7px;
+        font-size: 11px;
+    }
+
+    .fund-type-tag { font-size: 10px; padding: 3px 6px; }
+
+    /* 数据列：手机上横向铺满4列 */
+    .fund-performance {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px;
+        width: 100%;
+    }
+
+    .fund-return-container {
+        align-items: center;
+        min-width: unset;
+        padding: 6px 4px;
+        background: #242424;
+        border-radius: 6px;
+    }
+
+    .fund-return {
+        font-size: 13px;
+        text-align: center;
+    }
+
+    .fund-return-label {
+        font-size: 9px;
+        text-align: center;
+        white-space: nowrap;
+    }
+}
+
+/* ── 移动端响应式 ─────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+    .container { padding: 0; }
+
+    .header { padding: 10px 14px; }
+    .header h1 { font-size: 20px; }
+    .header button { padding: 6px 10px; font-size: 12px; }
+
+    .tabs { padding: 8px 14px; gap: 8px; }
+    .tab { padding: 7px 16px; font-size: 13px; }
+
+    .search-container { padding: 8px 14px; }
+    .search-input { font-size: 14px; padding: 8px 12px; }
+    .add-button { padding: 8px 14px; font-size: 13px; }
+
+    #fund-list-header { padding: 6px 14px 4px; }
+
+    .fund-list { padding: 8px 14px; }
+
+    /* 基金卡片：竖向布局 */
+    .fund-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .fund-info { width: 100%; }
+
+    .fund-name { font-size: 13px; }
+
+    .fund-details {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .fund-detail-box { font-size: 11px; padding: 3px 6px; }
+    .fund-type-tag { font-size: 10px; padding: 3px 6px; }
+
+    /* 右侧数据行：横向4格 */
+    .fund-performance {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px;
+        width: 100%;
+        border-top: 1px solid #2a2a2a;
+        padding-top: 8px;
+    }
+
+    .fund-return-container {
+        align-items: center;
+        min-width: unset;
+    }
+
+    .fund-return { font-size: 13px; text-align: center; }
+    .fund-return-label { font-size: 9px; text-align: center; }
+
+    /* 投资建议页移动适配 */
+    .ia-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+    .ia-card { padding: 14px; }
+    .ia-fund-title { font-size: 13px; }
+}
+
+@media (max-width: 380px) {
+    .fund-performance { grid-template-columns: repeat(2, 1fr); }
+    .fund-return { font-size: 12px; }
+}
