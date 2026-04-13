@@ -8,7 +8,11 @@ class InvestmentAdvice {
 
     loadInvestmentAdvice() {
         const cached = cacheManager.get(this.cacheKey);
-        if (cached) {
+        // 有缓存且缓存有实质数据才用缓存
+        const cacheHasData = cached &&
+            ((cached.holdingsAdvice && cached.holdingsAdvice.length > 0) ||
+             (cached.recommendedFunds && cached.recommendedFunds.length > 0));
+        if (cacheHasData) {
             if (window.activeTab === 'investment-advice') this.displayAdvice(cached);
             if (cacheManager.getRemainingTime(this.cacheKey) < this.cacheExpiry * 0.5) this.updateInBackground();
             return;
@@ -20,7 +24,7 @@ class InvestmentAdvice {
                 // 只有有实质数据时才缓存，避免缓存空结果
                 const hasData = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
                                 (a.recommendedFunds && a.recommendedFunds.length > 0);
-                if (hasData) cacheManager.set(this.cacheKey, a, 60*60*1000);
+                if (hasData) cacheManager.set(this.cacheKey, a, 5*60*1000);  // 5分钟缓存
                 if (window.activeTab==='investment-advice') this.displayAdvice(a);
             })
             .catch(e => { if (e!=='401' && window.activeTab==='investment-advice') this.displayDefaultAdvice(); });
@@ -31,7 +35,7 @@ class InvestmentAdvice {
             .then(a => {
                 const hasData = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
                                 (a.recommendedFunds && a.recommendedFunds.length > 0);
-                if (hasData) cacheManager.set(this.cacheKey, a, 60*60*1000);
+                if (hasData) cacheManager.set(this.cacheKey, a, 5*60*1000);  // 5分钟缓存
                 if (window.activeTab==='investment-advice') this.displayAdvice(a);
             })
             .catch(()=>{});
