@@ -1145,18 +1145,14 @@ function showFundDetails(fund) {
 
     // 弹框HTML
     modalContent.innerHTML = `
-        <div style="padding: 12px 16px; border-bottom: 1px solid #333;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-                <div style="flex:1; min-width:0;">
-                    <h2 style="color: white; margin: 0; font-size: 15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${fund.name}</h2>
-                    <div style="font-size: 12px; color: #aaa; margin-top: 2px;">${fund.code} NAV: ${fund.prices[fund.prices.length - 1]}</div>
-                </div>
-                <div style="flex-shrink:0;">
-                    <div style="display: flex; background-color: #1e1e1e; border-radius: 4px; overflow: hidden; border:1px solid #333;">
-                        <button class="tab-btn active" data-tab="details" style="padding: 6px 10px; border: none; background: transparent; color: #007bff; cursor: pointer; font-size: 12px; font-weight: bold; white-space:nowrap;">详情</button>
-                        <button class="tab-btn" data-tab="decision" style="padding: 6px 10px; border: none; background: transparent; color: #e0e0e0; cursor: pointer; font-size: 12px; white-space:nowrap;">决策</button>
-                        <button class="tab-btn" data-tab="holding" style="padding: 6px 10px; border: none; background: transparent; color: #e0e0e0; cursor: pointer; font-size: 12px; white-space:nowrap;">持仓</button>
-                    </div>
+        <div style="padding: 12px 16px; border-bottom: 1px solid #333; background:#121212;">
+            <h2 style="color:white; margin:0 0 4px 0; font-size:15px; line-height:1.3;">${fund.name}</h2>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <div style="font-size:12px; color:#aaa;">${fund.code} NAV: ${fund.prices[fund.prices.length - 1]}</div>
+                <div style="display:flex; background-color:#1e1e1e; border-radius:4px; overflow:hidden; border:1px solid #333; flex-shrink:0;">
+                    <button class="tab-btn active" data-tab="details" style="padding:6px 12px; border:none; background:transparent; color:#007bff; cursor:pointer; font-size:12px; font-weight:bold;">详情</button>
+                    <button class="tab-btn" data-tab="decision" style="padding:6px 12px; border:none; background:transparent; color:#e0e0e0; cursor:pointer; font-size:12px;">决策</button>
+                    <button class="tab-btn" data-tab="holding" style="padding:6px 12px; border:none; background:transparent; color:#e0e0e0; cursor:pointer; font-size:12px;">持仓</button>
                 </div>
             </div>
         </div>
@@ -1442,8 +1438,8 @@ function showFundDetails(fund) {
                 <div style="padding: 10px 20px;">
                     <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; ">势头信号</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 18px; border: 1px solid #333;">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;">
-                            <div style="flex: 1;">
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+                            <div>
                                 <div style="font-size: 13px; color: #e0e0e0; margin-bottom: 12px;"><strong>趋势方向</strong></div>
                                 ${(() => {
                                     // 计算趋势信号
@@ -1482,16 +1478,16 @@ function showFundDetails(fund) {
                                     }
                                     
                                     return `
-                                        <div style="font-size: 12px; color: ${trendColor}; display: flex; align-items: center; margin-bottom: 8px; ">
-                                            <span style="margin-right: 8px;">${trendIcon}</span> ${trendSignal}
+                                        <div style="font-size: 12px; color: ${trendColor}; display: flex; align-items: center; margin-bottom: 8px;">
+                                            <span style="margin-right: 6px; flex-shrink:0;">${trendIcon}</span> ${trendSignal}
                                         </div>
-                                        <div style="font-size: 11px; color: #aaa; line-height: 1.4;  overflow: hidden; text-overflow: ellipsis;">
+                                        <div style="font-size: 11px; color: #aaa; line-height: 1.4;">
                                             ${trendDesc}
                                         </div>
                                     `;
                                 })()}
                             </div>
-                            <div style="flex: 1; text-align: center;">
+                            <div>
                                 <div style="font-size: 13px; color: #e0e0e0; margin-bottom: 12px;"><strong>支撑位/阻力位</strong></div>
                                 ${(() => {
                                     if (fund.prices && fund.prices.length > 0) {
@@ -1520,7 +1516,7 @@ function showFundDetails(fund) {
                                     }
                                 })()}
                             </div>
-                            <div style="flex: 1; text-align: right;">
+                            <div>
                                 <div style="font-size: 13px; color: #e0e0e0; margin-bottom: 12px;"><strong>智能操作建议</strong></div>
                                 ${(() => {
                                     // 基于RSI、预测收益率和市场环境生成操作建议
@@ -1582,10 +1578,10 @@ function showFundDetails(fund) {
                                     }
                                     
                                     return `
-                                        <div style="font-size: 12px; color: ${adviceColor}; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 8px; ">
-                                            <span style="margin-right: 8px;">●</span> ${advice}
+                                        <div style="font-size: 12px; color: ${adviceColor}; display: flex; align-items: center; margin-bottom: 8px;">
+                                            <span style="margin-right: 6px;">●</span> ${advice}
                                         </div>
-                                        <div style="font-size: 11px; color: #aaa; line-height: 1.3; text-align: right;  overflow: hidden; text-overflow: ellipsis;">
+                                        <div style="font-size: 11px; color: #aaa; line-height: 1.4;">
                                             ${marketDesc ? marketDesc : adviceDesc}
                                         </div>
                                     `;
