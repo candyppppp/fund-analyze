@@ -33,22 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     migrateBuyRecordsToCloud();
 
-    // ── 排序按钮绑定（直接绑定到按钮，避免 SVG 子元素点击问题）────────────
-    function bindSortButtons() {
-        document.querySelectorAll('.sort-btn').forEach(btn => {
-            btn.onclick = function() {
-                const sort = this.dataset.sort;
-                if (sort === _currentSort) return;
-                _currentSort = sort;
-                document.querySelectorAll('.sort-btn').forEach(b => {
-                    b.classList.toggle('sort-active', b.dataset.sort === sort);
-                });
-                const cached = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
-                if (cached && cached.length) renderFunds(cached);
-            };
-        });
-    }
-    bindSortButtons();
+    // 排序固定为持仓优先，无需按钮事件
 
     // ── 定时闪烁（即使没数据更新也有视觉活跃感，每20秒随机闪一只卡片）──────
     setInterval(() => {
@@ -799,18 +784,12 @@ function startFundUpdateInterval() {
     }, interval);
 }
 
-// 当前排序模式：'holding'（持仓优先）| 'return'（收益排序）
-let _currentSort = 'holding';
-
 function _sortFunds(funds) {
+    // 持仓优先，持仓内按当日预估收益从高到低，未持仓按原顺序
     const hasBuy = f => {
         const s = getBuySettings(f.id);
         return s && s.shares > 0;
     };
-    if (_currentSort === 'return') {
-        return [...funds].sort((a, b) => (b.predicted_return || 0) - (a.predicted_return || 0));
-    }
-    // 默认：持仓优先，持仓内按收益降序，无持仓按添加顺序
     return [...funds].sort((a, b) => {
         const aHas = hasBuy(a), bHas = hasBuy(b);
         if (aHas && !bHas) return -1;
@@ -928,6 +907,7 @@ function renderFunds(funds) {
                         <span>RSI ${fund.rsi.toFixed(1)}</span>
                         <span class="rsi-emoji">${rsiStatus.emoji}</span>
                     </div>
+                    ${buySettings.shares <= 0 ? '<div class="fund-detail-box fund-no-holding"><span>暂未买入</span></div>' : ''}
                 </div>
             </div>
             <div class="fund-performance">
@@ -949,14 +929,16 @@ function renderFunds(funds) {
                         </div>
                         <div class="fund-return-label">Confidence</div>
                     </div>
-                    ${buySettings.shares > 0 ? `
-                        <div class="fund-return-container">
+                    <div class="fund-return-container">
+                        ${buySettings.shares > 0 ? `
                             <div class="fund-return ${estimatedReturn >= 0 ? '' : 'negative'}">
                                 ${estimatedReturn >= 0 ? '+' : ''}${estimatedReturn.toFixed(2)}元
                             </div>
-                            <div class="fund-return-label">Live Profit</div>
-                        </div>
-                    ` : ''}
+                        ` : `
+                            <div class="fund-return" style="color:#555;">--</div>
+                        `}
+                        <div class="fund-return-label">Live Profit</div>
+                    </div>
                 </div>
         `;
 
