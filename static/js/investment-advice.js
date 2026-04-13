@@ -3,42 +3,76 @@ import cacheManager from './cache-manager.js';
 class InvestmentAdvice {
     constructor() {
         this.cacheKey = 'investmentAdvice';
-        this.cacheExpiry = 5 * 60 * 1000;
+        this._timer = null;
+        this._startAutoRefresh();
+    }
+
+    // 判断是否交易时间（周一至周五 9:00-15:00）
+    _isTradingTime() {
+        const now = new Date();
+        const day = now.getDay();
+        const h = now.getHours();
+        const m = now.getMinutes();
+        const mins = h * 60 + m;
+        return day >= 1 && day <= 5 && mins >= 540 && mins < 900;
+    }
+
+    // 启动定时刷新
+    _startAutoRefresh() {
+        if (this._timer) clearInterval(this._timer);
+        const run = () => {
+            const interval = this._isTradingTime() ? 10 * 60 * 1000 : 60 * 60 * 1000;
+            if (this._timer) clearInterval(this._timer);
+            this._timer = setInterval(() => {
+                this._forceRefresh();
+                run(); // 每次结束后重新计算间隔
+            }, interval);
+        };
+        run();
+    }
+
+    // 强制刷新（绕过缓存，传 ?refresh=1）
+    _forceRefresh() {
+        fetch('/api/investment-advice?refresh=1')
+            .then(r => r.ok ? r.json() : null)
+            .then(a => {
+                if (!a) return;
+                const hasData = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
+                                (a.recommendedFunds && a.recommendedFunds.length > 0);
+                if (hasData) {
+                    cacheManager.set(this.cacheKey, a, 65 * 60 * 1000); // 65分钟本地缓存
+                    if (window.activeTab === 'investment-advice') this.displayAdvice(a);
+                }
+            })
+            .catch(() => {});
     }
 
     loadInvestmentAdvice() {
+        // 先读本地缓存立即展示（不阻塞）
         const cached = cacheManager.get(this.cacheKey);
-        // 有缓存且缓存有实质数据才用缓存
         const cacheHasData = cached &&
             ((cached.holdingsAdvice && cached.holdingsAdvice.length > 0) ||
              (cached.recommendedFunds && cached.recommendedFunds.length > 0));
         if (cacheHasData) {
             if (window.activeTab === 'investment-advice') this.displayAdvice(cached);
-            if (cacheManager.getRemainingTime(this.cacheKey) < this.cacheExpiry * 0.5) this.updateInBackground();
             return;
         }
+
+        // 无本地缓存，读云端缓存（快速返回）
         if (window.activeTab === 'investment-advice') this.showLoadingState();
         fetch('/api/investment-advice')
             .then(r => { if (r.status === 401) { window.location.href='/login'; return Promise.reject('401'); } return r.json(); })
             .then(a => {
-                // 只有有实质数据时才缓存，避免缓存空结果
                 const hasData = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
                                 (a.recommendedFunds && a.recommendedFunds.length > 0);
-                if (hasData) cacheManager.set(this.cacheKey, a, 5*60*1000);  // 5分钟缓存
-                if (window.activeTab==='investment-advice') this.displayAdvice(a);
+                if (hasData) cacheManager.set(this.cacheKey, a, 65 * 60 * 1000);
+                if (window.activeTab === 'investment-advice') this.displayAdvice(a);
             })
-            .catch(e => { if (e!=='401' && window.activeTab==='investment-advice') this.displayDefaultAdvice(); });
+            .catch(e => { if (e !== '401' && window.activeTab === 'investment-advice') this.displayDefaultAdvice(); });
     }
 
     updateInBackground() {
-        fetch('/api/investment-advice').then(r=>r.json())
-            .then(a => {
-                const hasData = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
-                                (a.recommendedFunds && a.recommendedFunds.length > 0);
-                if (hasData) cacheManager.set(this.cacheKey, a, 5*60*1000);  // 5分钟缓存
-                if (window.activeTab==='investment-advice') this.displayAdvice(a);
-            })
-            .catch(()=>{});
+        this._forceRefresh();
     }
 
     showLoadingState() {
@@ -167,6 +201,15 @@ class InvestmentAdvice {
 </style>
 
 <div class="ia">
+  <!-- 数据更新时间 -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding:8px 12px;background:#0d0d0d;border-radius:8px;border:1px solid #1a1a1a;">
+    <span style="font-size:11px;color:#555;">
+      ${advice._from_cache ? '📦 云端缓存' : '🔄 最新数据'}
+      · 更新于 ${advice._cache_time ? new Date(advice._cache_time).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : now}
+    </span>
+    <button onclick="investmentAdvice._forceRefresh();this.textContent='刷新中...';this.disabled=true;" style="font-size:11px;color:#555;background:transparent;border:1px solid #333;border-radius:4px;padding:2px 8px;cursor:pointer;">手动刷新</button>
+  </div>
+
   <!-- 投资建议 -->
   <div class="ia-sec">
     <div class="ia-sec-hd"><div class="bar" style="background:#007bff;"></div>投资建议</div>
