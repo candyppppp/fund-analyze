@@ -33,18 +33,22 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     migrateBuyRecordsToCloud();
 
-    // ── 排序按钮绑定 ────────────────────────────────────────────────────────
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('.sort-btn');
-        if (!btn) return;
-        const sort = btn.dataset.sort;
-        if (sort === _currentSort) return;
-        _currentSort = sort;
-        document.querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('sort-active', b.dataset.sort === sort));
-        // 用当前缓存数据重排，不重新请求
-        const cached = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
-        if (cached && cached.length) renderFunds(cached);
-    });
+    // ── 排序按钮绑定（直接绑定到按钮，避免 SVG 子元素点击问题）────────────
+    function bindSortButtons() {
+        document.querySelectorAll('.sort-btn').forEach(btn => {
+            btn.onclick = function() {
+                const sort = this.dataset.sort;
+                if (sort === _currentSort) return;
+                _currentSort = sort;
+                document.querySelectorAll('.sort-btn').forEach(b => {
+                    b.classList.toggle('sort-active', b.dataset.sort === sort);
+                });
+                const cached = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
+                if (cached && cached.length) renderFunds(cached);
+            };
+        });
+    }
+    bindSortButtons();
 
     // ── 定时闪烁（即使没数据更新也有视觉活跃感，每20秒随机闪一只卡片）──────
     setInterval(() => {
@@ -1828,13 +1832,17 @@ function showFundDetails(fund) {
             }
 
             // 保存买入记录的函数
-            function saveBuyRecordWithNav(nav) {
+            async function saveBuyRecordWithNav(nav) {
                 const buyRecord = {
                     date: buyDate,
                     shares: buyShares,
-                    nav: nav
+                    nav: nav,
+                    fund_id: String(fund.id),
+                    fund_code: fund.code,
+                    fund_name: fund.name,
+                    amount: buyShares * nav,
                 };
-                saveBuyRecord(fund.id, buyRecord);
+                await saveBuyRecord(fund.id, buyRecord);
 
                 // 计算总持仓
                 const buyRecords = getBuyRecords(fund.id);
@@ -1847,6 +1855,11 @@ function showFundDetails(fund) {
                 };
                 localStorage.setItem(`fundBuySettings_${fund.id}`, JSON.stringify(buySettings));
 
+                // 刷新云端缓存
+                fetchAllBuyRecords(true).then(records => {
+                    if (records) window._cloudBuyRecords = records;
+                });
+
                 // 重新加载买入记录
                 loadBuyRecords();
 
@@ -1855,7 +1868,6 @@ function showFundDetails(fund) {
                 document.getElementById('buy-shares').value = 0;
 
                 alert('买入设置已保存');
-                // 重新加载页面以更新预估收益
                 loadFunds();
             }
 
