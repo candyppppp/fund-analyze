@@ -2388,6 +2388,7 @@ async function deleteBuyRecord(recordId, fundId) {
 
 // 启动时把 localStorage 数据迁移到云端（只迁移一次）
 async function migrateBuyRecordsToCloud(force = false) {
+    return; // 迁移已完成，禁用自动迁移避免重复写入
     const migrated = localStorage.getItem('_buy_records_migrated_v2');
     if (migrated && !force) return;
 
