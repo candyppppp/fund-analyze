@@ -310,7 +310,7 @@ class DataSourceManager:
                 return None
 
             # 计算剩余页数（最多拉 3 年约 750 个交易日）
-            max_records = 750
+            max_records = 60
             if total_records > 0:
                 total_pages = min((total_records + actual_per - 1) // actual_per,
                                   (max_records + actual_per - 1) // actual_per)
