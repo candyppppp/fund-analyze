@@ -392,3 +392,19 @@ body {
 .add-fund-btn:hover {
     background-color: #0069d9;
 }
+/* ── 排序按钮 ──────────────────────────────────────────── */
+.sort-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: #888;
+    background: transparent;
+    border: 1px solid #333;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.sort-btn:hover { border-color: #555; color: #bbb; }
+.sort-btn.sort-active { border-color: #4a9eff; color: #4a9eff; background: rgba(74,158,255,.08); }
