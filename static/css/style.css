@@ -626,3 +626,11 @@ body {
         gap: 12px !important;
     }
 }
+
+/* 决策 tab 数据区：移动端两列 */
+@media (max-width: 600px) {
+    #decision-tab .data-grid-3 {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 12px 16px !important;
+    }
+}
