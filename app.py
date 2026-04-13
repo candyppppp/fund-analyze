@@ -1274,11 +1274,10 @@ def get_investment_advice():
         try:
             from datetime import timezone
             now_iso = datetime.now(timezone.utc).isoformat()
-            supabase_admin.table('advice_cache').upsert({
-                'username': username,
-                'data': result,
-                'updated_at': now_iso
-            }).execute()
+            supabase_admin.table('advice_cache').upsert(
+                {'username': username, 'data': result, 'updated_at': now_iso},
+                on_conflict='username'  # 按 username 唯一键冲突时更新
+            ).execute()
             logger.info('投资建议已写入云端缓存')
         except Exception as e:
             logger.warning(f'写入云端缓存失败: {e}')
