@@ -93,7 +93,6 @@ function checkLoginStatus() {
             // 检查登录信息是否过期（7天）
             if (now - info.timestamp < 7 * 24 * 60 * 60 * 1000) {
                 // 登录信息有效
-                console.log('用户已登录:', info.username);
                 return true;
             } else {
                 // 登录信息过期
@@ -163,7 +162,6 @@ function showLoadingState(message = '加载中...') {
 function addFundByCode(code) {
     // 防重复：和 addFund 共用同一个锁
     if (isAddingFund) {
-        console.log('addFundByCode: 正在添加中，忽略重复点击');
         return;
     }
     isAddingFund = true;
@@ -310,12 +308,10 @@ let fundHoldingsUpdateIntervals = {}; // 每个基金的持仓更新定时器
 function getMarketData() {
     const cachedData = cacheManager.get('marketData');
     if (cachedData) {
-        console.log('从本地缓存获取市场数据');
         return Promise.resolve(cachedData);
     }
 
     // 缓存过期，从API获取新数据
-    console.log('从API获取市场数据');
     return fetch('/api/market-data')
         .then(response => response.json())
         .then(data => {
@@ -361,7 +357,6 @@ function processFunds(funds) {
                     // 检查持仓数据缓存
                     const cachedHoldings = cacheManager.get('fundHoldings', code);
                     if (cachedHoldings) {
-                        console.log(`从缓存获取基金 ${code} 持仓数据`);
                         const fund = processedFunds.find(f => f.code === code);
                         if (fund) {
                             fund.stock_holdings = cachedHoldings;
@@ -423,7 +418,6 @@ function loadFunds() {
             const storedFunds = localStorage.getItem('funds');
             if (storedFunds) {
                 fundsData = JSON.parse(storedFunds);
-                console.log('从本地存储获取基金数据');
                 // 先显示本地数据，提供即时反馈
                 renderFunds(fundsData);
                 hideLoading();
@@ -437,7 +431,6 @@ function loadFunds() {
         // 检查缓存
         const cachedFunds = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
         if (cachedFunds) {
-            console.log('从内存缓存获取基金数据');
             // 显示缓存数据
             renderFunds(cachedFunds);
             hideLoading();
@@ -455,7 +448,6 @@ function loadFunds() {
             resolve(cachedFunds);
         } else {
             // 从API获取最新数据
-            console.log('从API获取基金数据');
             fetch('/api/funds')
                 .then(response => {
                     if (response.status === 401) {
@@ -506,7 +498,6 @@ function loadFunds() {
 
 // 后台更新基金数据
 function updateFundsInBackground() {
-    console.log('后台更新基金数据');
     // 获取当前缓存的基金数据
     const currentFunds = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
 
@@ -562,10 +553,7 @@ function updateFundsInBackground() {
                         });
                     }
                 }
-
-                console.log('后台更新基金数据完成');
             } else {
-                console.log('获取到空的基金数据，使用缓存数据');
             }
         })
         .catch(error => {
@@ -600,7 +588,6 @@ function startFundHoldingsUpdateIntervals(funds) {
                 const isTradingTime = day >= 1 && day <= 5 && hour >= 9 && hour < 15;
 
                 if (isTradingTime) {
-                    console.log(`更新基金 ${fund.code} 数据`);
                     // 只获取持仓数据，基金列表通过定期更新获取
                     fetch(`/api/funds/${fund.code}/holdings`)
                     .then(response => {
@@ -642,8 +629,6 @@ function startFundHoldingsUpdateIntervals(funds) {
                     });
                 }
             }, interval);
-
-            console.log(`基金 ${fund.code} 持仓更新定时器已启动，间隔 ${interval}ms，初始延迟 ${randomDelay}ms`);
         }, randomDelay);
     });
 }
@@ -765,9 +750,9 @@ function startFundUpdateInterval() {
         const isTradingTime = day >= 1 && day <= 5 && hour >= 9 && hour < 15;
 
         if (isTradingTime) {
-            return 60000; // 交易时间每1分钟更新一次基金列表
+            return 180000; // 交易时间每3分钟更新一次
         } else {
-            return 300000; // 非交易时间每5分钟更新一次基金列表
+            return 1800000; // 非交易时间每30分钟更新一次
         }
     }
 
@@ -775,7 +760,6 @@ function startFundUpdateInterval() {
     let interval = getUpdateInterval();
 
     fundUpdateInterval = setInterval(() => {
-        console.log('自动更新基金数据');
         loadFunds();
 
         // 重新计算更新间隔（如果时间发生变化）
@@ -784,14 +768,10 @@ function startFundUpdateInterval() {
             clearInterval(fundUpdateInterval);
             interval = newInterval;
             fundUpdateInterval = setInterval(() => {
-                console.log('自动更新基金数据');
                 loadFunds();
             }, interval);
-            console.log(`更新间隔已调整为 ${interval}ms`);
         }
     }, interval);
-
-    console.log(`基金数据自动更新已启动，间隔 ${interval}ms`);
 }
 
 function renderFunds(funds) {
@@ -957,7 +937,6 @@ function addFund() {
     }
 
     const code = document.getElementById('fund-code').value;
-    console.log('开始添加基金:', code);
 
     // 验证基金代码格式
     if (!/^\d{6}$/.test(code)) {
@@ -980,14 +959,12 @@ function addFund() {
         body: JSON.stringify({ code })
     })
     .then(response => {
-        console.log('添加基金API响应状态:', response.status);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         return response.json();
     })
     .then(data => {
-        console.log('添加基金API返回数据:', data);
         // 检查是否有错误
         if (data.error) {
             showError(data.error);
@@ -1849,7 +1826,6 @@ function showFundDetails(fund) {
                     .then(data => {
                         if (data.nav) {
                             buyNav = data.nav;
-                            console.log(`从后端API获取到 ${buyDate} 的净值: ${buyNav}`);
                         } else if (data.error) {
                             console.warn(`获取历史净值失败: ${data.error}`);
                             // 不尝试使用其他API，保持后端数据一致性
@@ -1994,7 +1970,6 @@ function loadStockHoldings(fundCode) {
     const cacheExpiry = getStockHoldingsCacheExpiry();
 
     if (stockHoldingsCache[cacheKey] && (currentTime - stockHoldingsCache[cacheKey].timestamp) < cacheExpiry) {
-        console.log('从缓存获取持仓股票数据');
         const cachedData = stockHoldingsCache[cacheKey].data;
 
         // 更新标题为"股票持仓 (X%)"
@@ -2019,7 +1994,6 @@ function loadStockHoldings(fundCode) {
     fetch(`/api/funds/${fundCode}/holdings`)
         .then(response => response.json())
         .then(data => {
-            console.log('获取到的持仓股票数据:', data);
 
             // 存储到缓存
             stockHoldingsCache[cacheKey] = {
@@ -2062,7 +2036,7 @@ function setupStockUpdateInterval(fundCode) {
     // 只有在交易时间才设置自动更新
     if (isTradingTime()) {
         // 交易时间10-25秒随机更新一次
-        const interval = Math.floor(Math.random() * 15000) + 10000;
+        const interval = 60000; // 股票价格1分钟更新
 
         // 设置更新定时器
         stockUpdateIntervals[fundCode] = setInterval(() => {
@@ -2091,13 +2065,9 @@ function setupStockUpdateInterval(fundCode) {
             if (!isTradingTime()) {
                 clearInterval(stockUpdateIntervals[fundCode]);
                 delete stockUpdateIntervals[fundCode];
-                console.log('非交易时间，停止股票数据自动更新');
             }
         }, interval);
-
-        console.log(`股票数据自动更新已启动，间隔 ${interval}ms`);
     } else {
-        console.log('非交易时间，使用缓存数据，不设置自动更新');
     }
 }
 
@@ -2372,7 +2342,6 @@ async function migrateBuyRecordsToCloud() {
                 });
             } catch(e) {}
         }
-        console.log(`迁移 ${allRecords.length} 条买入记录到云端`);
     }
     localStorage.setItem('_buy_records_migrated_v1', '1');
 }
@@ -2395,13 +2364,6 @@ function updateChart(fund, chartId, days) {
     }
 
     // 调试信息
-    console.log('更新图表:', {
-        fundCode: fund.code,
-        days: days,
-        totalDataPoints: prices.length,
-        displayDataPoints: displayPrices.length,
-        startIndex: startIndex
-    });
 
     // 检查数据是否足够
     if (prices.length === 0) {
@@ -2468,16 +2430,6 @@ function updateChart(fund, chartId, days) {
     };
 
     // 调试布林带数据
-    console.log('布林带数据:', {
-        fullLength: fullBollingerBands.upper.length,
-        displayLength: bollingerBands.upper.length,
-        hasData: bollingerBands.upper.some(val => val !== null),
-        sampleData: {
-            upper: bollingerBands.upper.slice(-5),
-            middle: bollingerBands.middle.slice(-5),
-            lower: bollingerBands.lower.slice(-5)
-        }
-    });
 
     // 计算MACD（使用完整数据，然后截取需要显示的部分）
     const fullMACD = calculateMACD(prices);
@@ -3088,7 +3040,6 @@ function applySettings(settings) {
     document.body.style.fontSize = settings.fontSize === 'small' ? '13px' : settings.fontSize === 'large' ? '15px' : '14px';
 
     // 应用其他设置（这里可以添加更多设置的应用逻辑）
-    console.log('应用设置:', settings);
 }
 
 function loadFundManagement(container) {
@@ -3148,12 +3099,9 @@ function startFundAutoUpdate() {
     const updateMinutes = parseInt(settings.updateFrequency) || 5;
     const updateIntervalMs = updateMinutes * 60 * 1000;
 
-    console.log(`启动基金数据自动更新，每 ${updateMinutes} 分钟更新一次`);
-
     // 设置新的定时器
     fundUpdateInterval = setInterval(() => {
         if (isTradingTime()) {
-            console.log('自动更新基金数据...');
             loadFunds();
         }
     }, updateIntervalMs);
@@ -3164,7 +3112,6 @@ function stopFundAutoUpdate() {
     if (fundUpdateInterval) {
         clearInterval(fundUpdateInterval);
         fundUpdateInterval = null;
-        console.log('停止基金数据自动更新');
     }
 }
 
