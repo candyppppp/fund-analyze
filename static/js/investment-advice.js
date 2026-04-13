@@ -16,13 +16,24 @@ class InvestmentAdvice {
         if (window.activeTab === 'investment-advice') this.showLoadingState();
         fetch('/api/investment-advice')
             .then(r => { if (r.status === 401) { window.location.href='/login'; return Promise.reject('401'); } return r.json(); })
-            .then(a => { cacheManager.set(this.cacheKey, a, 60*60*1000); if (window.activeTab==='investment-advice') this.displayAdvice(a); })
+            .then(a => {
+                // 只有有实质数据时才缓存，避免缓存空结果
+                const hasData = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
+                                (a.recommendedFunds && a.recommendedFunds.length > 0);
+                if (hasData) cacheManager.set(this.cacheKey, a, 60*60*1000);
+                if (window.activeTab==='investment-advice') this.displayAdvice(a);
+            })
             .catch(e => { if (e!=='401' && window.activeTab==='investment-advice') this.displayDefaultAdvice(); });
     }
 
     updateInBackground() {
         fetch('/api/investment-advice').then(r=>r.json())
-            .then(a => { cacheManager.set(this.cacheKey,a,60*60*1000); if(window.activeTab==='investment-advice') this.displayAdvice(a); })
+            .then(a => {
+                const hasData = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
+                                (a.recommendedFunds && a.recommendedFunds.length > 0);
+                if (hasData) cacheManager.set(this.cacheKey, a, 60*60*1000);
+                if (window.activeTab==='investment-advice') this.displayAdvice(a);
+            })
             .catch(()=>{});
     }
 
@@ -102,7 +113,7 @@ class InvestmentAdvice {
     border-radius:8px;
     padding:13px 15px;
 }
-.ia-cell-lbl{font-size:11px;color:#aaa;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ia-cell-lbl{font-size:11px;color:#444;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ia-cell-val{font-size:15px;font-weight:600;}
 
 .pos {color:#dc3545;}
@@ -125,7 +136,7 @@ class InvestmentAdvice {
 
 /* 推荐卡 */
 .ia-rec-card{
-    background:#141414;border:1px solid #908e8e;
+    background:#141414;border:1px solid #1e1e1e;
     border-radius:12px;padding:22px 24px;
     margin-bottom:14px;transition:border-color .2s;
 }
@@ -428,7 +439,7 @@ class InvestmentAdvice {
                 // 各维度信号列表
                 const signalRows = signals.map(s =>
                     '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1a1a1a;">' +
-                    '<span style="color:#aaa;font-size: 11px;">' + s.label + '</span>' +
+                    '<span style="color:#888;">' + s.label + '</span>' +
                     '<span style="color:#aaa;font-size:11px;">' + s.desc + '</span>' +
                     '<span style="color:' + badgeColor + ';font-weight:600;min-width:36px;text-align:right;font-size: 11px;">+' + s.weight + '分</span>' +
                     '</div>'
@@ -453,7 +464,7 @@ class InvestmentAdvice {
                     '</div>' +
 
                     '<div style="background:#0c0c0c;border-radius:6px;padding:12px 14px;margin-bottom:14px;">' +
-                    '<div style="font-size:10px;color:#aaa;letter-spacing:.8px;text-transform:uppercase;margin-bottom:12px;">触发信号明细</div>' +
+                    '<div style="font-size:10px;color:#858484;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;">触发信号明细</div>' +
                     signalRows +
                     '</div>' +
 
