@@ -222,8 +222,12 @@ class InvestmentAdvice {
     <span style="font-size:11px;color:#3a3a3a;">
       最后更新时间 ${advice._cache_time ? (() => {
         const d = new Date(advice._cache_time);
-        const bj = new Date(d.getTime() + 8 * 3600 * 1000);
-        return bj.toISOString().replace('T',' ').slice(0,19);
+        return d.toLocaleString('zh-CN', {
+          timeZone: 'Asia/Shanghai',
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+          hour12: false
+        }).replace(/\//g, '-');
       })() : '--'}
     </span>
     <button id="ia-manual-refresh-btn"
