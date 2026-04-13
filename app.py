@@ -1126,7 +1126,26 @@ def get_investment_advice():
         if not funds:
             load_funds(session['username'])
 
+        # 无论是否有缓存，都要拉实时估值更新 predicted_return
+        # 否则从 Supabase 加载的历史值可能全是0，导致全部判断为"持有"
         market_data = get_market_data()
+        for fund in funds:
+            try:
+                rt = data_source_manager.get_fund_estimated_return(fund.code)
+                if rt and rt.get('gszzl') is not None:
+                    fund.predicted_return = fund.calculate_predicted_return(
+                        real_time_estimated_return=rt
+                    )
+                    fund.gszzl = rt.get('gszzl')
+                    fund.gsz = rt.get('gsz')
+                    fund.gztime = rt.get('gztime')
+                    fund.est_source = rt.get('source', '')
+                    fund.has_realtime = True
+                else:
+                    fund.has_realtime = False
+                    fund.gszzl = None
+            except Exception as e:
+                logger.warning(f"投资建议接口更新 {fund.code} 实时估值失败: {e}")
 
         holdingsAdvice = []
         for fund in funds:
