@@ -6,33 +6,27 @@ class UpdateStrategyManager {
         this.fundListInterval = null;
         this.holdingsInterval = null;
         this.investmentAdviceInterval = null;
-        
+
         // 当前激活的标签
         this.activeTab = 'fund-prediction';
-        
-        // 数据源健康状态
+
+        // 数据源健康状态（后端管理，前端不直接检查）
         this.dataSourceHealth = {
-            sina: { status: 'healthy', lastCheck: null, failCount: 0 },
             eastmoney: { status: 'healthy', lastCheck: null, failCount: 0 },
-            tencent: { status: 'healthy', lastCheck: null, failCount: 0 },
-            ths: { status: 'healthy', lastCheck: null, failCount: 0 }
+            sina: { status: 'healthy', lastCheck: null, failCount: 0 },
         };
-        
-        // 数据源健康检查阈值
         this.healthThreshold = 3;
-        this.healthCheckInterval = 60 * 60 * 1000; // 1小时检查一次
-        
-        // 启动数据源健康检查
-        this.startDataSourceHealthCheck();
+        this.healthCheckInterval = 60 * 60 * 1000;
+        // 数据源健康检查由后端负责，前端不直接请求外部接口
     }
-    
+
     // 判断是否为交易时间
     isTradingTime() {
         const now = new Date();
         const day = now.getDay();
         const hour = now.getHours();
         const minute = now.getMinutes();
-        
+
         // 周一到周五
         if (day >= 1 && day <= 5) {
             // 上午: 9:30 - 11:30
@@ -46,7 +40,7 @@ class UpdateStrategyManager {
         }
         return false;
     }
-    
+
     // 判断是否为盘前时间 (9:00 - 9:30)
     isPreMarketTime() {
         const now = new Date();
@@ -55,7 +49,7 @@ class UpdateStrategyManager {
         const minute = now.getMinutes();
         return day >= 1 && day <= 5 && hour === 9 && minute < 30;
     }
-    
+
     // 判断是否为盘后时间 (15:00 - 16:00)
     isAfterMarketTime() {
         const now = new Date();
@@ -63,13 +57,13 @@ class UpdateStrategyManager {
         const hour = now.getHours();
         return day >= 1 && day <= 5 && hour >= 15 && hour < 16;
     }
-    
+
     // 获取更新时间间隔（毫秒）
     getUpdateInterval(type) {
         const isTrading = this.isTradingTime();
         const isPreMarket = this.isPreMarketTime();
         const isAfterMarket = this.isAfterMarketTime();
-        
+
         switch (type) {
             case 'fundList':
                 // 基金列表更新频率
@@ -80,7 +74,7 @@ class UpdateStrategyManager {
                 } else {
                     return 30 * 60 * 1000; // 非交易时间: 30分钟
                 }
-                
+
             case 'holdings':
                 // 股票持仓更新频率
                 if (isTrading) {
@@ -90,7 +84,7 @@ class UpdateStrategyManager {
                 } else {
                     return 10 * 60 * 1000; // 非交易时间: 10分钟
                 }
-                
+
             case 'investmentAdvice':
                 // 投资建议更新频率
                 if (isTrading) {
@@ -98,24 +92,24 @@ class UpdateStrategyManager {
                 } else {
                     return 60 * 60 * 1000; // 非交易时间: 1小时
                 }
-                
+
             default:
                 return 60 * 1000;
         }
     }
-    
+
     // 切换标签
     switchTab(tabName) {
         if (this.activeTab === tabName) return;
-        
+
         // 停止之前的更新
         this.stopAllUpdates();
-        
+
         // 启动新的更新
         this.activeTab = tabName;
         this.startUpdatesForTab(tabName);
     }
-    
+
     // 根据标签启动更新
     startUpdatesForTab(tabName) {
         switch (tabName) {
@@ -124,88 +118,88 @@ class UpdateStrategyManager {
                 this.startFundListUpdate();
                 this.startHoldingsUpdate();
                 break;
-                
+
             case 'investment-advice':
                 // 投资建议标签：启动投资建议更新
                 this.startInvestmentAdviceUpdate();
                 break;
         }
     }
-    
+
     // 启动基金列表更新
     startFundListUpdate() {
         if (this.fundListInterval) {
             clearInterval(this.fundListInterval);
         }
-        
+
         const update = () => {
             console.log(`[${new Date().toLocaleTimeString()}] 基金列表更新，间隔: ${this.getUpdateInterval('fundList') / 1000}秒`);
             // 使用事件触发基金列表更新
             const event = new CustomEvent('updateFundList');
             window.dispatchEvent(event);
         };
-        
+
         // 立即执行一次
         update();
-        
+
         // 设置定时器
         this.fundListInterval = setInterval(update, this.getUpdateInterval('fundList'));
-        
+
         // 监听交易时间变化，重新设置定时器
         this.checkAndResetInterval('fundList', this.fundListInterval);
     }
-    
+
     // 启动持仓更新
     startHoldingsUpdate() {
         if (this.holdingsInterval) {
             clearInterval(this.holdingsInterval);
         }
-        
+
         const update = () => {
             console.log(`[${new Date().toLocaleTimeString()}] 股票持仓更新，间隔: ${this.getUpdateInterval('holdings') / 1000}秒`);
             // 使用事件触发持仓更新
             const event = new CustomEvent('updateHoldings');
             window.dispatchEvent(event);
         };
-        
+
         // 立即执行一次
         update();
-        
+
         // 设置定时器
         this.holdingsInterval = setInterval(update, this.getUpdateInterval('holdings'));
     }
-    
+
     // 启动投资建议更新
     startInvestmentAdviceUpdate() {
         if (this.investmentAdviceInterval) {
             clearInterval(this.investmentAdviceInterval);
         }
-        
+
         const update = () => {
             console.log(`[${new Date().toLocaleTimeString()}] 投资建议更新，间隔: ${this.getUpdateInterval('investmentAdvice') / 1000}秒`);
             // 使用事件触发投资建议更新
             const event = new CustomEvent('updateInvestmentAdvice');
             window.dispatchEvent(event);
         };
-        
+
         // 立即执行一次
         update();
-        
+
         // 设置定时器
         this.investmentAdviceInterval = setInterval(update, this.getUpdateInterval('investmentAdvice'));
     }
-    
+
     // 检查并重置定时器（交易时间变化时）
     checkAndResetInterval(type, currentInterval) {
         const checkInterval = 60 * 1000; // 每分钟检查一次
-        
+
         setInterval(() => {
             const newInterval = this.getUpdateInterval(type);
             // 如果时间间隔变化了，重新启动更新
             // 这里可以添加更复杂的逻辑
         }, checkInterval);
     }
-    
+
     // 停止所有更新
     stopAllUpdates() {
         if (this.fundListInterval) {
@@ -221,11 +215,11 @@ class UpdateStrategyManager {
             this.investmentAdviceInterval = null;
         }
     }
-    
+
     // 数据源健康检查
     async checkDataSourceHealth(source) {
         const testCodes = ['000001', '510310']; // 测试用基金代码
-        
+
         // 跳过会导致 CORS 错误的数据源
         const corsSources = ['sina', 'eastmoney'];
         if (corsSources.includes(source)) {
@@ -234,7 +228,7 @@ class UpdateStrategyManager {
             this.updateSourceHealth(source, true);
             return true;
         }
-        
+
         try {
             let url;
             switch (source) {
@@ -244,14 +238,14 @@ class UpdateStrategyManager {
                 default:
                     return false;
             }
-            
+
             const startTime = Date.now();
             const response = await fetch(url, { timeout: 5000 });
             const latency = Date.now() - startTime;
-            
+
             if (response.ok) {
                 const data = await response.text();
-                
+
                 // 检查数据是否有效
                 if (data && data.length > 10) {
                     this.updateSourceHealth(source, true);
@@ -259,7 +253,7 @@ class UpdateStrategyManager {
                     return true;
                 }
             }
-            
+
             this.updateSourceHealth(source, false);
             return false;
         } catch (error) {
@@ -268,12 +262,12 @@ class UpdateStrategyManager {
             return false;
         }
     }
-    
+
     // 更新数据源健康状态
     updateSourceHealth(source, success) {
         const health = this.dataSourceHealth[source];
         health.lastCheck = new Date();
-        
+
         if (success) {
             health.failCount = 0;
             health.status = 'healthy';
@@ -285,18 +279,18 @@ class UpdateStrategyManager {
             }
         }
     }
-    
+
     // 获取当前可用的最佳数据源
     getBestDataSource() {
         const healthySources = Object.entries(this.dataSourceHealth)
             .filter(([_, health]) => health.status === 'healthy')
             .map(([name, _]) => name);
-        
+
         if (healthySources.length === 0) {
             // 所有数据源都不健康，返回第一个（默认）
             return 'sina';
         }
-        
+
         // 优先顺序: sina > eastmoney > tencent > ths
         const priority = ['sina', 'eastmoney', 'tencent', 'ths'];
         for (const source of priority) {
@@ -304,36 +298,30 @@ class UpdateStrategyManager {
                 return source;
             }
         }
-        
+
         return 'sina';
     }
-    
+
     // 启动数据源健康检查
     startDataSourceHealthCheck() {
-        // 立即执行一次健康检查
-        this.performHealthCheck();
-        
-        // 每小时执行一次健康检查
-        setInterval(() => {
-            this.performHealthCheck();
-        }, this.healthCheckInterval);
+        // 数据源由后端管理，前端不做健康检查
     }
-    
+
     // 执行健康检查
     async performHealthCheck() {
         console.log(`[${new Date().toLocaleTimeString()}] 开始数据源健康检查...`);
-        
+
         const sources = ['sina', 'eastmoney', 'tencent', 'ths'];
         const results = await Promise.all(
             sources.map(source => this.checkDataSourceHealth(source))
         );
-        
+
         const healthyCount = results.filter(r => r).length;
         const bestSource = this.getBestDataSource();
-        
+
         console.log(`[数据源健康检查] 完成，可用: ${healthyCount}/${sources.length}，推荐: ${bestSource}`);
     }
-    
+
     // 获取数据源状态报告
     getDataSourceStatus() {
         return {
