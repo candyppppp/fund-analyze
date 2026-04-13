@@ -49,10 +49,12 @@ app = Flask(__name__,
             static_folder=os.path.join(base_dir, 'static'),
             template_folder=os.path.join(base_dir, 'templates'))
 import os as _os
+
 _cors_origins = _os.environ.get('CORS_ORIGINS', '').split(',')
 _cors_origins = [o.strip() for o in _cors_origins if o.strip()] or ['*']
 
 import secrets as _secrets
+
 
 def generate_csrf_token():
     """生成并存储 CSRF token 到 session"""
@@ -60,10 +62,12 @@ def generate_csrf_token():
         session['_csrf_token'] = _secrets.token_hex(32)
     return session['_csrf_token']
 
+
 def validate_csrf_token():
     """验证 POST 请求的 CSRF token"""
     token = request.form.get('_csrf_token') or request.headers.get('X-CSRF-Token')
     return token and token == session.get('_csrf_token')
+
 
 app.jinja_env.globals['csrf_token'] = generate_csrf_token
 
@@ -191,31 +195,48 @@ def load_funds(username=None):
 
 
 def save_funds(username=None):
-    """保存基金数据到 Supabase（upsert，60秒节流）"""
+    """更新 Supabase 中每只基金的技术指标（只更新，不新增不删除）
+
+    只更新已存在的基金的技术指标字段，避免覆盖删除操作或影响新增基金。
+    新增基金由 add_fund 负责，删除由 delete_fund 负责。
+    """
     global funds, last_save_time
 
-    # 节流：60 秒内不重复写，避免每次 GET /api/funds 都触发写库
     now = time.time()
     if now - last_save_time < 60:
-        logger.debug('save_funds 节流跳过（距上次写入 %.0f 秒）', now - last_save_time)
+        logger.debug('save_funds 节流跳过')
         return
     last_save_time = now
 
-    logger.info('开始保存基金数据到 Supabase')
+    logger.info('更新基金技术指标到 Supabase')
     try:
-        rows = []
         for fund in funds:
-            fund_data = fund.to_dict()
-            fund_data['username'] = username or fund.username
-            rows.append(fund_data)
-        if rows:
-            supabase.table('funds').upsert(rows).execute()
-            logger.info(f'成功 upsert {len(rows)} 只基金')
-        logger.info(f"成功保存 {len(funds)} 只基金到 Supabase")
+            # 只更新技术指标相关字段，不动 id/code/username
+            update_data = {
+                'rsi': fund.rsi,
+                'volatility': fund.volatility,
+                'macd': list(fund.macd) if fund.macd else [0, 0, 0],
+                'kdj': list(fund.kdj) if fund.kdj else [0, 0, 0],
+                'bollinger_bands': list(fund.bollinger_bands) if fund.bollinger_bands else [0, 0, 0],
+                'atr': fund.atr,
+                'volume_ratio': fund.volume_ratio,
+                'predicted_return': fund.predicted_return,
+                'prediction_confidence': fund.prediction_confidence,
+                'previous_day_return': fund.previous_day_return,
+                'prices': fund.prices,
+                'dates': fund.dates,
+                'returns': fund.returns,
+                'nav_updated_at': getattr(fund, 'nav_updated_at', None),
+                'has_realtime': getattr(fund, 'has_realtime', False),
+                'gszzl': getattr(fund, 'gszzl', None),
+                'gsz': getattr(fund, 'gsz', None),
+                'gztime': getattr(fund, 'gztime', None),
+                'est_source': getattr(fund, 'est_source', ''),
+            }
+            supabase.table('funds').update(update_data).eq('id', fund.id).execute()
+        logger.info(f'成功更新 {len(funds)} 只基金技术指标')
     except Exception as e:
-        logger.error(f"保存基金数据到 Supabase 失败: {e}")
-
-    # Vercel 无持久文件系统，仅用 Supabase 持久化
+        logger.error(f"更新基金数据失败: {e}")
 
 
 # 初始化加载数据
@@ -225,10 +246,10 @@ except Exception as e:
     logger.error(f'初始化加载数据失败: {e}')
     funds = []
 
-
 # 获取基金持仓数据
-_holdings_cache = {}   # {code: (timestamp, holdings_data)}
+_holdings_cache = {}  # {code: (timestamp, holdings_data)}
 _HOLDINGS_TTL = 7 * 24 * 3600  # 7天，持仓数据按季度更新
+
 
 def get_fund_holdings(code):
     """获取基金的持仓数据
