@@ -110,12 +110,12 @@ def load_funds(username=None):
             # 重建Fund对象
             try:
                 fund = Fund(
-                    data['name'],
+                    data['name'] or f"基金{data['code']}",
                     data['code'],
-                    data['prices'],
-                    data['dates'],
-                    data['returns'],
-                    data.get('volumes', [])
+                    data['prices'] or [],
+                    data['dates'] or [],
+                    data['returns'] or [],
+                    data.get('volumes') or []
                 )
                 # 恢复其他属性
                 fund.id = data['id']
@@ -133,7 +133,7 @@ def load_funds(username=None):
                 fund.nav_updated_at = data.get('nav_updated_at', None)
                 funds.append(fund)
             except Exception as e:
-                logger.error(f"重建基金对象失败: {e}")
+                logger.error(f"重建基金对象失败 id={data.get('id')} code={data.get('code')}: {e}")
                 continue
 
         # 更新ID计数器
@@ -821,18 +821,22 @@ def add_fund():
         code = data['code']
         logger.info(f'添加基金: {code}')
 
-        # 确保funds列表不为空
+        # 直接查 Supabase 检查是否已存在（不依赖内存，避免无状态漏判）
+        try:
+            existing = supabase.table('funds').select('id').eq('code', code).eq('username',
+                                                                                session['username']).execute()
+            if existing.data:
+                logger.warning(f'基金已经存在: {code}')
+                return jsonify({'error': '基金已经存在'}), 400
+        except Exception as e:
+            logger.error(f'检查基金存在失败: {e}')
+
+        # 同步内存（确保后续操作不重复）
         if not funds:
             try:
                 load_funds(session['username'])
             except Exception as e:
                 logger.error(f'加载基金数据失败: {e}')
-
-        # 检查基金是否已经存在
-        for existing_fund in funds:
-            if existing_fund.code == code:
-                logger.warning(f'基金已经存在: {code}')
-                return jsonify({'error': '基金已经存在'}), 400
 
         logger.info(f'基金 {code} 不存在，准备添加')
 
@@ -907,12 +911,17 @@ def add_fund():
             fund.est_source = ''
             fund.has_realtime = False
         fund.prediction_confidence = fund.calculate_prediction_confidence()
-        funds.append(fund)
-        # 直接 insert 新基金到 Supabase（save_funds 只 update 不 insert）
+        # 直接 insert 新基金到 Supabase（不传 id，由数据库自增）
         fund_data = fund.to_dict()
         fund_data['username'] = session['username']
-        supabase.table('funds').insert(fund_data).execute()
-        logger.info(f'基金添加成功: {code}，历史净值 {len(prices)} 条')
+        fund_data.pop('id', None)  # 去掉 id，让 Supabase 自动生成
+        resp = supabase.table('funds').insert(fund_data).execute()
+        # 用数据库生成的 id 更新内存对象
+        if resp.data:
+            fund.id = resp.data[0]['id']
+            Fund.id_counter = fund.id + 1
+        funds.append(fund)
+        logger.info(f'基金添加成功: {code}，id={fund.id}，历史净值 {len(prices)} 条')
         return jsonify(fund.to_dict()), 201
     except Exception as e:
         logger.error(f'添加基金失败: {e}')
