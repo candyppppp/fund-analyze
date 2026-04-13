@@ -1196,17 +1196,17 @@ function showFundDetails(fund) {
                 <div style="padding: 10px 20px;">
                     <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; ">基金风险评估</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 18px; border: 1px solid #333;">
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 15px;">
-                            <div style="font-size: 12px; "><strong>当前净值:</strong> <span style="color: #e0e0e0;">${fund.prices && fund.prices.length > 0 ? fund.prices[fund.prices.length - 1] : '数据不足'}</span></div>
-                            <div style="font-size: 12px; "><strong>RSI指标:</strong> <span style="color: #e0e0e0;">${fund.rsi ? fund.rsi.toFixed(2) + ' ' + getRSIMessage(fund.rsi) : '数据不足'}</span></div>
-                            <div style="font-size: 12px; "><strong>波动率:</strong> <span style="color: #e0e0e0;">${fund.volatility ? (fund.volatility * 100).toFixed(2) + '%' : '数据不足'}</span></div>
-                            <div style="font-size: 12px; "><strong>预测当日收益率:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return ? (fund.predicted_return >= 0 ? '+' : '') + (fund.predicted_return * 100).toFixed(2) + '%' : '数据不足'}</span></div>
-                            <div style="font-size: 12px; "><strong>预测置信度:</strong> <span style="color: #e0e0e0;">${fund.prediction_confidence ? (fund.prediction_confidence * 100).toFixed(0) + '%' : '数据不足'}</span></div>
-                            <div style="font-size: 12px; "><strong>ATR指标:</strong> <span style="color: #e0e0e0;">${fund.atr ? fund.atr.toFixed(4) : '数据不足'}</span></div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 24px; margin-bottom: 15px;">
+                            <div style="font-size:12px;line-height:1.6;"><span style="color:#666;font-size:11px;">当前净值</span><br><span style="color:#e0e0e0;font-weight:500;">${fund.prices && fund.prices.length > 0 ? fund.prices[fund.prices.length - 1] : '数据不足'}</span></div>
+                            <div style="font-size:12px;line-height:1.6;"><span style="color:#666;font-size:11px;">RSI指标</span><br><span style="color:#e0e0e0;font-weight:500;">${fund.rsi ? fund.rsi.toFixed(2) + ' ' + getRSIMessage(fund.rsi) : '数据不足'}</span></div>
+                            <div style="font-size:12px;line-height:1.6;"><span style="color:#666;font-size:11px;">波动率</span><br><span style="color:#e0e0e0;font-weight:500;">${fund.volatility ? (fund.volatility * 100).toFixed(2) + '%' : '数据不足'}</span></div>
+                            <div style="font-size:12px;line-height:1.6;"><span style="color:#666;font-size:11px;">预测当日收益率</span><br><span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return ? (fund.predicted_return >= 0 ? '+' : '') + (fund.predicted_return * 100).toFixed(2) + '%' : '数据不足'}</span></div>
+                            <div style="font-size:12px;line-height:1.6;"><span style="color:#666;font-size:11px;">预测置信度</span><br><span style="color:#e0e0e0;font-weight:500;">${fund.prediction_confidence ? (fund.prediction_confidence * 100).toFixed(0) + '%' : '数据不足'}</span></div>
+                            <div style="font-size:12px;line-height:1.6;"><span style="color:#666;font-size:11px;">ATR指标</span><br><span style="color:#e0e0e0;font-weight:500;">${fund.atr ? fund.atr.toFixed(4) : '数据不足'}</span></div>
                         </div>
                         <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333;">
                             <h4 style="color: #e0e0e0; margin: 0 0 12px 0; font-size: 13px; ">技术指标分析</h4>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; font-size: 12px;">
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 24px; font-size: 12px;">
                                 ${(() => {
                                     // 计算MACD信号
                                     let macdSignal = '数据不足';
@@ -1288,7 +1288,7 @@ function showFundDetails(fund) {
                         </div>
                         <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333;">
                             <h4 style="color: #e0e0e0; margin: 0 0 12px 0; font-size: 13px; ">风险评估</h4>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; font-size: 12px;">
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 24px; font-size: 12px;">
                                 <div style=""><strong>RSI风险:</strong> <span style="color: ${fund.rsi ? (fund.rsi > 70 ? '#ff4444' : fund.rsi < 30 ? '#4caf50' : '#ff9800') : '#aaa'}">${fund.rsi ? (fund.rsi > 70 ? '高' : fund.rsi < 30 ? '低' : '中') : '数据不足'}</span></div>
                                 <div style=""><strong>波动率风险:</strong> <span style="color: ${fund.volatility ? (fund.volatility > 0.2 ? '#ff4444' : fund.volatility > 0.1 ? '#ff9800' : '#4caf50') : '#aaa'}">${fund.volatility ? (fund.volatility > 0.2 ? '高' : fund.volatility > 0.1 ? '中' : '低') : '数据不足'}</span></div>
                                 ${(() => {
