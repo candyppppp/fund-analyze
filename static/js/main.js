@@ -1147,8 +1147,8 @@ function showFundDetails(fund) {
     modalContent.innerHTML = `
         <div style="background:#1a1a1a; border-bottom:1px solid #2a2a2a;">
             <div style="padding:14px 18px 0;">
-                <div style="font-size:11px;color:#555;margin-bottom:3px;">${fund.code} &nbsp;·&nbsp; NAV ${fund.prices[fund.prices.length - 1]}</div>
-                <div style="font-size:16px;font-weight:600;color:#fff;line-height:1.3;margin-bottom:14px;">${fund.name}</div>
+                <div style="font-size:16px;font-weight:600;color:#fff;line-height:1.3;margin-bottom:3px;">${fund.name}</div>
+                <div style="font-size:11px;color:#555;margin-bottom:14px;">${fund.code} &nbsp;·&nbsp; NAV ${fund.prices[fund.prices.length - 1]}</div>
             </div>
             <div style="display:flex; border-top:1px solid #2a2a2a;">
                 <button class="tab-btn active" data-tab="details" style="flex:1;padding:10px 0;border:none;background:transparent;color:#4a9eff;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid #4a9eff;letter-spacing:.5px;">详情</button>
