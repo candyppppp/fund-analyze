@@ -950,12 +950,78 @@ def add_fund():
             fund.has_realtime = False
         fund.prediction_confidence = fund.calculate_prediction_confidence()
         funds.append(fund)
-        save_funds(session['username'])
+        # 直接 insert 新基金到 Supabase（save_funds 只 update 不 insert）
+        fund_data = fund.to_dict()
+        fund_data['username'] = session['username']
+        supabase.table('funds').insert(fund_data).execute()
         logger.info(f'基金添加成功: {code}，历史净值 {len(prices)} 条')
         return jsonify(fund.to_dict()), 201
     except Exception as e:
         logger.error(f'添加基金失败: {e}')
         return jsonify({'error': str(e)}), 400
+
+
+# ── 买入记录 API（云端持久化）────────────────────────────────────────────────
+
+@app.route('/api/buy_records', methods=['GET'])
+@performance_monitor
+@rate_limit
+def get_buy_records():
+    """获取当前用户所有买入记录"""
+    try:
+        if 'username' not in session:
+            return jsonify({'error': '未登录'}), 401
+        username = session['username']
+        resp = supabase.table('buy_records').select('*').eq('username', username).execute()
+        return jsonify(resp.data or [])
+    except Exception as e:
+        logger.error(f'获取买入记录失败: {e}')
+        return jsonify([])
+
+
+@app.route('/api/buy_records', methods=['POST'])
+@performance_monitor
+@rate_limit
+def add_buy_record():
+    """添加买入记录"""
+    try:
+        if 'username' not in session:
+            return jsonify({'error': '未登录'}), 401
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '缺少数据'}), 400
+        record = {
+            'username': session['username'],
+            'fund_id': data.get('fund_id'),
+            'fund_code': data.get('fund_code'),
+            'fund_name': data.get('fund_name', ''),
+            'nav': data.get('nav'),
+            'shares': data.get('shares'),
+            'amount': data.get('amount'),
+            'date': data.get('date'),
+            'note': data.get('note', ''),
+        }
+        resp = supabase.table('buy_records').insert(record).execute()
+        return jsonify(resp.data[0] if resp.data else record), 201
+    except Exception as e:
+        logger.error(f'添加买入记录失败: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/buy_records/<int:record_id>', methods=['DELETE'])
+@performance_monitor
+@rate_limit
+def delete_buy_record(record_id):
+    """删除买入记录"""
+    try:
+        if 'username' not in session:
+            return jsonify({'error': '未登录'}), 401
+        username = session['username']
+        supabase.table('buy_records').delete().eq('id', record_id).eq('username', username).execute()
+        return jsonify({'message': 'deleted'})
+    except Exception as e:
+        logger.error(f'删除买入记录失败: {e}')
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/funds/<int:fund_id>', methods=['DELETE'])
