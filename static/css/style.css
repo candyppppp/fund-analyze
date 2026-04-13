@@ -556,3 +556,53 @@ body {
     .fund-performance { grid-template-columns: repeat(2, 1fr); }
     .fund-return { font-size: 12px; }
 }
+/* ── 弹窗移动端适配 ─────────────────────────────────── */
+@media (max-width: 600px) {
+    /* 弹窗顶部：标题和 tab 改为上下布局 */
+    .modal-content > div:first-child {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 10px !important;
+        padding: 12px 14px !important;
+    }
+
+    /* tab 按钮组撑满宽度 */
+    .modal-content > div:first-child > div:last-child {
+        width: 100% !important;
+    }
+
+    .modal-content > div:first-child > div:last-child > div {
+        width: 100% !important;
+        display: flex !important;
+    }
+
+    .tab-btn {
+        flex: 1 !important;
+        text-align: center !important;
+        padding: 8px 0 !important;
+        font-size: 13px !important;
+    }
+
+    /* 决策内容：三列改两列，去掉强制不换行 */
+    #decision-tab [style*="grid-template-columns: repeat(3"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    #decision-tab [style*="white-space: nowrap"] {
+        white-space: normal !important;
+        word-break: break-all;
+    }
+
+    /* 决策智能分析文字块 */
+    #decision-tab p, #decision-tab div {
+        word-break: break-word;
+        overflow-wrap: break-word;
+    }
+
+    /* 弹窗内边距收窄 */
+    #decision-tab > div,
+    #details-tab > div,
+    #holding-tab > div {
+        padding: 10px 14px !important;
+    }
+}
