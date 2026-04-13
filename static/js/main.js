@@ -33,6 +33,27 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     migrateBuyRecordsToCloud();
 
+    // ── 排序按钮绑定 ────────────────────────────────────────────────────────
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.sort-btn');
+        if (!btn) return;
+        const sort = btn.dataset.sort;
+        if (sort === _currentSort) return;
+        _currentSort = sort;
+        document.querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('sort-active', b.dataset.sort === sort));
+        // 用当前缓存数据重排，不重新请求
+        const cached = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
+        if (cached && cached.length) renderFunds(cached);
+    });
+
+    // ── 定时闪烁（即使没数据更新也有视觉活跃感，每20秒随机闪一只卡片）──────
+    setInterval(() => {
+        const cards = document.querySelectorAll('.fund-item');
+        if (!cards.length) return;
+        const idx = Math.floor(Math.random() * cards.length);
+        flashCard(cards[idx]);
+    }, 20000);
+
     // 检查登录状态
     checkLoginStatus();
 
@@ -774,6 +795,27 @@ function startFundUpdateInterval() {
     }, interval);
 }
 
+// 当前排序模式：'holding'（持仓优先）| 'return'（收益排序）
+let _currentSort = 'holding';
+
+function _sortFunds(funds) {
+    const hasBuy = f => {
+        const s = getBuySettings(f.id);
+        return s && s.shares > 0;
+    };
+    if (_currentSort === 'return') {
+        return [...funds].sort((a, b) => (b.predicted_return || 0) - (a.predicted_return || 0));
+    }
+    // 默认：持仓优先，持仓内按收益降序，无持仓按添加顺序
+    return [...funds].sort((a, b) => {
+        const aHas = hasBuy(a), bHas = hasBuy(b);
+        if (aHas && !bHas) return -1;
+        if (!aHas && bHas) return 1;
+        if (aHas && bHas) return (b.predicted_return || 0) - (a.predicted_return || 0);
+        return 0;
+    });
+}
+
 function renderFunds(funds) {
     // 建立 id→code 映射，供 investment-advice.js 止盈计算时查找买入记录
     window._fundIdCodeMap = {};
@@ -782,18 +824,18 @@ function renderFunds(funds) {
     const container = document.getElementById('funds-container');
     container.innerHTML = '';
 
-    // 更新组计数
+    // 更新 Group Count
     const groupCountElement = document.getElementById('group-count');
-    if (groupCountElement) {
-        groupCountElement.textContent = funds.length;
-    }
+    if (groupCountElement) groupCountElement.textContent = funds.length;
 
     if (funds.length === 0) {
         container.innerHTML = '<p style="text-align: center; color: #888; padding: 20px;">No funds in this group. Add one to track.</p>';
         return;
     }
 
-    funds.forEach(fund => {
+    // 应用排序
+    const sortedFunds = _sortFunds(funds);
+    sortedFunds.forEach(fund => {
         const fundItem = document.createElement('div');
         fundItem.className = 'fund-item';
         fundItem.id = `fund-${fund.id}`;
