@@ -1106,12 +1106,34 @@ def get_investment_advice():
         if 'username' not in session:
             return jsonify({'error': '未登录'}), 401
 
-        logger.info('获取投资建议')
+        username = session['username']
+        force_refresh = request.args.get('refresh') == '1'
+
+        # ── 读云端缓存（非强制刷新时直接返回）────────────────────────────────
+        if not force_refresh:
+            try:
+                cache_resp = supabase.table('advice_cache').select('data,updated_at').eq('username', username).execute()
+                if cache_resp.data:
+                    cached = cache_resp.data[0]
+                    cached_data = cached['data']
+                    updated_at = cached['updated_at']
+                    # 缓存有数据才返回（空列表不算有效缓存）
+                    if cached_data and (
+                        cached_data.get('holdingsAdvice') or cached_data.get('recommendedFunds')
+                    ):
+                        cached_data['_from_cache'] = True
+                        cached_data['_cache_time'] = updated_at
+                        logger.info(f'投资建议读云端缓存，更新时间: {updated_at}')
+                        return jsonify(cached_data)
+            except Exception as e:
+                logger.warning(f'读取云端缓存失败，重新计算: {e}')
+
+        logger.info('重新计算投资建议')
 
         # Vercel 无状态：确保内存有数据
         global funds
         if not funds:
-            load_funds(session['username'])
+            load_funds(username)
 
         # 并行拉所有基金实时估值，更新 predicted_return
         # 否则从 Supabase 加载的历史值可能全是0，导致全部判断为"持有"
@@ -1246,7 +1268,24 @@ def get_investment_advice():
             logger.error(f'推荐引擎异常: {e}')
             recommendedFunds = []
 
-        return jsonify({'holdingsAdvice': holdingsAdvice, 'recommendedFunds': recommendedFunds})
+        result = {'holdingsAdvice': holdingsAdvice, 'recommendedFunds': recommendedFunds}
+
+        # ── 写入云端缓存 ──────────────────────────────────────────────────────
+        try:
+            from datetime import timezone
+            now_iso = datetime.now(timezone.utc).isoformat()
+            supabase_admin.table('advice_cache').upsert({
+                'username': username,
+                'data': result,
+                'updated_at': now_iso
+            }).execute()
+            logger.info('投资建议已写入云端缓存')
+        except Exception as e:
+            logger.warning(f'写入云端缓存失败: {e}')
+
+        result['_from_cache'] = False
+        result['_cache_time'] = datetime.now().isoformat()
+        return jsonify(result)
     except Exception as e:
         logger.error(f'获取投资建议失败: {e}')
         return jsonify({'holdingsAdvice': [], 'recommendedFunds': []})
