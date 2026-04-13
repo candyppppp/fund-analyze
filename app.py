@@ -1284,7 +1284,7 @@ def get_investment_advice():
             logger.warning(f'写入云端缓存失败: {e}')
 
         result['_from_cache'] = False
-        result['_cache_time'] = datetime.now().isoformat()
+        result['_cache_time'] = datetime.now(timezone.utc).isoformat()
         return jsonify(result)
     except Exception as e:
         logger.error(f'获取投资建议失败: {e}')
