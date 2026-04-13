@@ -7,44 +7,46 @@ class InvestmentAdvice {
         this._startAutoRefresh();
     }
 
-    // 判断是否交易时间（周一至周五 9:00-15:00）
+    // 判断是否交易时间（周一至周五 9:30-15:00，北京时间）
     _isTradingTime() {
+        // 用 Asia/Shanghai 时区判断，避免用户设备时区影响
         const now = new Date();
-        const day = now.getDay();
-        const h = now.getHours();
-        const m = now.getMinutes();
-        const mins = h * 60 + m;
-        return day >= 1 && day <= 5 && mins >= 540 && mins < 900;
+        const bjStr = now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' });
+        const bj = new Date(bjStr);
+        const day = bj.getDay();
+        const mins = bj.getHours() * 60 + bj.getMinutes();
+        return day >= 1 && day <= 5 && mins >= 570 && mins < 900; // 9:30-15:00
     }
 
-    // 启动定时刷新
+    // 启动定时刷新（用 setTimeout 链式调用，避免 setInterval 嵌套导致定时器泄漏）
     _startAutoRefresh() {
-        if (this._timer) clearInterval(this._timer);
-        const run = () => {
+        if (this._timer) clearTimeout(this._timer);
+        const schedule = () => {
             const interval = this._isTradingTime() ? 10 * 60 * 1000 : 60 * 60 * 1000;
-            if (this._timer) clearInterval(this._timer);
-            this._timer = setInterval(() => {
-                this._forceRefresh();
-                run(); // 每次结束后重新计算间隔
+            this._timer = setTimeout(() => {
+                this._forceRefresh().finally(() => schedule()); // 请求完成后再安排下一次
             }, interval);
         };
-        run();
+        schedule();
     }
 
-    // 强制刷新（绕过缓存，传 ?refresh=1）
+    // 强制刷新（绕过缓存，传 ?refresh=1），返回 Promise，带防并发锁
     _forceRefresh() {
-        fetch('/api/investment-advice?refresh=1')
+        if (this._refreshing) return Promise.resolve(); // 防并发
+        this._refreshing = true;
+        return fetch('/api/investment-advice?refresh=1')
             .then(r => r.ok ? r.json() : null)
             .then(a => {
                 if (!a) return;
                 const hasData = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
                                 (a.recommendedFunds && a.recommendedFunds.length > 0);
                 if (hasData) {
-                    cacheManager.set(this.cacheKey, a, 65 * 60 * 1000); // 65分钟本地缓存
+                    cacheManager.set(this.cacheKey, a, 65 * 60 * 1000);
                     if (window.activeTab === 'investment-advice') this.displayAdvice(a);
                 }
             })
-            .catch(() => {});
+            .catch(() => {})
+            .finally(() => { this._refreshing = false; });
     }
 
     loadInvestmentAdvice() {
