@@ -606,3 +606,11 @@ body {
         padding: 10px 14px !important;
     }
 }
+
+/* 势头信号三列 → 手机单列 */
+@media (max-width: 600px) {
+    #decision-tab [style*="grid-template-columns: repeat(3, 1fr)"] {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+}
