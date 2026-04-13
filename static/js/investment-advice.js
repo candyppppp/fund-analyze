@@ -140,7 +140,7 @@ class InvestmentAdvice {
 
 /* 推荐卡 */
 .ia-rec-card{
-    background:#141414;border:1px solid #1e1e1e;
+    background:#141414;border:1px solid #908e8e;
     border-radius:12px;padding:22px 24px;
     margin-bottom:14px;transition:border-color .2s;
 }

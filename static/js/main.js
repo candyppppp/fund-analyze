@@ -29,9 +29,14 @@ window.activeTab = activeTab; // 使activeTab在全局范围内可用
 document.addEventListener('DOMContentLoaded', function() {
     // 预热云端买入记录缓存 + 迁移 localStorage 数据
     fetchAllBuyRecords().then(records => {
-        if (records) window._cloudBuyRecords = records;
+        if (records && records.length > 0) {
+            window._cloudBuyRecords = records;
+            // 云端数据加载完后重新渲染，确保持仓数据正确显示
+            const cached = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
+            if (cached && cached.length) renderFunds(cached);
+        }
     });
-    migrateBuyRecordsToCloud();
+    setTimeout(() => migrateBuyRecordsToCloud(), 3000); // 等基金列表加载完再迁移
 
     // 排序固定为持仓优先，无需按钮事件
 
@@ -2259,6 +2264,23 @@ function getBuySettings(fundId) {
         shares: 0
     };
 
+    // 优先从云端缓存计算持仓（支持多设备）
+    if (window._cloudBuyRecords && window._cloudBuyRecords.length > 0) {
+        const fundIdStr = String(fundId);
+        const records = window._cloudBuyRecords.filter(r =>
+            String(r.fund_id) === fundIdStr
+        );
+        if (records.length > 0) {
+            const totalShares = records.reduce((sum, r) => sum + (r.shares || 0), 0);
+            const lastRecord = records[records.length - 1];
+            // 同步写入 localStorage 保持一致
+            const settings = { date: lastRecord.date, shares: totalShares };
+            localStorage.setItem(`fundBuySettings_${fundId}`, JSON.stringify(settings));
+            return settings;
+        }
+    }
+
+    // 降级：读 localStorage
     const savedSettings = localStorage.getItem(`fundBuySettings_${fundId}`);
     return savedSettings ? JSON.parse(savedSettings) : defaultSettings;
 }
@@ -2317,7 +2339,15 @@ async function fetchAllBuyRecords(forceRefresh = false) {
 }
 
 function getBuyRecords(fundId) {
-    // 同步读 localStorage（兼容旧数据和止盈计算）
+    // 优先从云端缓存读取（支持多设备）
+    if (window._cloudBuyRecords && window._cloudBuyRecords.length > 0) {
+        const records = window._cloudBuyRecords.filter(r => String(r.fund_id) === String(fundId));
+        if (records.length > 0) {
+            const localRecords = records.map(r => ({ date: r.date, shares: r.shares, nav: r.nav, id: r.id }));
+            localStorage.setItem(`fundBuyRecords_${fundId}`, JSON.stringify(localRecords));
+            return localRecords;
+        }
+    }
     const savedRecords = localStorage.getItem(`fundBuyRecords_${fundId}`);
     return savedRecords ? JSON.parse(savedRecords) : [];
 }
@@ -2357,29 +2387,49 @@ async function deleteBuyRecord(recordId, fundId) {
 }
 
 // 启动时把 localStorage 数据迁移到云端（只迁移一次）
-async function migrateBuyRecordsToCloud() {
-    const migrated = localStorage.getItem('_buy_records_migrated_v1');
-    if (migrated) return;
+async function migrateBuyRecordsToCloud(force = false) {
+    const migrated = localStorage.getItem('_buy_records_migrated_v2');
+    if (migrated && !force) return;
+
     const allRecords = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (!key || !key.startsWith('fundBuyRecords_')) continue;
         const fundId = key.replace('fundBuyRecords_', '');
         const records = JSON.parse(localStorage.getItem(key) || '[]');
-        records.forEach(r => allRecords.push({ ...r, fund_id: fundId }));
+        // 通过 _fundIdCodeMap 找到 fund_code
+        const fundCode = window._fundIdCodeMap ? window._fundIdCodeMap[fundId] : null;
+        // 通过缓存找 fund_name
+        const cachedFunds = cacheManager.get(CACHE_KEYS.FUNDS_LIST) || [];
+        const fundInfo = cachedFunds.find(f => String(f.id) === String(fundId));
+        records.forEach(r => allRecords.push({
+            ...r,
+            fund_id: String(fundId),
+            fund_code: r.fund_code || fundCode || '',
+            fund_name: r.fund_name || (fundInfo ? fundInfo.name : ''),
+            amount: r.amount || (r.nav && r.shares ? r.nav * r.shares : 0),
+        }));
     }
+
     if (allRecords.length > 0) {
+        let success = 0;
         for (const r of allRecords) {
             try {
-                await fetch('/api/buy_records', {
+                const resp = await fetch('/api/buy_records', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(r)
                 });
+                if (resp.ok) success++;
             } catch(e) {}
         }
+        console.warn(\`迁移完成：${allRecords.length} 条记录，成功 \${success} 条\`);
+        // 刷新云端缓存
+        fetchAllBuyRecords(true).then(records => {
+            if (records) window._cloudBuyRecords = records;
+        });
     }
-    localStorage.setItem('_buy_records_migrated_v1', '1');
+    localStorage.setItem('_buy_records_migrated_v2', '1');
 }
 
 
@@ -2938,7 +2988,7 @@ function showSettings() {
             <h2 style="color: white; margin: 0; font-size: 14px;">设置</h2>
             <button class="close-btn" style="background-color: #2a2a2a; color: #e0e0e0; border: 1px solid #333; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">关闭</button>
         </div>
-        
+
         <div style="margin-bottom: 16px;">
             <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">显示设置</h3>
             <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
@@ -2974,7 +3024,7 @@ function showSettings() {
                 </div>
             </div>
         </div>
-        
+
         <div style="margin-bottom: 16px;">
             <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">基金管理</h3>
             <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
@@ -2983,14 +3033,14 @@ function showSettings() {
                 </div>
             </div>
         </div>
-        
+
         <div id="admin-section" style="margin-bottom: 16px; display: none;">
             <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">账户管理</h3>
             <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
                 <button id="account-management" style="background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; width: 100%;">管理账户</button>
             </div>
         </div>
-        
+
         <div style="display: flex; justify-content: flex-end; gap: 8px;">
             <button id="clear-cache" style="background-color: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px;">清除缓存</button>
             <button id="save-settings" style="background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px;">保存设置</button>
