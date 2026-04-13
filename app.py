@@ -1120,6 +1120,12 @@ def get_investment_advice():
             return jsonify({'error': '未登录'}), 401
 
         logger.info('获取投资建议')
+
+        # Vercel 无状态：确保内存有数据
+        global funds
+        if not funds:
+            load_funds(session['username'])
+
         market_data = get_market_data()
 
         holdingsAdvice = []
