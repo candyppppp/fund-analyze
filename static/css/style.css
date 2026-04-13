@@ -189,28 +189,49 @@ body {
     gap: 8px;
 }
 
+/* 所有标签统一规格 */
+.fund-type-tag,
+.fund-detail-box {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+
 .fund-type-tag {
     background-color: #007bff;
     color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: bold;
-    border: 1px solid #333;
+    border: 1px solid transparent;
+    gap: 0;
 }
 
 .fund-detail-box {
     background-color: #2a2a2a;
     border: 1px solid #333;
-    padding: 4px 8px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
+    color: #ccc;
     gap: 4px;
 }
 
+/* 暂未买入标签和其他标签等高 */
+.fund-no-holding {
+    background-color: #2a2a2a;
+    border: 1px solid #333 !important;
+    color: #555 !important;
+}
+.fund-no-holding span {
+    color: #555;
+    font-size: 11px;
+    line-height: 18px;
+}
+
 .rsi-emoji {
-    font-size: 12px;
+    font-size: 11px;
 }
 
 .fund-performance {
@@ -409,15 +430,6 @@ body {
 .sort-btn:hover { border-color: #555; color: #bbb; }
 .sort-btn.sort-active { border-color: #4a9eff; color: #4a9eff; background: rgba(74,158,255,.08); }
 
-/* 暂未买入标签 */
-.fund-no-holding {
-    border-color: #444 !important;
-    color: #555 !important;
-}
-.fund-no-holding span {
-    color: #555;
-    font-size: 12px;
-}
 
 /* ── 移动端响应式适配 ─────────────────────────────────── */
 @media (max-width: 600px) {
@@ -452,12 +464,12 @@ body {
         gap: 6px;
     }
 
-    .fund-detail-box {
-        padding: 3px 7px;
+    .fund-detail-box,
+    .fund-type-tag {
+        height: 20px;
+        padding: 0 7px;
         font-size: 11px;
     }
-
-    .fund-type-tag { font-size: 10px; padding: 3px 6px; }
 
     /* 数据列：手机上横向铺满4列 */
     .fund-performance {
