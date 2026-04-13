@@ -27,6 +27,12 @@ let activeTab = 'fund-prediction';
 window.activeTab = activeTab; // 使activeTab在全局范围内可用
 
 document.addEventListener('DOMContentLoaded', function() {
+    // 预热云端买入记录缓存 + 迁移 localStorage 数据
+    fetchAllBuyRecords().then(records => {
+        if (records) window._cloudBuyRecords = records;
+    });
+    migrateBuyRecordsToCloud();
+
     // 检查登录状态
     checkLoginStatus();
 
@@ -578,11 +584,11 @@ function startFundHoldingsUpdateIntervals(funds) {
 
     // 为每个基金设置独立的更新定时器
     funds.forEach((fund, index) => {
-        // 持仓数据按季度公告，5分钟更新一次足够，避免 429
-        const interval = 5 * 60 * 1000;
+        // 持仓股票价格1分钟更新一次
+        const interval = 60 * 1000;
 
-        // 随机延迟0-5分钟，错开各基金请求时间
-        const randomDelay = Math.floor(Math.random() * 5 * 60 * 1000);
+        // 随机延迟0-60秒，错开各基金请求时间
+        const randomDelay = Math.floor(Math.random() * 60 * 1000);
 
         // 先延迟一段时间，然后开始更新
         setTimeout(() => {
@@ -2278,15 +2284,97 @@ function getPreviousTradingDay() {
     return previousDay;
 }
 
+// ── 买入记录（云端 + localStorage 双写，保证兼容性）────────────────────────
+
+// 内存缓存，避免重复请求
+let _buyRecordsCache = null;
+let _buyRecordsCacheTime = 0;
+const _BUY_RECORDS_TTL = 60 * 1000; // 1分钟缓存
+
+async function fetchAllBuyRecords(forceRefresh = false) {
+    const now = Date.now();
+    if (!forceRefresh && _buyRecordsCache && now - _buyRecordsCacheTime < _BUY_RECORDS_TTL) {
+        return _buyRecordsCache;
+    }
+    try {
+        const resp = await fetch('/api/buy_records');
+        if (resp.ok) {
+            const data = await resp.json();
+            _buyRecordsCache = data;
+            _buyRecordsCacheTime = now;
+            return data;
+        }
+    } catch(e) {
+        console.warn('获取云端买入记录失败，降级用 localStorage:', e);
+    }
+    return null;
+}
+
 function getBuyRecords(fundId) {
+    // 同步读 localStorage（兼容旧数据和止盈计算）
     const savedRecords = localStorage.getItem(`fundBuyRecords_${fundId}`);
     return savedRecords ? JSON.parse(savedRecords) : [];
 }
 
-function saveBuyRecord(fundId, record) {
+async function saveBuyRecord(fundId, record) {
+    // 1. 先写 localStorage（保证止盈计算立即可用）
     const records = getBuyRecords(fundId);
     records.push(record);
     localStorage.setItem(`fundBuyRecords_${fundId}`, JSON.stringify(records));
+
+    // 2. 同步写云端
+    try {
+        await fetch('/api/buy_records', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(record)
+        });
+        _buyRecordsCache = null; // 清缓存
+    } catch(e) {
+        console.warn('云端买入记录保存失败，已保存到本地:', e);
+    }
+}
+
+async function deleteBuyRecord(recordId, fundId) {
+    // 1. 先删 localStorage
+    if (fundId) {
+        const records = getBuyRecords(fundId).filter((_, i) => i !== recordId);
+        localStorage.setItem(`fundBuyRecords_${fundId}`, JSON.stringify(records));
+    }
+    // 2. 删云端（recordId 是云端 id）
+    try {
+        await fetch(`/api/buy_records/${recordId}`, { method: 'DELETE' });
+        _buyRecordsCache = null;
+    } catch(e) {
+        console.warn('云端买入记录删除失败:', e);
+    }
+}
+
+// 启动时把 localStorage 数据迁移到云端（只迁移一次）
+async function migrateBuyRecordsToCloud() {
+    const migrated = localStorage.getItem('_buy_records_migrated_v1');
+    if (migrated) return;
+    const allRecords = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !key.startsWith('fundBuyRecords_')) continue;
+        const fundId = key.replace('fundBuyRecords_', '');
+        const records = JSON.parse(localStorage.getItem(key) || '[]');
+        records.forEach(r => allRecords.push({ ...r, fund_id: fundId }));
+    }
+    if (allRecords.length > 0) {
+        for (const r of allRecords) {
+            try {
+                await fetch('/api/buy_records', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(r)
+                });
+            } catch(e) {}
+        }
+        console.log(`迁移 ${allRecords.length} 条买入记录到云端`);
+    }
+    localStorage.setItem('_buy_records_migrated_v1', '1');
 }
 
 

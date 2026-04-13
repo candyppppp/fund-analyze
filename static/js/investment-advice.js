@@ -488,18 +488,26 @@ class InvestmentAdvice {
     }
 
     _getBuyRecordsByCode(fundCode) {
-        // 遍历 localStorage 找匹配基金代码的买入记录
-        // fundBuyRecords_{id} 配合 fundBuySettings_{id}（内含 shares），
-        // 但 id 是数字，不直接存 code，需要遍历所有 key 找到对应记录
-        // 实际：基金列表卡片渲染时 fund.id 已知，这里通过全 key 扫描降级匹配
+        // 优先读云端缓存（fetchAllBuyRecords 已在页面加载时预热）
+        try {
+            if (window._cloudBuyRecords) {
+                return window._cloudBuyRecords.filter(r =>
+                    r.fund_code === fundCode || String(r.fund_id) === String(
+                        window._fundIdCodeMap ? Object.keys(window._fundIdCodeMap).find(
+                            k => window._fundIdCodeMap[k] === fundCode
+                        ) : null
+                    )
+                );
+            }
+        } catch(e) {}
+
+        // 降级：读 localStorage
         try {
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
                 if (!key || !key.startsWith('fundBuyRecords_')) continue;
                 const records = JSON.parse(localStorage.getItem(key) || '[]');
-                // 验证：records 里有 nav 字段，且不为空
                 if (!records || records.length === 0) continue;
-                // 通过 fundId 匹配：从 window 上的 funds 列表找对应 code
                 const fundId = key.replace('fundBuyRecords_', '');
                 if (window._fundIdCodeMap && window._fundIdCodeMap[fundId] === fundCode) {
                     return records;
