@@ -1121,8 +1121,8 @@ def delete_fund(fund_id):
         username = session['username']
         logger.info(f'删除基金: {fund_id}')
 
-        # 直接从 Supabase 删除
-        result = supabase.table('funds').delete().eq('id', fund_id).eq('username', username).execute()
+        # 先从 Supabase 删除，确保持久化
+        supabase.table('funds').delete().eq('id', fund_id).eq('username', username).execute()
 
         # 同步删内存
         global funds
