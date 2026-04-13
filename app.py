@@ -375,189 +375,71 @@ def get_fund_holdings(code):
 
 # 获取股票名称
 def get_stock_name(stock_code):
-    """从多个数据源获取股票名称"""
-    # 不再使用硬编码的股票列表，直接从API获取
-
-    # 数据源1: 东方财富API (优先使用，更稳定)
+    """从东方财富 JSON 接口获取股票名称（对境外服务器友好）"""
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Referer": "https://fund.eastmoney.com/"
-        }
-
-        # 为东方财富API添加市场前缀
-        if stock_code.startswith('6'):
-            full_code = f"sh{stock_code}"
-        elif stock_code.startswith('0') or stock_code.startswith('3'):
-            full_code = f"sz{stock_code}"
-        elif stock_code.startswith('688'):
-            full_code = f"sh{stock_code}"
+        # 判断市场
+        if stock_code.startswith('6') or stock_code.startswith('688'):
+            market = 1  # 沪市
         else:
-            full_code = stock_code
+            market = 0  # 深市
 
-        stock_url = f"https://emweb.securities.eastmoney.com/PC_HSF10/StockStructure/Index?type=web&code={full_code}"
-        response = requests.get(stock_url, headers=headers, timeout=3)
-
-        if response.status_code == 200:
-            stock_data = response.text
-            # 提取股票名称
-            name_match = re.search(r'<title>(.*?)_股本结构', stock_data)
-            if name_match:
-                stock_name = name_match.group(1)
-                if stock_name and stock_name != '' and '股本结构' not in stock_name:
-                    return stock_name
-    except Exception as _e:
-
-        logger.warning(f"caught exception: {_e}")
-
-    # 数据源2: 新浪财经API
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Referer": "https://finance.sina.com.cn/"
-        }
-
-        # 对于沪市股票，需要添加sh前缀；深市股票添加sz前缀
-        if stock_code.startswith('6'):
-            full_code = f"sh{stock_code}"
-        else:
-            full_code = f"sz{stock_code}"
-
-        stock_url = f"http://hq.sinajs.cn/list={full_code}"
-        response = requests.get(stock_url, headers=headers, timeout=3)
-
-        if response.status_code == 200:
-            stock_data = response.text
-            # 解析股票数据
-            name_match = re.search(r'"(.*?),', stock_data)
-            if name_match:
-                stock_name = name_match.group(1)
-                if stock_name and stock_name != '' and stock_name != 'null':
-                    return stock_name
-    except Exception as _e:
-
-        logger.warning(f"caught exception: {_e}")
-
-    # 数据源3: 百度股票API
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
-
-        stock_url = f"https://gupiao.baidu.com/stock/{stock_code}.html"
-        response = requests.get(stock_url, headers=headers, timeout=3)
-
-        if response.status_code == 200:
-            stock_data = response.text
-            # 提取股票名称
-            name_match = re.search(r'<title>(.*?)_股票行情', stock_data)
-            if name_match:
-                stock_name = name_match.group(1)
-                if stock_name and stock_name != '' and '股票行情' not in stock_name:
-                    return stock_name
-    except Exception as _e:
-
-        logger.warning(f"caught exception: {_e}")
-
-    # 数据源4: 同花顺API
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
-
-        stock_url = f"https://basic.10jqka.com.cn/{stock_code}/"
-        response = requests.get(stock_url, headers=headers, timeout=3)
-
-        if response.status_code == 200:
-            stock_data = response.text
-            # 提取股票名称
-            name_match = re.search(r'<title>(.*?)_同花顺', stock_data)
-            if name_match:
-                stock_name = name_match.group(1)
-                if stock_name and stock_name != '' and '同花顺' not in stock_name:
-                    return stock_name
-    except Exception as _e:
-
-        logger.warning(f"caught exception: {_e}")
-
-    # 如果所有数据源都失败，返回默认名称
+        url = (f"https://push2.eastmoney.com/api/qt/stock/get"
+               f"?secid={market}.{stock_code}&fields=f58,f43,f169,f170")
+        headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.eastmoney.com/"}
+        resp = requests.get(url, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json().get('data', {})
+            name = data.get('f58', '')
+            if name and name != '-':
+                return name
+    except Exception as e:
+        logger.warning(f"获取股票名称失败 {stock_code}: {e}")
     return f'股票{stock_code}'
 
 
 # 批量获取股票实时数据
 def get_batch_stock_real_time_data(stock_codes):
-    """批量获取股票的实时数据，减少API调用次数"""
+    """批量获取股票实时数据，使用东方财富 JSON 接口（对境外服务器友好）"""
     results = {}
+    if not stock_codes:
+        return results
 
-    # 批量获取股票数据
-    if stock_codes:
-        # 限制批量请求数量，避免API限制
-        batch_size = 10
-        for i in range(0, len(stock_codes), batch_size):
-            batch_codes = stock_codes[i:i + batch_size]
-            try:
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-                    "Referer": "https://finance.sina.com.cn/"
-                }
+    batch_size = 20
+    headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.eastmoney.com/"}
 
-                # 构建批量API URL
-                full_codes = []
-                for stock_code in batch_codes:
-                    if stock_code.startswith('6'):
-                        full_codes.append(f"sh{stock_code}")
-                    else:
-                        full_codes.append(f"sz{stock_code}")
+    for i in range(0, len(stock_codes), batch_size):
+        batch = stock_codes[i:i + batch_size]
+        try:
+            # 东方财富市场号：沪市=1，深市=0
+            secids = []
+            for code in batch:
+                market = 1 if (code.startswith('6') or code.startswith('688')) else 0
+                secids.append(f"{market}.{code}")
 
-                code_str = ",".join(full_codes)
-                stock_url = f"http://hq.sinajs.cn/list={code_str}"
-                response = requests.get(stock_url, headers=headers, timeout=3)  # 减少超时时间
+            url = ("https://push2.eastmoney.com/api/qt/ulist.np/get"
+                   f"?fltt=2&invt=2&fields=f12,f2,f4,f3"
+                   f"&secids={','.join(secids)}")
+            resp = requests.get(url, headers=headers, timeout=5)
 
-                if response.status_code == 200:
-                    stock_data = response.text
-
-                    # 解析数据
-                    lines = stock_data.strip().split('\n')
-                    for line in lines:
-                        if line:
-                            try:
-                                # 提取股票代码
-                                code_part = line.split('=')[0]
-                                stock_code = code_part.split('_')[-1].replace('sh', '').replace('sz', '')
-                                if stock_code in batch_codes:
-                                    # 解析股票数据
-                                    data_part = line.split('=', 1)[1].strip('"')
-                                    stock_info = data_part.split(',')
-                                    if len(stock_info) > 3:
-                                        # 计算涨跌幅
-                                        current_price = float(stock_info[3])
-                                        previous_close = float(stock_info[2])
-                                        if previous_close > 0:
-                                            change = (current_price - previous_close) / previous_close
-                                            change_amount = current_price - previous_close
-                                            stock_data = {
-                                                'current_price': current_price,
-                                                'change_amount': change_amount,
-                                                'change_ratio': change
-                                            }
-                                            results[stock_code] = stock_data
-                            except Exception as e:
-                                logger.debug(f"解析股票数据失败: {e}")
-                else:
-                    for stock_code in batch_codes:
-                        results[stock_code] = {
-                            'current_price': 0,
-                            'change_amount': 0,
-                            'change_ratio': 0
-                        }
-            except Exception as e:
-                logger.debug(f"获取批量股票数据失败: {e}")
-                for stock_code in batch_codes:
-                    results[stock_code] = {
-                        'current_price': 0,
-                        'change_amount': 0,
-                        'change_ratio': 0
+            if resp.status_code == 200:
+                items = resp.json().get('data', {}).get('diff', [])
+                for item in items:
+                    code = str(item.get('f12', ''))
+                    price = item.get('f2', 0) or 0
+                    change_amount = item.get('f4', 0) or 0
+                    change_ratio = (item.get('f3', 0) or 0) / 100
+                    results[code] = {
+                        'current_price': price,
+                        'change_amount': change_amount,
+                        'change_ratio': change_ratio,
                     }
+        except Exception as e:
+            logger.debug(f"批量获取股票数据失败: {e}")
+
+        # 补全未获取到的
+        for code in batch:
+            if code not in results:
+                results[code] = {'current_price': 0, 'change_amount': 0, 'change_ratio': 0}
 
     return results
 
@@ -574,96 +456,41 @@ def get_stock_real_time_data(stock_code):
     })
 
 
-# 获取市场数据（大盘指数和行业板块）
+# 获取市场数据（大盘指数）
 def get_market_data():
-    """获取市场数据，包括主要大盘指数和行业板块的实时数据"""
+    """获取大盘指数实时数据，使用东方财富 JSON 接口（对境外服务器友好）"""
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Referer": "https://finance.sina.com.cn/"
+        # 东方财富批量行情接口
+        # secids: 1.000001=上证, 0.399001=深证, 0.399006=创业板, 1.000300=沪深300
+        url = ("https://push2.eastmoney.com/api/qt/ulist.np/get"
+               "?fltt=2&invt=2&fields=f12,f14,f3,f4,f2"
+               "&secids=1.000001,0.399001,0.399006,1.000300")
+        headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.eastmoney.com/"}
+        resp = requests.get(url, headers=headers, timeout=5)
+
+        result = {'indices': {}, 'sectors': {}}
+        name_map = {
+            '000001': '上证指数',
+            '399001': '深证成指',
+            '399006': '创业板指',
+            '000300': '沪深300',
         }
 
-        # 主要大盘指数
-        index_codes = {
-            'sh000001': '上证指数',
-            'sz399001': '深证成指',
-            'sz399006': '创业板指',
-            'sh000300': '沪深300'
-        }
-
-        # 主要行业板块
-        sector_codes = {
-            'sh000037': '医药制造',
-            'sh000039': '食品饮料',
-            'sh000043': '信息技术',
-            'sh000063': '电子元件',
-            'sh000048': '银行',
-            'sh000046': '房地产',
-            'sh000042': '电力',
-            'sh000044': '通信设备',
-            'sh000041': '航天航空',
-            'sh000038': '纺织服装',
-            'sh000040': '有色金属',
-            'sh000045': '建筑材料',
-            'sh000047': '交通运输',
-            'sh000049': '煤炭',
-            'sh000050': '石油',
-            'sh000051': '钢铁',
-            'sh000052': '化工',
-            'sh000053': '机械',
-            'sh000054': '汽车'
-        }
-
-        # 构建API URL
-        all_codes = list(index_codes.keys()) + list(sector_codes.keys())
-        code_str = ",".join(all_codes)
-        market_url = f"http://hq.sinajs.cn/list={code_str}"
-        response = requests.get(market_url, headers=headers, timeout=5)
-
-        if response.status_code == 200:
-            market_data = response.text
-
-            # 解析数据
-            lines = market_data.strip().split('\n')
-            result = {
-                'indices': {},
-                'sectors': {}
-            }
-
-            for line in lines:
-                if '=' in line:
-                    try:
-                        code_part, data_part = line.split('=', 1)
-                        code = code_part.split('_')[-1]
-                        data = data_part.strip('"').split(',')
-
-                        if len(data) > 3:
-                            current_price = float(data[3])
-                            previous_close = float(data[2])
-                            if previous_close > 0:
-                                change = (current_price - previous_close) / previous_close
-                                change_amount = current_price - previous_close
-
-                                if code in index_codes:
-                                    result['indices'][index_codes[code]] = {
-                                        'code': code,
-                                        'current_price': current_price,
-                                        'change_amount': change_amount,
-                                        'change_ratio': change
-                                    }
-                                elif code in sector_codes:
-                                    result['sectors'][sector_codes[code]] = {
-                                        'code': code,
-                                        'current_price': current_price,
-                                        'change_amount': change_amount,
-                                        'change_ratio': change
-                                    }
-                    except Exception as e:
-                        logger.debug(f"解析市场数据失败: {e}")
-
-            return result
-        else:
-            return {'indices': {}, 'sectors': {}}
+        if resp.status_code == 200:
+            items = resp.json().get('data', {}).get('diff', [])
+            for item in items:
+                code = str(item.get('f12', ''))
+                name = name_map.get(code, item.get('f14', code))
+                price = item.get('f2', 0) or 0
+                change_ratio = (item.get('f3', 0) or 0) / 100  # 东方财富是百分比×100
+                change_amount = item.get('f4', 0) or 0
+                result['indices'][name] = {
+                    'code': code,
+                    'current_price': price,
+                    'change_amount': change_amount,
+                    'change_ratio': change_ratio,
+                }
+        return result
     except Exception as e:
         logger.debug(f"获取市场数据失败: {e}")
         return {'indices': {}, 'sectors': {}}
