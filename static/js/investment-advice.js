@@ -201,15 +201,6 @@ class InvestmentAdvice {
 </style>
 
 <div class="ia">
-  <!-- 数据更新时间 -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding:8px 12px;background:#0d0d0d;border-radius:8px;border:1px solid #1a1a1a;">
-    <span style="font-size:11px;color:#555;">
-      ${advice._from_cache ? '📦 云端缓存' : '🔄 最新数据'}
-      · 更新于 ${advice._cache_time ? new Date(advice._cache_time).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : now}
-    </span>
-    <button onclick="investmentAdvice._forceRefresh();this.textContent='刷新中...';this.disabled=true;" style="font-size:11px;color:#555;background:transparent;border:1px solid #333;border-radius:4px;padding:2px 8px;cursor:pointer;">手动刷新</button>
-  </div>
-
   <!-- 投资建议 -->
   <div class="ia-sec">
     <div class="ia-sec-hd"><div class="bar" style="background:#007bff;"></div>投资建议</div>
@@ -225,6 +216,14 @@ class InvestmentAdvice {
     ${recommended.length > 0
         ? recommended.map((item, i) => this._recCard(item, i)).join('')
         : '<div class="ia-empty">推荐引擎正在分析市场，请稍后刷新</div>'}
+  </div>
+
+  <div style="display:flex;justify-content:flex-end;padding:4px 0 16px;">
+    <button id="ia-manual-refresh-btn"
+      onclick="window.investmentAdvice._forceRefresh();this.textContent='刷新中...';this.disabled=true;"
+      style="font-size:12px;color:#555;background:transparent;border:1px solid #2a2a2a;border-radius:6px;padding:6px 16px;cursor:pointer;">
+      手动刷新数据
+    </button>
   </div>
 </div>`;
 

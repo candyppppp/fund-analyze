@@ -9,6 +9,7 @@ import updateStrategyManager from './update-strategy.js';
 
 // 创建投资建议实例
 const investmentAdvice = new InvestmentAdvice();
+window.investmentAdvice = investmentAdvice; // 暴露到全局供 onclick 使用
 
 // 缓存键
 const CACHE_KEYS = {
