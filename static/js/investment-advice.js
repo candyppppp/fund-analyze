@@ -398,64 +398,60 @@ class InvestmentAdvice {
                 let score = 0;
                 const signals = [];  // 记录触发的信号，用于分析依据文字
 
-                // 1. 累计收益率：收益越高权重越大，但不是硬阈值
-                //    5%=10分 8%=20分 12%=30分 20%=40分（满分40，最核心维度）
+                // 1. 累计收益率
                 if (gainPct >= 5) {
                     const gainScore = Math.min(40, Math.floor(gainPct / 20 * 40));
                     score += gainScore;
-                    signals.push({ label: '累计收益', desc: `浮盈 +${gainPct.toFixed(2)}%，已形成较好的安全垫`, weight: gainScore });
+                    signals.push({ label: '基金收益', desc: `浮盈 +${gainPct.toFixed(2)}%，已形成较好的安全垫`, weight: gainScore });
                 }
 
-                // 2. 近期趋势反转：近5日净值均值 vs 近10日净值均值
-                //    近期跑输长期均线 → 趋势减弱信号（最高15分）
-                const prices = (item.indicators && item.indicators.nav) ? [] : [];
-                // 从 holdingsAdvice 拿不到价格序列，用 RSI/MACD 代替判断趋势
+                // 2. MACD
                 const macd = d.macd || [0, 0, 0];
                 const macdLine = macd[0], signalLine = macd[1], histogram = macd[2];
                 if (macdLine < signalLine && histogram < 0) {
                     score += 15;
-                    signals.push({ label: 'MACD死叉', desc: `DIF=${macdLine.toFixed(4)} 下穿 DEA=${signalLine.toFixed(4)}，动能转弱`, weight: 15 });
+                    signals.push({ label: 'MACD', desc: `DIF=${macdLine.toFixed(4)} 下穿 DEA=${signalLine.toFixed(4)}，动能转弱`, weight: 15 });
                 } else if (macdLine < signalLine) {
                     score += 8;
-                    signals.push({ label: 'MACD偏空', desc: 'DIF 位于 DEA 下方，上行动能收敛', weight: 8 });
+                    signals.push({ label: 'MACD', desc: `DIF=${macdLine.toFixed(4)} 位于 DEA=${signalLine.toFixed(4)} 下方，上行动能收敛`, weight: 8 });
                 }
 
-                // 3. RSI 超买（最高15分）
+                // 3. RSI
                 const rsi = d.rsi || 50;
                 if (rsi > 75) {
                     score += 15;
-                    signals.push({ label: `RSI超买 ${rsi.toFixed(1)}`, desc: 'RSI 严重超买，回调风险显著', weight: 15 });
+                    signals.push({ label: 'RSI', desc: `RSI ${rsi.toFixed(1)}，严重超买，回调风险显著`, weight: 15 });
                 } else if (rsi > 65) {
                     score += 8;
-                    signals.push({ label: `RSI偏高 ${rsi.toFixed(1)}`, desc: 'RSI 处于偏热区间，注意短线压力', weight: 8 });
+                    signals.push({ label: 'RSI', desc: `RSI ${rsi.toFixed(1)}，处于偏热区间，注意短线压力`, weight: 8 });
                 }
 
-                // 4. 布林带位置（最高15分）
+                // 4. 布林带
                 const bb = d.bollinger_bands || [0, 0, 0];
                 const bbU = bb[0], bbM = bb[1], bbL = bb[2];
                 if (currentNav && bbU && currentNav > bbU) {
                     score += 15;
-                    signals.push({ label: '突破布林上轨', desc: `净值 ${currentNav.toFixed(4)} 超过上轨 ${bbU.toFixed(4)}，短期偏强但易回踩`, weight: 15 });
+                    signals.push({ label: '布林带', desc: `净值 ${currentNav.toFixed(4)} 超过上轨 ${bbU.toFixed(4)}，短期偏强但易回踩`, weight: 15 });
                 } else if (d.bb_pos && d.bb_pos > 80) {
                     score += 8;
-                    signals.push({ label: `布林带位置 ${d.bb_pos.toFixed(0)}%`, desc: '净值运行于布林带上方区域，动能偏强但回调风险上升', weight: 8 });
+                    signals.push({ label: '布林带', desc: `布林带位置 ${d.bb_pos.toFixed(0)}%，净值运行于上方区域，回调风险上升`, weight: 8 });
                 }
 
-                // 5. 波动率骤升（最高10分）—— 大涨往往伴随波动放大，是止盈良机
+                // 5. 波动率
                 const vol = d.volatility || 0;
                 if (vol > 20) {
                     score += 10;
-                    signals.push({ label: `波动率 ${vol.toFixed(1)}%`, desc: '年化波动率偏高，市场不确定性上升，止盈可锁定收益', weight: 10 });
+                    signals.push({ label: '波动率', desc: `年化波动率（${vol.toFixed(1)}%）偏高，市场不确定性上升，止盈可锁定收益`, weight: 10 });
                 } else if (vol > 12) {
                     score += 5;
-                    signals.push({ label: `波动率 ${vol.toFixed(1)}%`, desc: '波动率中等偏高，宜保持警惕', weight: 5 });
+                    signals.push({ label: '波动率', desc: `年化波动率（${vol.toFixed(1)}%）中等偏高，宜保持警惕`, weight: 5 });
                 }
 
-                // 6. KDJ J 值超买（最高5分）
+                // 6. KDJ
                 const kdjJ = d.kdj_j;
                 if (kdjJ !== null && kdjJ !== undefined && kdjJ > 85) {
                     score += 5;
-                    signals.push({ label: `KDJ-J ${kdjJ.toFixed(1)}`, desc: 'J值严重超买，短线回调概率较高', weight: 5 });
+                    signals.push({ label: 'KDJ', desc: `J值（${kdjJ.toFixed(1)}）严重超买，短线回调概率较高`, weight: 5 });
                 }
 
                 // ── 判断是否触发止盈 ─────────────────────────────────────
@@ -484,10 +480,10 @@ class InvestmentAdvice {
 
                 // 各维度信号列表
                 const signalRows = signals.map(s =>
-                    '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1a1a1a;">' +
-                    '<span style="color:#888;">' + s.label + '</span>' +
-                    '<span style="color:#aaa;font-size:11px;">' + s.desc + '</span>' +
-                    '<span style="color:' + badgeColor + ';font-weight:600;min-width:36px;text-align:right;font-size: 11px;">+' + s.weight + '分</span>' +
+                    '<div style="display:grid;grid-template-columns:72px 1fr 44px;align-items:center;padding:6px 0;border-bottom:1px solid #1a1a1a;gap:8px;">' +
+                    '<span style="color:#888;font-size:12px;white-space:nowrap;">' + s.label + '</span>' +
+                    '<span style="color:#aaa;font-size:12px;text-align:left;">' + s.desc + '</span>' +
+                    '<span style="color:' + badgeColor + ';font-weight:600;font-size:12px;text-align:right;">+' + s.weight + '分</span>' +
                     '</div>'
                 ).join('');
 

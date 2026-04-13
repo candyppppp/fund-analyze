@@ -1145,16 +1145,18 @@ function showFundDetails(fund) {
 
     // 弹框HTML
     modalContent.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid #333;">
-            <div style="display: flex; flex-direction: column;">
-                <h2 style="color: white; margin: 0; font-size: 16px;">${fund.name}</h2>
-                <div style="font-size: 12px; color: #aaa; margin-top: 2px;">${fund.code} NAV: ${fund.prices[fund.prices.length - 1]}</div>
-            </div>
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <div style="display: flex; background-color: #1e1e1e; border-radius: 4px; overflow: hidden;">
-                    <button class="tab-btn active" data-tab="details" style="padding: 6px 12px; border: none; background: transparent; color: #007bff; cursor: pointer; font-size: 12px; font-weight: bold;">详情</button>
-                    <button class="tab-btn" data-tab="decision" style="padding: 6px 12px; border: none; background: transparent; color: #e0e0e0; cursor: pointer; font-size: 12px;">决策</button>
-                    <button class="tab-btn" data-tab="holding" style="padding: 6px 12px; border: none; background: transparent; color: #e0e0e0; cursor: pointer; font-size: 12px;">持仓</button>
+        <div style="padding: 12px 16px; border-bottom: 1px solid #333;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                <div style="flex:1; min-width:0;">
+                    <h2 style="color: white; margin: 0; font-size: 15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${fund.name}</h2>
+                    <div style="font-size: 12px; color: #aaa; margin-top: 2px;">${fund.code} NAV: ${fund.prices[fund.prices.length - 1]}</div>
+                </div>
+                <div style="flex-shrink:0;">
+                    <div style="display: flex; background-color: #1e1e1e; border-radius: 4px; overflow: hidden; border:1px solid #333;">
+                        <button class="tab-btn active" data-tab="details" style="padding: 6px 10px; border: none; background: transparent; color: #007bff; cursor: pointer; font-size: 12px; font-weight: bold; white-space:nowrap;">详情</button>
+                        <button class="tab-btn" data-tab="decision" style="padding: 6px 10px; border: none; background: transparent; color: #e0e0e0; cursor: pointer; font-size: 12px; white-space:nowrap;">决策</button>
+                        <button class="tab-btn" data-tab="holding" style="padding: 6px 10px; border: none; background: transparent; color: #e0e0e0; cursor: pointer; font-size: 12px; white-space:nowrap;">持仓</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1196,19 +1198,19 @@ function showFundDetails(fund) {
             <div id="decision-tab" class="tab-content" style="display: none;">
                 <!-- 基金风险评估 -->
                 <div style="padding: 10px 20px;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; white-space: nowrap;">基金风险评估</h3>
+                    <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; ">基金风险评估</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 18px; border: 1px solid #333;">
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
-                            <div style="font-size: 12px; white-space: nowrap;"><strong>当前净值:</strong> <span style="color: #e0e0e0;">${fund.prices && fund.prices.length > 0 ? fund.prices[fund.prices.length - 1] : '数据不足'}</span></div>
-                            <div style="font-size: 12px; white-space: nowrap;"><strong>RSI指标:</strong> <span style="color: #e0e0e0;">${fund.rsi ? fund.rsi.toFixed(2) + ' ' + getRSIMessage(fund.rsi) : '数据不足'}</span></div>
-                            <div style="font-size: 12px; white-space: nowrap;"><strong>波动率:</strong> <span style="color: #e0e0e0;">${fund.volatility ? (fund.volatility * 100).toFixed(2) + '%' : '数据不足'}</span></div>
-                            <div style="font-size: 12px; white-space: nowrap;"><strong>预测当日收益率:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return ? (fund.predicted_return >= 0 ? '+' : '') + (fund.predicted_return * 100).toFixed(2) + '%' : '数据不足'}</span></div>
-                            <div style="font-size: 12px; white-space: nowrap;"><strong>预测置信度:</strong> <span style="color: #e0e0e0;">${fund.prediction_confidence ? (fund.prediction_confidence * 100).toFixed(0) + '%' : '数据不足'}</span></div>
-                            <div style="font-size: 12px; white-space: nowrap;"><strong>ATR指标:</strong> <span style="color: #e0e0e0;">${fund.atr ? fund.atr.toFixed(4) : '数据不足'}</span></div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 15px;">
+                            <div style="font-size: 12px; "><strong>当前净值:</strong> <span style="color: #e0e0e0;">${fund.prices && fund.prices.length > 0 ? fund.prices[fund.prices.length - 1] : '数据不足'}</span></div>
+                            <div style="font-size: 12px; "><strong>RSI指标:</strong> <span style="color: #e0e0e0;">${fund.rsi ? fund.rsi.toFixed(2) + ' ' + getRSIMessage(fund.rsi) : '数据不足'}</span></div>
+                            <div style="font-size: 12px; "><strong>波动率:</strong> <span style="color: #e0e0e0;">${fund.volatility ? (fund.volatility * 100).toFixed(2) + '%' : '数据不足'}</span></div>
+                            <div style="font-size: 12px; "><strong>预测当日收益率:</strong> <span class="return-value ${fund.predicted_return >= 0 ? 'positive' : 'negative'}">${fund.predicted_return ? (fund.predicted_return >= 0 ? '+' : '') + (fund.predicted_return * 100).toFixed(2) + '%' : '数据不足'}</span></div>
+                            <div style="font-size: 12px; "><strong>预测置信度:</strong> <span style="color: #e0e0e0;">${fund.prediction_confidence ? (fund.prediction_confidence * 100).toFixed(0) + '%' : '数据不足'}</span></div>
+                            <div style="font-size: 12px; "><strong>ATR指标:</strong> <span style="color: #e0e0e0;">${fund.atr ? fund.atr.toFixed(4) : '数据不足'}</span></div>
                         </div>
                         <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333;">
-                            <h4 style="color: #e0e0e0; margin: 0 0 12px 0; font-size: 13px; white-space: nowrap;">技术指标分析</h4>
-                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 12px;">
+                            <h4 style="color: #e0e0e0; margin: 0 0 12px 0; font-size: 13px; ">技术指标分析</h4>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; font-size: 12px;">
                                 ${(() => {
                                     // 计算MACD信号
                                     let macdSignal = '数据不足';
@@ -1235,7 +1237,7 @@ function showFundDetails(fund) {
                                         }
                                     }
                                     
-                                    return `<div style="white-space: nowrap;"><strong>MACD信号:</strong> <span style="color: ${macdSignalColor};">${macdSignal}</span></div>`;
+                                    return `<div style=""><strong>MACD信号:</strong> <span style="color: ${macdSignalColor};">${macdSignal}</span></div>`;
                                 })()}
                                 ${(() => {
                                     // 计算KDJ信号
@@ -1259,7 +1261,7 @@ function showFundDetails(fund) {
                                         }
                                     }
                                     
-                                    return `<div style="white-space: nowrap;"><strong>KDJ信号:</strong> <span style="color: ${kdjSignalColor};">${kdjSignal}</span></div>`;
+                                    return `<div style=""><strong>KDJ信号:</strong> <span style="color: ${kdjSignalColor};">${kdjSignal}</span></div>`;
                                 })()}
                                 ${(() => {
                                     // 计算布林带信号
@@ -1284,15 +1286,15 @@ function showFundDetails(fund) {
                                         }
                                     }
                                     
-                                    return `<div style="white-space: nowrap;"><strong>布林带位置:</strong> <span style="color: ${bollingerSignalColor};">${bollingerSignal}</span></div>`;
+                                    return `<div style=""><strong>布林带位置:</strong> <span style="color: ${bollingerSignalColor};">${bollingerSignal}</span></div>`;
                                 })()}
                             </div>
                         </div>
                         <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333;">
-                            <h4 style="color: #e0e0e0; margin: 0 0 12px 0; font-size: 13px; white-space: nowrap;">风险评估</h4>
-                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 12px;">
-                                <div style="white-space: nowrap;"><strong>RSI风险:</strong> <span style="color: ${fund.rsi ? (fund.rsi > 70 ? '#ff4444' : fund.rsi < 30 ? '#4caf50' : '#ff9800') : '#aaa'}">${fund.rsi ? (fund.rsi > 70 ? '高' : fund.rsi < 30 ? '低' : '中') : '数据不足'}</span></div>
-                                <div style="white-space: nowrap;"><strong>波动率风险:</strong> <span style="color: ${fund.volatility ? (fund.volatility > 0.2 ? '#ff4444' : fund.volatility > 0.1 ? '#ff9800' : '#4caf50') : '#aaa'}">${fund.volatility ? (fund.volatility > 0.2 ? '高' : fund.volatility > 0.1 ? '中' : '低') : '数据不足'}</span></div>
+                            <h4 style="color: #e0e0e0; margin: 0 0 12px 0; font-size: 13px; ">风险评估</h4>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; font-size: 12px;">
+                                <div style=""><strong>RSI风险:</strong> <span style="color: ${fund.rsi ? (fund.rsi > 70 ? '#ff4444' : fund.rsi < 30 ? '#4caf50' : '#ff9800') : '#aaa'}">${fund.rsi ? (fund.rsi > 70 ? '高' : fund.rsi < 30 ? '低' : '中') : '数据不足'}</span></div>
+                                <div style=""><strong>波动率风险:</strong> <span style="color: ${fund.volatility ? (fund.volatility > 0.2 ? '#ff4444' : fund.volatility > 0.1 ? '#ff9800' : '#4caf50') : '#aaa'}">${fund.volatility ? (fund.volatility > 0.2 ? '高' : fund.volatility > 0.1 ? '中' : '低') : '数据不足'}</span></div>
                                 ${(() => {
                                     // 计算趋势风险
                                     let trendRisk = '数据不足';
@@ -1315,10 +1317,10 @@ function showFundDetails(fund) {
                                         }
                                     }
                                     
-                                    return `<div style="white-space: nowrap;"><strong>趋势风险:</strong> <span style="color: ${trendRiskColor};">${trendRisk}</span></div>`;
+                                    return `<div style=""><strong>趋势风险:</strong> <span style="color: ${trendRiskColor};">${trendRisk}</span></div>`;
                                 })()}
-                                <div style="white-space: nowrap;"><strong>流动性风险:</strong> <span style="color: #ff9800;">中</span></div>
-                                <div style="white-space: nowrap;"><strong>市场风险:</strong> <span style="color: ${fund.volatility && fund.volatility > 0.15 ? '#ff9800' : '#4caf50'}">${fund.volatility && fund.volatility > 0.15 ? '中' : '低'}</span></div>
+                                <div style=""><strong>流动性风险:</strong> <span style="color: #ff9800;">中</span></div>
+                                <div style=""><strong>市场风险:</strong> <span style="color: ${fund.volatility && fund.volatility > 0.15 ? '#ff9800' : '#4caf50'}">${fund.volatility && fund.volatility > 0.15 ? '中' : '低'}</span></div>
                                 ${(() => {
                                     // 计算整体风险
                                     let overallRisk = '数据不足';
@@ -1363,7 +1365,7 @@ function showFundDetails(fund) {
                                         }
                                     }
                                     
-                                    return `<div style="white-space: nowrap;"><strong>整体风险:</strong> <span style="color: ${overallRiskColor};">${overallRisk}</span></div>`;
+                                    return `<div style=""><strong>整体风险:</strong> <span style="color: ${overallRiskColor};">${overallRisk}</span></div>`;
                                 })()}
                             </div>
                         </div>
@@ -1372,7 +1374,7 @@ function showFundDetails(fund) {
                 
                 <!-- 智能决策 -->
                 <div style="padding: 10px 20px;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; white-space: nowrap;">智能决策</h3>
+                    <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; ">智能决策</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 18px; border: 1px solid #333;">
                         <div style="font-size: 12px; line-height: 1.8; color: #e0e0e0;">
                             ${(() => {
@@ -1438,7 +1440,7 @@ function showFundDetails(fund) {
                 
                 <!-- 势头信号和智能操作建议 -->
                 <div style="padding: 10px 20px;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; white-space: nowrap;">势头信号</h3>
+                    <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; ">势头信号</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 18px; border: 1px solid #333;">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;">
                             <div style="flex: 1;">
@@ -1480,10 +1482,10 @@ function showFundDetails(fund) {
                                     }
                                     
                                     return `
-                                        <div style="font-size: 12px; color: ${trendColor}; display: flex; align-items: center; margin-bottom: 8px; white-space: nowrap;">
+                                        <div style="font-size: 12px; color: ${trendColor}; display: flex; align-items: center; margin-bottom: 8px; ">
                                             <span style="margin-right: 8px;">${trendIcon}</span> ${trendSignal}
                                         </div>
-                                        <div style="font-size: 11px; color: #aaa; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        <div style="font-size: 11px; color: #aaa; line-height: 1.4;  overflow: hidden; text-overflow: ellipsis;">
                                             ${trendDesc}
                                         </div>
                                     `;
@@ -1502,16 +1504,16 @@ function showFundDetails(fund) {
                                         const resistanceColor = resistanceRate >= 0 ? '#4caf50' : '#ff4444';
                                         
                                         return `
-                                            <div style="font-size: 11px; color: #e0e0e0; margin-bottom: 8px; white-space: nowrap;">
+                                            <div style="font-size: 11px; color: #e0e0e0; margin-bottom: 8px; ">
                                                 支撑位: ${minPrice.toFixed(4)} <span style="color: ${supportColor};">(${supportRate >= 0 ? '+' : ''}${supportRate}%)</span>
                                             </div>
-                                            <div style="font-size: 11px; color: #e0e0e0; white-space: nowrap;">
+                                            <div style="font-size: 11px; color: #e0e0e0; ">
                                                 阻力位: ${maxPrice.toFixed(4)} <span style="color: ${resistanceColor};">(-${resistanceRate}%)</span>
                                             </div>
                                         `;
                                     } else {
                                         return `
-                                            <div style="font-size: 11px; color: #e0e0e0; margin-bottom: 8px; white-space: nowrap;">
+                                            <div style="font-size: 11px; color: #e0e0e0; margin-bottom: 8px; ">
                                                 数据不足
                                             </div>
                                         `;
@@ -1580,10 +1582,10 @@ function showFundDetails(fund) {
                                     }
                                     
                                     return `
-                                        <div style="font-size: 12px; color: ${adviceColor}; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 8px; white-space: nowrap;">
+                                        <div style="font-size: 12px; color: ${adviceColor}; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 8px; ">
                                             <span style="margin-right: 8px;">●</span> ${advice}
                                         </div>
-                                        <div style="font-size: 11px; color: #aaa; line-height: 1.3; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        <div style="font-size: 11px; color: #aaa; line-height: 1.3; text-align: right;  overflow: hidden; text-overflow: ellipsis;">
                                             ${marketDesc ? marketDesc : adviceDesc}
                                         </div>
                                     `;
@@ -1595,7 +1597,7 @@ function showFundDetails(fund) {
                 
                 <!-- 市场环境分析 -->
                 <div style="padding: 10px 20px; margin-top: 10px;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; white-space: nowrap;">市场环境分析</h3>
+                    <h3 style="color: #e0e0e0; margin-bottom: 15px; font-size: 14px; ">市场环境分析</h3>
                     ${(() => {
                         if (fund.market_data) {
                             const indices = fund.market_data.indices || {};
@@ -1612,7 +1614,7 @@ function showFundDetails(fund) {
                                                         const changePercent = (data.change_ratio * 100).toFixed(2);
                                                         const changeColor = data.change_ratio >= 0 ? '#ff4444' : '#4caf50';
                                                         return `
-                                                            <div style="white-space: nowrap;">
+                                                            <div style="">
                                                                 <strong>${name}:</strong> ${data.current_price ? data.current_price.toFixed(2) : '0.00'} 
                                                                 <span style="color: ${changeColor};">
                                                                     (${data.change_ratio >= 0 ? '+' : ''}${changePercent}%)
@@ -1631,7 +1633,7 @@ function showFundDetails(fund) {
                                                         const changePercent = (data.change_ratio * 100).toFixed(2);
                                                         const changeColor = data.change_ratio >= 0 ? '#ff4444' : '#4caf50';
                                                         return `
-                                                            <div style="white-space: nowrap;">
+                                                            <div style="">
                                                                 <strong>${name}:</strong> ${data.current_price ? data.current_price.toFixed(2) : '0.00'} 
                                                                 <span style="color: ${changeColor};">
                                                                     (${data.change_ratio >= 0 ? '+' : ''}${changePercent}%)
