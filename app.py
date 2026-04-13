@@ -91,11 +91,6 @@ funds = []
 last_save_time = 0
 
 
-def get_user_data_file(username):
-    """获取用户数据文件路径"""
-    return os.path.join(USER_DATA_DIR, f"{username}_funds.json")
-
-
 def load_funds(username=None):
     """从 Supabase 或本地文件加载基金数据"""
     global funds
@@ -572,27 +567,6 @@ def login():
 
 
 # 移除注册路由，因为不需要用户自行注册
-# @app.route('/register', methods=['GET', 'POST'])
-# def register():
-#     if request.method == 'POST':
-#         username = request.form.get('username')
-#         password = request.form.get('password')
-#
-#         # 创建新用户
-#         user = user_manager.create_user(username, password)
-#         if user:
-#             # 自动登录
-#             session['username'] = user.username
-#             session.permanent = True
-#
-#             # 初始化用户的基金数据
-#             load_funds(user.username)
-#
-#             return redirect(url_for('index'))
-#         else:
-#             return render_template('register.html', error='用户名已存在')
-#
-#     return render_template('register.html')
 
 @app.route('/logout')
 def logout():
@@ -737,86 +711,70 @@ def get_funds():
         updated_funds = []
 
         try:
+            from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
+
             market_data = get_market_data()
 
-            for fund in funds:
+            def _update_one(fund):
+                """单只基金并发更新"""
                 try:
-                    # ── 判断是否需要更新历史净值 ──────────────────────────────
-                    # nav_updated_at 记录上次拉取历史数据的日期
-                    # 如果今天已经更新过，直接用缓存；否则做增量更新
                     already_updated_today = (
                             fund.nav_updated_at is not None and
                             str(fund.nav_updated_at)[:10] == today
                     )
-
                     if already_updated_today:
-                        # ── 缓存命中：只拉实时预估收益率，不重新拉历史 ──────
-                        logger.info(f'基金 {fund.code} 今日已更新历史净值，跳过重拉')
-                        real_time_estimated_return = data_source_manager.get_fund_estimated_return(fund.code)
+                        rt = data_source_manager.get_fund_estimated_return(fund.code)
                     else:
-                        # ── 缓存未命中：增量拉取今日新净值，追加到历史数据 ──
-                        logger.info(f'基金 {fund.code} 开始增量更新净值')
                         name, new_prices, new_dates, new_returns = get_fund_data(fund.code)
-                        real_time_estimated_return = data_source_manager.get_fund_estimated_return(fund.code)
-
+                        rt = data_source_manager.get_fund_estimated_return(fund.code)
                         if new_prices and new_dates:
-                            # 只追加缓存中没有的新日期，不替换历史数据
-                            existing_dates = set(fund.dates)
-                            appended = 0
+                            existing = set(fund.dates)
+                            added = 0
                             for d, p, r in zip(new_dates, new_prices, new_returns):
-                                if d not in existing_dates:
+                                if d not in existing:
                                     fund.dates.append(d)
                                     fund.prices.append(p)
                                     fund.returns.append(r)
-                                    existing_dates.add(d)
-                                    appended += 1
-
-                            # 重新按日期排序（保证顺序正确）
-                            if appended > 0:
+                                    existing.add(d)
+                                    added += 1
+                            if added > 0:
                                 combined = sorted(zip(fund.dates, fund.prices, fund.returns))
                                 fund.dates = [x[0] for x in combined]
                                 fund.prices = [x[1] for x in combined]
                                 fund.returns = [x[2] for x in combined]
-                                logger.info(f'基金 {fund.code}: 追加 {appended} 条新净值，'
-                                            f'共 {len(fund.prices)} 条')
-                            else:
-                                logger.info(f'基金 {fund.code}: 无新净值（已是最新）')
-
-                        # 更新技术指标
                         fund.update_prices(fund.prices, fund.dates, fund.returns,
                                            market_data=market_data)
-                        # 标记今日已更新
                         fund.nav_updated_at = today
 
-                    # ── 实时预估收益率 + 预测（每次都更新，不缓存） ──────────
-                    holdings = get_fund_holdings(fund.code)
-                    if real_time_estimated_return:
+                    holdings = _holdings_cache.get(fund.code, (0, {}))[1] if fund.code in _holdings_cache else {}
+                    if rt:
                         fund.predicted_return = fund.calculate_predicted_return(
-                            stock_holdings=holdings,
-                            market_data=market_data,
-                            real_time_estimated_return=real_time_estimated_return,
-                        )
-                        # 缓存原始估值字段，投资建议接口直接读，避免重复请求
-                        fund.gszzl = real_time_estimated_return.get('gszzl')
-                        fund.gsz = real_time_estimated_return.get('gsz')
-                        fund.gztime = real_time_estimated_return.get('gztime')
-                        fund.est_source = real_time_estimated_return.get('source', '')
+                            stock_holdings=holdings, market_data=market_data,
+                            real_time_estimated_return=rt)
+                        fund.gszzl = rt.get('gszzl')
+                        fund.gsz = rt.get('gsz')
+                        fund.gztime = rt.get('gztime')
+                        fund.est_source = rt.get('source', '')
                         fund.has_realtime = True
                     else:
                         fund.predicted_return = fund.calculate_predicted_return(
-                            stock_holdings=holdings, market_data=market_data,
-                        )
-                        fund.gszzl = None
-                        fund.gsz = None
-                        fund.gztime = None
+                            stock_holdings=holdings, market_data=market_data)
+                        fund.gszzl = fund.gsz = fund.gztime = None
                         fund.est_source = ''
                         fund.has_realtime = False
                     fund.prediction_confidence = fund.calculate_prediction_confidence()
-                    updated_funds.append(fund.to_dict())
-
+                    return fund.to_dict()
                 except Exception as e:
                     logger.error(f'更新基金 {fund.code} 失败: {e}')
-                    updated_funds.append(fund.to_dict())
+                    return fund.to_dict()
+
+            # 并发更新所有基金（最多6个线程）
+            with ThreadPoolExecutor(max_workers=6) as executor:
+                futures = {executor.submit(_update_one, fund): fund for fund in funds}
+                for future in _as_completed(futures):
+                    result = future.result()
+                    if result:
+                        updated_funds.append(result)
 
             save_funds(session['username'])
             logger.info('基金数据更新完成')
@@ -1131,52 +1089,6 @@ def get_fund_details(code):
     })
 
 
-@app.route('/api/news', methods=['GET'])
-@performance_monitor
-@rate_limit
-def get_news():
-    try:
-        logger.info('获取实时快讯')
-        # 返回空数组，因为外部API调用可能被阻止
-        # 在实际生产环境中，可以使用更稳定的新闻数据源
-        return jsonify([])
-    except Exception as e:
-        logger.error(f'获取实时快讯失败: {e}')
-        # 如果API调用失败，返回空数组
-        return jsonify([])
-
-
-@app.route('/api/prediction', methods=['GET'])
-@performance_monitor
-@rate_limit
-def get_prediction():
-    try:
-        # 检查用户是否已登录
-        if 'username' not in session:
-            return jsonify({'error': '未登录'}), 401
-
-        logger.info('获取基金预测数据')
-
-        # 基于当前基金数据生成预测
-        predictions = []
-        for fund in funds:
-            prediction = {
-                'name': fund.name,
-                'code': fund.code,
-                'predicted_return': fund.predicted_return,
-                'prediction_confidence': fund.prediction_confidence,
-                'prediction_time': datetime.now().isoformat(),
-                'prediction_reason': '基于历史数据和技术指标分析'
-            }
-            predictions.append(prediction)
-
-        return jsonify(predictions)
-    except Exception as e:
-        logger.error(f'获取基金预测数据失败: {e}')
-        # 如果API调用失败，返回空数组
-        return jsonify([])
-
-
 @app.route('/api/investment-advice', methods=['GET'])
 @performance_monitor
 @rate_limit
@@ -1457,38 +1369,6 @@ def generate_holding_reason(fund, action: str, market_data: dict) -> str:
     )
 
     return '；'.join(parts) + '。'
-
-
-def get_detailed_analysis(fund):
-    """尝试调用本地ollama获取详细的基金分析"""
-    try:
-        import requests
-        import json
-
-        # 构建请求数据
-        prompt = f"请对基金 {fund.name} ({fund.code}) 进行详细分析，包括：1. 基金表现分析 2. 风险评估 3. 投资建议 4. 未来展望。基于以下数据：预测收益率 {fund.predicted_return:.4f}，预测置信度 {fund.prediction_confidence:.2f}，RSI {fund.rsi:.2f}，波动率 {fund.volatility:.4f}。请提供专业、科学、准确的分析，不要使用任何引导性短语，直接给出分析内容。"
-
-        # 调用本地ollama API
-        response = requests.post(
-            'http://localhost:11434/api/generate',
-            json={
-                'model': 'llama3',
-                'prompt': prompt,
-                'max_tokens': 500,
-                'temperature': 0.7
-            },
-            timeout=5
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            return data.get('response', '').strip()
-        else:
-            logger.warning('调用ollama API失败，使用默认分析')
-            return None
-    except Exception as e:
-        logger.warning(f'调用ollama失败: {e}，使用默认分析')
-        return None
 
 
 @app.route('/api/market-data', methods=['GET'])
