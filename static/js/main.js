@@ -578,11 +578,11 @@ function startFundHoldingsUpdateIntervals(funds) {
 
     // 为每个基金设置独立的更新定时器
     funds.forEach((fund, index) => {
-        // 生成25秒的固定间隔
-        const interval = 25000;
+        // 持仓数据按季度公告，5分钟更新一次足够，避免 429
+        const interval = 5 * 60 * 1000;
 
-        // 生成0-25秒的随机延迟，实现不同基金在不同时间更新
-        const randomDelay = Math.floor(Math.random() * 25000);
+        // 随机延迟0-5分钟，错开各基金请求时间
+        const randomDelay = Math.floor(Math.random() * 5 * 60 * 1000);
 
         // 先延迟一段时间，然后开始更新
         setTimeout(() => {
