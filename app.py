@@ -228,7 +228,7 @@ def save_funds(username=None):
                 'gztime': getattr(fund, 'gztime', None),
                 'est_source': getattr(fund, 'est_source', ''),
             }
-            supabase.table('funds').update(update_data).eq('id', fund.id).execute()
+            supabase_admin.table('funds').update(update_data).eq('id', fund.id).execute()
         logger.info(f'成功更新 {len(funds)} 只基金技术指标')
     except Exception as e:
         logger.error(f"更新基金数据失败: {e}")
@@ -915,7 +915,7 @@ def add_fund():
         fund_data = fund.to_dict()
         fund_data['username'] = session['username']
         fund_data.pop('id', None)  # 去掉 id，让 Supabase 自动生成
-        resp = supabase.table('funds').insert(fund_data).execute()
+        resp = supabase_admin.table('funds').insert(fund_data).execute()
         # 用数据库生成的 id 更新内存对象
         if resp.data:
             fund.id = resp.data[0]['id']
@@ -968,7 +968,7 @@ def add_buy_record():
             'date': data.get('date'),
             'note': data.get('note', ''),
         }
-        resp = supabase.table('buy_records').insert(record).execute()
+        resp = supabase_admin.table('buy_records').insert(record).execute()
         return jsonify(resp.data[0] if resp.data else record), 201
     except Exception as e:
         logger.error(f'添加买入记录失败: {e}')
@@ -984,7 +984,7 @@ def delete_buy_record(record_id):
         if 'username' not in session:
             return jsonify({'error': '未登录'}), 401
         username = session['username']
-        supabase.table('buy_records').delete().eq('id', record_id).eq('username', username).execute()
+        supabase_admin.table('buy_records').delete().eq('id', record_id).eq('username', username).execute()
         return jsonify({'message': 'deleted'})
     except Exception as e:
         logger.error(f'删除买入记录失败: {e}')
@@ -1003,7 +1003,7 @@ def delete_fund(fund_id):
         logger.info(f'删除基金: {fund_id}')
 
         # 先从 Supabase 删除，确保持久化
-        supabase.table('funds').delete().eq('id', fund_id).eq('username', username).execute()
+        supabase_admin.table('funds').delete().eq('id', fund_id).eq('username', username).execute()
 
         # 同步删内存
         global funds
