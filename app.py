@@ -1126,16 +1126,31 @@ def get_investment_advice():
         if not funds:
             load_funds(session['username'])
 
-        # 无论是否有缓存，都要拉实时估值更新 predicted_return
+        # 并行拉所有基金实时估值，更新 predicted_return
         # 否则从 Supabase 加载的历史值可能全是0，导致全部判断为"持有"
         market_data = get_market_data()
-        for fund in funds:
+
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def fetch_rt(fund):
             try:
                 rt = data_source_manager.get_fund_estimated_return(fund.code)
+                return fund, rt
+            except Exception as e:
+                logger.warning(f"获取 {fund.code} 实时估值失败: {e}")
+                return fund, None
+
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            futures = {executor.submit(fetch_rt, fund): fund for fund in funds}
+            for future in as_completed(futures):
+                fund, rt = future.result()
                 if rt and rt.get('gszzl') is not None:
-                    fund.predicted_return = fund.calculate_predicted_return(
-                        real_time_estimated_return=rt
-                    )
+                    try:
+                        fund.predicted_return = fund.calculate_predicted_return(
+                            real_time_estimated_return=rt
+                        )
+                    except Exception:
+                        pass
                     fund.gszzl = rt.get('gszzl')
                     fund.gsz = rt.get('gsz')
                     fund.gztime = rt.get('gztime')
@@ -1144,8 +1159,6 @@ def get_investment_advice():
                 else:
                     fund.has_realtime = False
                     fund.gszzl = None
-            except Exception as e:
-                logger.warning(f"投资建议接口更新 {fund.code} 实时估值失败: {e}")
 
         holdingsAdvice = []
         for fund in funds:
