@@ -2423,7 +2423,7 @@ async function migrateBuyRecordsToCloud(force = false) {
                 if (resp.ok) success++;
             } catch(e) {}
         }
-        console.warn(\`迁移完成：${allRecords.length} 条记录，成功 \${success} 条\`);
+        console.warn('迁移完成：' + allRecords.length + ' 条记录，成功 ' + success + ' 条');
         // 刷新云端缓存
         fetchAllBuyRecords(true).then(records => {
             if (records) window._cloudBuyRecords = records;
@@ -2988,7 +2988,7 @@ function showSettings() {
             <h2 style="color: white; margin: 0; font-size: 14px;">设置</h2>
             <button class="close-btn" style="background-color: #2a2a2a; color: #e0e0e0; border: 1px solid #333; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">关闭</button>
         </div>
-
+        
         <div style="margin-bottom: 16px;">
             <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">显示设置</h3>
             <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
@@ -3024,7 +3024,7 @@ function showSettings() {
                 </div>
             </div>
         </div>
-
+        
         <div style="margin-bottom: 16px;">
             <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">基金管理</h3>
             <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
@@ -3033,14 +3033,14 @@ function showSettings() {
                 </div>
             </div>
         </div>
-
+        
         <div id="admin-section" style="margin-bottom: 16px; display: none;">
             <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">账户管理</h3>
             <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
                 <button id="account-management" style="background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; width: 100%;">管理账户</button>
             </div>
         </div>
-
+        
         <div style="display: flex; justify-content: flex-end; gap: 8px;">
             <button id="clear-cache" style="background-color: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px;">清除缓存</button>
             <button id="save-settings" style="background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px;">保存设置</button>
