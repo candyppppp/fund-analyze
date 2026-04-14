@@ -412,7 +412,7 @@ class InvestmentAdvice {
 
                 const gainPct    = (currentNav - avgCost) / avgCost * 100;
                 const totalValue  = totalShares * currentNav;
-                const totalProfit = totalValue - totalCost;
+                const totalProfit = totalValue - buyCost;
 
                 // ── 综合止盈打分 ─────────────────────────────────────────
                 // 每项最高贡献若干分，总分 >= 40 提示，>= 70 强烈提示
