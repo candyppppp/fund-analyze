@@ -78,7 +78,7 @@ class UpdateStrategyManager {
             case 'holdings':
                 // 股票持仓更新频率
                 if (isTrading) {
-                    return 15 * 1000; // 交易时间: 15秒
+                    return 3 * 60 * 1000; // ✅ 交易时间3分钟
                 } else if (isPreMarket || isAfterMarket) {
                     return 60 * 1000; // 盘前盘后: 1分钟
                 } else {

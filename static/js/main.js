@@ -588,11 +588,11 @@ function startFundHoldingsUpdateIntervals(funds) {
 
     // 为每个基金设置独立的更新定时器
     funds.forEach((fund, index) => {
-        // 持仓股票价格1分钟更新一次
-        const interval = 60 * 1000;
+        // 持仓股票价格5分钟更新一次（降低请求频率，避免429）
+        const interval = 5 * 60 * 1000;
 
-        // 随机延迟0-60秒，错开各基金请求时间
-        const randomDelay = Math.floor(Math.random() * 60 * 1000);
+        // 随机延迟0-5分钟，错开各基金请求时间
+        const randomDelay = Math.floor(Math.random() * 5 * 60 * 1000);
 
         // 先延迟一段时间，然后开始更新
         setTimeout(() => {
@@ -1741,6 +1741,7 @@ function showFundDetails(fund) {
             let recordsHTML = '';
             let totalShares = 0;
             let totalAmount = 0;
+            let buyOnlyShares = 0; // 仅累计买入份数，用于计算平均成本
             buyRecords.forEach((record, index) => {
                 const isSell = record.shares < 0;
                 const action = isSell ? '卖出' : '买入';
@@ -1754,11 +1755,15 @@ function showFundDetails(fund) {
                     <span class="delete-record" data-index="${index}" style="cursor:pointer;color:#ff4444;margin-left:auto;opacity:0;transition:opacity 0.2s;font-size:11px;">✕</span>
                 </p>`;
                 totalShares += record.shares;
-                if (!isSell) totalAmount += record.shares * record.nav; // 卖出不计入成本
+                if (!isSell) {
+                    totalAmount += record.shares * record.nav; // 卖出不计入成本
+                    buyOnlyShares += record.shares; // 仅买入份数累计
+                }
             });
             buyRecordsContent.innerHTML = recordsHTML;
             totalSharesElement.textContent = totalShares;
-            const avgNav = totalAmount / totalShares;
+            // 平均持仓成本 = 买入总金额 ÷ 买入总份数（不含卖出）
+            const avgNav = buyOnlyShares > 0 ? totalAmount / buyOnlyShares : 0;
             avgNavElement.textContent = avgNav.toFixed(4);
 
             // 添加hover效果
