@@ -1655,27 +1655,27 @@ function showFundDetails(fund) {
                 <div style="padding: 10px 20px; border-bottom: 1px solid #333;">
                     <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px; white-space: nowrap;">我的持仓 (持仓: <span id="total-shares">${buySettings.shares}</span>份，平均净值: <span id="avg-nav">0.0000</span>元)</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
-                        <div id="buy-records-content" style="font-size: 12px; white-space: nowrap;">
+                        <div id="buy-records-content" style="font-size: 12px;">
                             加载中...
                         </div>
                     </div>
                 </div>
                 
-                <!-- 买入设置 -->
+                <!-- 买卖操作 -->
                 <div style="padding: 10px 20px;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px; white-space: nowrap;">买入设置</h3>
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">买卖操作</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
                             <div>
-                                <label style="display: block; margin-bottom: 5px; white-space: nowrap;">买入日期:</label>
-                                <input type="date" id="buy-date" value="${new Date().toISOString().split('T')[0]}" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 5px; border-radius: 4px; font-size: 12px;">
+                                <label style="display: block; margin-bottom: 5px; color: #888;">操作日期</label>
+                                <input type="date" id="buy-date" value="${new Date().toISOString().split('T')[0]}" style="width:100%;box-sizing:border-box;background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 6px 8px; border-radius: 4px; font-size: 12px;">
                             </div>
                             <div>
-                                <label style="display: block; margin-bottom: 5px; white-space: nowrap;">买入份数:</label>
-                                <input type="number" id="buy-shares" value="0" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 5px; border-radius: 4px; font-size: 12px;">
+                                <label style="display: block; margin-bottom: 5px; color: #888;">份数 <span style="color:#555;font-size:10px;">（负数为卖出）</span></label>
+                                <input type="number" id="buy-shares" value="0" style="width:100%;box-sizing:border-box;background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 6px 8px; border-radius: 4px; font-size: 12px;">
                             </div>
                         </div>
-                        <button id="save-buy-settings" style="margin-top: 10px; background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap;">保存设置</button>
+                        <button id="save-buy-settings" style="margin-top: 12px; width:100%; background-color: #007bff; color: white; border: none; padding: 8px 0; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight:500;">确认</button>
                     </div>
                 </div>
             </div>
@@ -1742,9 +1742,19 @@ function showFundDetails(fund) {
             let totalShares = 0;
             let totalAmount = 0;
             buyRecords.forEach((record, index) => {
-                recordsHTML += `<p style="display: flex; align-items: center;">• ${record.date} ${record.shares}份 净值${record.nav}元<span class="delete-record" data-index="${index}" style="cursor: pointer; color: #ff4444; margin-left: 10px; opacity: 0; transition: opacity 0.2s;">x</span></p>`;
+                const isSell = record.shares < 0;
+                const action = isSell ? '卖出' : '买入';
+                const actionColor = isSell ? '#4caf50' : '#e0e0e0';
+                const sharesAbs = Math.abs(record.shares);
+                recordsHTML += `<p style="display:flex;align-items:center;padding:4px 0;border-bottom:1px solid #1e1e1e;gap:6px;">
+                    <span style="color:${actionColor};font-size:11px;min-width:28px;">${action}</span>
+                    <span style="color:#888;font-size:11px;">${record.date}</span>
+                    <span style="color:#e0e0e0;">${sharesAbs}份</span>
+                    <span style="color:#666;font-size:11px;">@${record.nav}元</span>
+                    <span class="delete-record" data-index="${index}" style="cursor:pointer;color:#ff4444;margin-left:auto;opacity:0;transition:opacity 0.2s;font-size:11px;">✕</span>
+                </p>`;
                 totalShares += record.shares;
-                totalAmount += record.shares * record.nav;
+                if (!isSell) totalAmount += record.shares * record.nav; // 卖出不计入成本
             });
             buyRecordsContent.innerHTML = recordsHTML;
             totalSharesElement.textContent = totalShares;
@@ -1786,13 +1796,30 @@ function showFundDetails(fund) {
         }
     }
 
-    // 删除买入记录
-    function deleteBuyRecord(fundId, index) {
+    // 删除买入记录（同步删云端）
+    async function deleteBuyRecord(fundId, index) {
         const records = getBuyRecords(fundId);
-        if (index >= 0 && index < records.length) {
-            records.splice(index, 1);
-            localStorage.setItem(`fundBuyRecords_${fundId}`, JSON.stringify(records));
+        if (index < 0 || index >= records.length) return;
+        const record = records[index];
+        // 先删本地
+        records.splice(index, 1);
+        localStorage.setItem(`fundBuyRecords_${fundId}`, JSON.stringify(records));
+        // 再删云端（用云端 id）
+        if (record.id) {
+            try {
+                await fetch(`/api/buy_records/${record.id}`, { method: 'DELETE' });
+                _buyRecordsCache = null;
+                fetchAllBuyRecords(true).then(r => { if (r) window._cloudBuyRecords = r; });
+            } catch(e) {
+                console.warn('云端删除失败:', e);
+            }
         }
+        // 同步更新 settings
+        const remaining = records.reduce((s, r) => s + r.shares, 0);
+        localStorage.setItem(`fundBuySettings_${fundId}`, JSON.stringify({
+            date: new Date().toISOString().split('T')[0],
+            shares: Math.max(0, remaining)
+        }));
     }
 
 
@@ -1805,9 +1832,9 @@ function showFundDetails(fund) {
         const buyDate = document.getElementById('buy-date').value;
         const buyShares = parseInt(document.getElementById('buy-shares').value) || 0;
 
-        if (buyShares > 0) {
-            // 尝试获取购买当天的净值
-            let buyNav = fund.prices[fund.prices.length - 1]; // 默认使用当前净值
+        if (buyShares !== 0) {
+            // 默认使用最新净值，下方会尝试从历史数据查找对应日期净值
+            let buyNav = fund.prices[fund.prices.length - 1];
 
             // 尝试从历史数据中查找对应日期的净值
             if (fund.dates && fund.prices) {
@@ -1821,26 +1848,25 @@ function showFundDetails(fund) {
 
             // 保存买入记录的函数
             async function saveBuyRecordWithNav(nav) {
+                const isSell = buyShares < 0;
                 const buyRecord = {
                     date: buyDate,
-                    shares: buyShares,
+                    shares: buyShares,          // 负数 = 卖出
                     nav: nav,
                     fund_id: String(fund.id),
                     fund_code: fund.code,
                     fund_name: fund.name,
-                    amount: buyShares * nav,
+                    amount: buyShares * nav,    // 负数 = 卖出金额
+                    note: isSell ? '卖出' : '买入',
                 };
                 await saveBuyRecord(fund.id, buyRecord);
 
-                // 计算总持仓
-                const buyRecords = getBuyRecords(fund.id);
-                const totalShares = buyRecords.reduce((total, record) => total + record.shares, 0);
+                // 重新计算累计持仓
+                const allRecords = getBuyRecords(fund.id);
+                const totalShares = allRecords.reduce((sum, r) => sum + r.shares, 0);
 
-                // 保存总持仓
-                const buySettings = {
-                    date: buyDate,
-                    shares: totalShares
-                };
+                // 更新持仓设置
+                const buySettings = { date: buyDate, shares: Math.max(0, totalShares) };
                 localStorage.setItem(`fundBuySettings_${fund.id}`, JSON.stringify(buySettings));
 
                 // 刷新云端缓存
@@ -1848,14 +1874,17 @@ function showFundDetails(fund) {
                     if (records) window._cloudBuyRecords = records;
                 });
 
-                // 重新加载买入记录
+                // 重新加载记录列表
                 loadBuyRecords();
 
-                // 初始化表单
+                // 清空表单
                 document.getElementById('buy-date').value = new Date().toISOString().split('T')[0];
                 document.getElementById('buy-shares').value = 0;
 
-                alert('买入设置已保存');
+                const msg = isSell ? `卖出 ${Math.abs(sellShares)} 份已记录` : `买入 ${buyShares} 份已记录`;
+                alert(msg);
+
+                // 重新渲染基金列表（更新 Live Profit 和排序）
                 loadFunds();
             }
 

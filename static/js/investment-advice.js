@@ -393,11 +393,19 @@ class InvestmentAdvice {
                 const records = this._getBuyRecordsByCode(item.fundCode);
                 if (!records || records.length === 0) return;
 
-                let totalShares = 0, totalCost = 0;
-                records.forEach(r => { totalShares += r.shares; totalCost += r.shares * r.nav; });
-                if (totalShares <= 0 || totalCost <= 0) return;
+                // 净持仓 = 买入份数总和 + 卖出份数总和（卖出为负数）
+                let totalShares = 0;
+                let buyShares = 0, buyCost = 0;
+                records.forEach(r => {
+                    totalShares += r.shares;
+                    if (r.shares > 0) { // 只用买入记录计算成本
+                        buyShares += r.shares;
+                        buyCost   += r.shares * r.nav;
+                    }
+                });
+                if (totalShares <= 0 || buyCost <= 0 || buyShares <= 0) return; // 已全部卖出则跳过
 
-                const avgCost   = totalCost / totalShares;
+                const avgCost = buyCost / buyShares; // 平均买入成本
                 const d         = item.indicators || {};
                 const currentNav = (d.has_realtime && d.est_nav) ? d.est_nav : (d.nav || 0);
                 if (!currentNav || !avgCost) return;
