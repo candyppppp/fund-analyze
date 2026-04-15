@@ -1670,7 +1670,7 @@ function showFundDetails(fund) {
             <div id="holding-tab" class="tab-content" style="display: none;">
                 <!-- 我的持仓 -->
                 <div style="padding: 10px 20px; border-bottom: 1px solid #333;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 13px; white-space: normal; line-height:1.6;">我的持仓<br><span style="font-weight:400;font-size:12px;color:#aaa;">持仓: <span id="total-shares">${buySettings.shares}</span>份 &nbsp;·&nbsp; 均价: <span id="avg-nav">0.0000</span>元</span></h3>
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">我的持仓 (持仓: <span id="total-shares">${buySettings.shares}</span>份，平均净值: <span id="avg-nav">0.0000</span>元)</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
                         <div id="buy-records-content" style="font-size: 12px;">
                             加载中...
@@ -1682,14 +1682,14 @@ function showFundDetails(fund) {
                 <div style="padding: 10px 20px;">
                     <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">买卖操作</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
-                        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 12px;">
-                            <div>
+                        <div style="display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr); gap: 10px; font-size: 12px;">
+                            <div style="min-width: 0;">
                                 <label style="display: block; margin-bottom: 6px; color: #888; font-size: 11px; letter-spacing:.4px;">操作日期</label>
-                                <input type="date" id="buy-date" value="${new Date().toISOString().split('T')[0]}" style="width:100%;box-sizing:border-box;background-color:#333;color:#e0e0e0;border:1px solid #444;padding:10px 12px;border-radius:6px;font-size:14px;-webkit-appearance:none;appearance:none;">
+                                <input type="date" id="buy-date" value="${new Date().toISOString().split('T')[0]}" style="width:100%;box-sizing:border-box;background-color:#333;color:#e0e0e0;border:1px solid #444;padding:10px 8px;border-radius:6px;font-size:13px;-webkit-appearance:none;appearance:none;">
                             </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 6px; color: #888; font-size: 11px; letter-spacing:.4px;">份数 <span style="color:#555;font-size:10px;">（负数为卖出）</span></label>
-                                <input type="number" id="buy-shares" value="0" inputmode="numeric" style="width:100%;box-sizing:border-box;background-color:#333;color:#e0e0e0;border:1px solid #444;padding:10px 12px;border-radius:6px;font-size:14px;">
+                            <div style="min-width: 0;">
+                                <label style="display: block; margin-bottom: 6px; color: #888; font-size: 11px; letter-spacing:.4px;">份数 <span style="color:#555;font-size:10px;">（负数卖出）</span></label>
+                                <input type="number" id="buy-shares" value="0" inputmode="numeric" style="width:100%;box-sizing:border-box;background-color:#333;color:#e0e0e0;border:1px solid #444;padding:10px 8px;border-radius:6px;font-size:13px;">
                             </div>
                         </div>
                         <button id="save-buy-settings" style="margin-top: 16px; width:100%; background-color: #007bff; color: white; border: none; padding: 14px 0; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight:600; letter-spacing:.3px;">确认</button>
