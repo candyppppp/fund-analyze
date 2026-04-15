@@ -1106,34 +1106,12 @@ def get_investment_advice():
         if 'username' not in session:
             return jsonify({'error': '未登录'}), 401
 
-        username = session['username']
-        force_refresh = request.args.get('refresh') == '1'
-
-        # ── 读云端缓存（非强制刷新时直接返回）────────────────────────────────
-        if not force_refresh:
-            try:
-                cache_resp = supabase.table('advice_cache').select('data,updated_at').eq('username', username).execute()
-                if cache_resp.data:
-                    cached = cache_resp.data[0]
-                    cached_data = cached['data']
-                    updated_at = cached['updated_at']
-                    # 缓存有数据才返回（空列表不算有效缓存）
-                    if cached_data and (
-                        cached_data.get('holdingsAdvice') or cached_data.get('recommendedFunds')
-                    ):
-                        cached_data['_from_cache'] = True
-                        cached_data['_cache_time'] = updated_at
-                        logger.info(f'投资建议读云端缓存，更新时间: {updated_at}')
-                        return jsonify(cached_data)
-            except Exception as e:
-                logger.warning(f'读取云端缓存失败，重新计算: {e}')
-
-        logger.info('重新计算投资建议')
+        logger.info('获取投资建议')
 
         # Vercel 无状态：确保内存有数据
         global funds
         if not funds:
-            load_funds(username)
+            load_funds(session['username'])
 
         # 并行拉所有基金实时估值，更新 predicted_return
         # 否则从 Supabase 加载的历史值可能全是0，导致全部判断为"持有"
@@ -1169,6 +1147,23 @@ def get_investment_advice():
                     fund.has_realtime = False
                     fund.gszzl = None
 
+        # 读取前端传来的投资偏好档位（small / medium / large）
+        investment_level = request.args.get('level', 'small')
+        if investment_level not in ('small', 'medium', 'large'):
+            investment_level = 'small'
+
+        # 读取当前用户持仓记录（用于区分"补仓"和"建仓"）
+        try:
+            holding_records = supabase.table('buy_records').select('fund_code,shares').eq('username', session['username']).execute()
+            # 计算每只基金的净持仓份数
+            _holding_map = {}
+            for r in (holding_records.data or []):
+                fc = r.get('fund_code', '')
+                _holding_map[fc] = _holding_map.get(fc, 0) + (r.get('shares', 0) or 0)
+        except Exception as _e:
+            logger.warning(f'读取持仓记录失败: {_e}')
+            _holding_map = {}
+
         holdingsAdvice = []
         for fund in funds:
             pr = getattr(fund, 'predicted_return', 0)
@@ -1179,23 +1174,13 @@ def get_investment_advice():
             nav = _prices[-1] if _prices else 0
             est_nav_add = round(nav * (1 + gszzl), 4) if gszzl is not None and nav else nav
 
-            if pr > 0.02:
-                action = '补仓'
-                # 金额梯度（最高500元）
-                if pr > 0.05:
-                    suggest_amount = 500
-                elif pr > 0.035:
-                    suggest_amount = 300
-                elif pr > 0.025:
-                    suggest_amount = 200
-                else:
-                    suggest_amount = 100
-            elif pr < -0.02:
-                action = '减仓'
-                suggest_amount = 0
-            else:
-                action = '持有'
-                suggest_amount = 0
+            # ── 多维度综合决策（替代单日涨跌判断）─────────────────────────────
+            action, suggest_amount = _calc_action(fund, pr, market_data, investment_level)
+
+            # ── 建仓逻辑：关注但无净持仓的基金，看多信号改为"建仓" ──────────
+            net_holding = _holding_map.get(fund.code, 0)
+            if net_holding <= 0 and action in ('补仓', '轻仓补入'):
+                action = '建仓'   # 首次入场，改用建仓标签
 
             reason = generate_holding_reason(fund, action, market_data)
 
@@ -1268,26 +1253,130 @@ def get_investment_advice():
             logger.error(f'推荐引擎异常: {e}')
             recommendedFunds = []
 
-        result = {'holdingsAdvice': holdingsAdvice, 'recommendedFunds': recommendedFunds}
-
-        # ── 写入云端缓存 ──────────────────────────────────────────────────────
-        try:
-            from datetime import timezone
-            now_iso = datetime.now(timezone.utc).isoformat()
-            supabase_admin.table('advice_cache').upsert(
-                {'username': username, 'data': result, 'updated_at': now_iso},
-                on_conflict='username'  # 按 username 唯一键冲突时更新
-            ).execute()
-            logger.info('投资建议已写入云端缓存')
-        except Exception as e:
-            logger.warning(f'写入云端缓存失败: {e}')
-
-        result['_from_cache'] = False
-        result['_cache_time'] = datetime.now(timezone.utc).isoformat()
-        return jsonify(result)
+        return jsonify({'holdingsAdvice': holdingsAdvice, 'recommendedFunds': recommendedFunds})
     except Exception as e:
         logger.error(f'获取投资建议失败: {e}')
         return jsonify({'holdingsAdvice': [], 'recommendedFunds': []})
+
+
+def _calc_action(fund, pr: float, market_data: dict, investment_level: str = 'small') -> tuple:
+    """
+    多维度综合决策引擎，替代单纯依赖当日 predicted_return 的简单判断。
+
+    决策逻辑分三层：
+      1. 5日净值趋势（主信号）：用近5日均值方向代替单日涨跌，过滤噪音
+      2. 多技术指标共识（门槛）：补仓/减仓需至少2项技术指标同向确认
+      3. 强度分级输出：综合得分决定操作力度，避免频繁翻转
+
+    返回: (action: str, suggest_amount: int)
+    """
+    prices = getattr(fund, 'prices', []) or []
+    rsi    = getattr(fund, 'rsi', 50) or 50
+    macd   = getattr(fund, 'macd', [0, 0, 0]) or [0, 0, 0]
+    kdj    = getattr(fund, 'kdj', [0, 0, 0]) or [0, 0, 0]
+    bb     = getattr(fund, 'bollinger_bands', [0, 0, 0]) or [0, 0, 0]
+
+    # ── 1. 5日净值趋势（主方向）──────────────────────────────────────────────
+    # 用近5日平均涨跌幅代替今日单点，平滑日内噪音
+    trend_5d = 0.0
+    if len(prices) >= 6:
+        daily_returns = [
+            (prices[-i] / prices[-i - 1] - 1)
+            for i in range(1, 6)
+        ]
+        trend_5d = sum(daily_returns) / len(daily_returns)
+
+    # ── 2. 多技术指标打分（每项 -1/0/+1）────────────────────────────────────
+    score = 0  # 正=看多，负=看空
+
+    # 2a. 今日实时估值（权重最高，有实时数据才计入）
+    has_realtime = getattr(fund, 'has_realtime', False)
+    if has_realtime and abs(pr) > 0.005:
+        score += 2 if pr > 0 else -2   # 实时信号权重×2
+
+    # 2b. 5日趋势
+    if trend_5d > 0.003:
+        score += 1
+    elif trend_5d < -0.003:
+        score -= 1
+
+    # 2c. MACD
+    ml, sl, hist = macd[0], macd[1], macd[2]
+    if ml > sl and hist > 0:
+        score += 1   # 金叉+红柱
+    elif ml < sl and hist < 0:
+        score -= 1   # 死叉+绿柱
+
+    # 2d. RSI
+    if rsi < 35:
+        score += 1   # 超卖
+    elif rsi > 65:
+        score -= 1   # 超买
+
+    # 2e. KDJ（J值）
+    j = kdj[2]
+    if j < 20:
+        score += 1
+    elif j > 80:
+        score -= 1
+
+    # 2f. 布林带位置
+    if bb[0] != bb[2] and prices:
+        bb_pct = (prices[-1] - bb[2]) / (bb[0] - bb[2])
+        if bb_pct < 0.2:
+            score += 1   # 靠近下轨，超卖
+        elif bb_pct > 0.8:
+            score -= 1   # 靠近上轨，超买
+
+    # ── 3. 大盘环境修正（市场逆风时降低多头得分）────────────────────────────
+    if market_data:
+        indices = market_data.get('indices', {})
+        if indices:
+            avg_market = sum(v.get('change_ratio', 0) for v in indices.values()) / len(indices)
+            if avg_market < -0.015:   # 大盘跌超1.5%，多头信号打折
+                score -= 1
+            elif avg_market > 0.015:  # 大盘涨超1.5%，空头信号打折
+                score += 1
+
+    # ── 4. 决策输出（需足够强的共识才触发操作）──────────────────────────────
+    # 评分范围约 -7 ~ +7
+    # 补仓：score >= 3（多项指标共同看多）
+    # 减仓：score <= -3（多项指标共同看空）
+    # 持有：其他（信号混乱或不足，不贸然操作）
+    # ── 5. 按投资档位选取金额梯度表 ─────────────────────────────────────────
+    AMOUNT_TABLE = {
+        'small':  [100, 200, 300, 500],   # 小额：score 4/5/6/7+
+        'medium': [300, 500, 800, 1000],  # 中额
+        'large':  [800, 1000, 1200, 1500, 2000],  # 大额：score 4/5/6/7/8+
+    }
+    amounts = AMOUNT_TABLE.get(investment_level, AMOUNT_TABLE['small'])
+
+    def pick_amount(sc, tbl):
+        # score 从4开始对应 tbl[0], 超出上限取最后一档
+        idx = max(0, sc - 4)
+        return tbl[min(idx, len(tbl) - 1)]
+
+    if score >= 4:
+        action = '补仓'
+        suggest_amount = pick_amount(score, amounts)
+    elif score <= -4:
+        action = '减仓'
+        suggest_amount = 0
+    elif score >= 3:
+        action = '轻仓补入'
+        suggest_amount = amounts[0]   # 最小档
+    elif score <= -3:
+        action = '观望减持'
+        suggest_amount = 0
+    else:
+        action = '持有'
+        suggest_amount = 0
+
+    logger.debug(
+        f"[决策] {getattr(fund, 'code', '?')} score={score} "
+        f"pr={pr:.3f} trend5d={trend_5d:.4f} rsi={rsi:.1f} → {action}"
+    )
+    return action, suggest_amount
 
 
 def generate_holding_reason(fund, action: str, market_data: dict) -> str:
