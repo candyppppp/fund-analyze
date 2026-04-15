@@ -1123,11 +1123,28 @@ function showFundDetails(fund) {
         align-items: center;
         z-index: 1000;
     `;
+    // 移动端：底部抽屉式弹出
+    if (window.innerWidth <= 600) {
+        modal.style.alignItems = 'flex-end';
+    }
 
     // 弹框内容
     const modalContent = document.createElement('div');
     modalContent.className = 'modal-content';
-    modalContent.style.cssText = `
+    const isMobile = window.innerWidth <= 600;
+    modalContent.style.cssText = isMobile ? `
+        background-color: #121212;
+        border-radius: 16px 16px 0 0;
+        width: 100%;
+        max-width: 100%;
+        max-height: 92vh;
+        overflow: hidden;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.7);
+        border: 1px solid #2a2a2a;
+        border-bottom: none;
+        display: flex;
+        flex-direction: column;
+    ` : `
         background-color: #121212;
         border-radius: 6px;
         width: 90%;
@@ -1653,7 +1670,7 @@ function showFundDetails(fund) {
             <div id="holding-tab" class="tab-content" style="display: none;">
                 <!-- 我的持仓 -->
                 <div style="padding: 10px 20px; border-bottom: 1px solid #333;">
-                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px; white-space: nowrap;">我的持仓 (持仓: <span id="total-shares">${buySettings.shares}</span>份，平均净值: <span id="avg-nav">0.0000</span>元)</h3>
+                    <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 13px; white-space: normal; line-height:1.6;">我的持仓<br><span style="font-weight:400;font-size:12px;color:#aaa;">持仓: <span id="total-shares">${buySettings.shares}</span>份 &nbsp;·&nbsp; 均价: <span id="avg-nav">0.0000</span>元</span></h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
                         <div id="buy-records-content" style="font-size: 12px;">
                             加载中...
@@ -1665,17 +1682,17 @@ function showFundDetails(fund) {
                 <div style="padding: 10px 20px;">
                     <h3 style="color: #e0e0e0; margin-bottom: 10px; font-size: 14px;">买卖操作</h3>
                     <div style="background-color: #2a2a2a; border-radius: 4px; padding: 14px; border: 1px solid #333;">
-                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 12px;">
+                        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 12px;">
                             <div>
-                                <label style="display: block; margin-bottom: 5px; color: #888;">操作日期</label>
-                                <input type="date" id="buy-date" value="${new Date().toISOString().split('T')[0]}" style="width:100%;box-sizing:border-box;background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 6px 8px; border-radius: 4px; font-size: 12px;">
+                                <label style="display: block; margin-bottom: 6px; color: #888; font-size: 11px; letter-spacing:.4px;">操作日期</label>
+                                <input type="date" id="buy-date" value="${new Date().toISOString().split('T')[0]}" style="width:100%;box-sizing:border-box;background-color:#333;color:#e0e0e0;border:1px solid #444;padding:10px 12px;border-radius:6px;font-size:14px;-webkit-appearance:none;appearance:none;">
                             </div>
                             <div>
-                                <label style="display: block; margin-bottom: 5px; color: #888;">份数 <span style="color:#555;font-size:10px;">（负数为卖出）</span></label>
-                                <input type="number" id="buy-shares" value="0" style="width:100%;box-sizing:border-box;background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 6px 8px; border-radius: 4px; font-size: 12px;">
+                                <label style="display: block; margin-bottom: 6px; color: #888; font-size: 11px; letter-spacing:.4px;">份数 <span style="color:#555;font-size:10px;">（负数为卖出）</span></label>
+                                <input type="number" id="buy-shares" value="0" inputmode="numeric" style="width:100%;box-sizing:border-box;background-color:#333;color:#e0e0e0;border:1px solid #444;padding:10px 12px;border-radius:6px;font-size:14px;">
                             </div>
                         </div>
-                        <button id="save-buy-settings" style="margin-top: 12px; width:100%; background-color: #007bff; color: white; border: none; padding: 8px 0; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight:500;">确认</button>
+                        <button id="save-buy-settings" style="margin-top: 16px; width:100%; background-color: #007bff; color: white; border: none; padding: 14px 0; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight:600; letter-spacing:.3px;">确认</button>
                     </div>
                 </div>
             </div>
@@ -3002,6 +3019,10 @@ function showSettings() {
         align-items: center;
         z-index: 1000;
     `;
+    // 移动端：底部抽屉式弹出
+    if (window.innerWidth <= 600) {
+        modal.style.alignItems = 'flex-end';
+    }
 
     // 弹框内容
     const modalContent = document.createElement('div');
@@ -3044,6 +3065,14 @@ function showSettings() {
                         <option value="15" ${settings.updateFrequency === '15' ? 'selected' : ''}>15分钟</option>
                         <option value="30" ${settings.updateFrequency === '30' ? 'selected' : ''}>30分钟</option>
                         <option value="60" ${settings.updateFrequency === '60' ? 'selected' : ''}>1小时</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <label style="font-size: 11px; margin-right: 10px;">投资偏好:</label>
+                    <select id="investment-level" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 3px 6px; border-radius: 4px; font-size: 10px;">
+                        <option value="small"  ${settings.investmentLevel === 'small'  ? 'selected' : ''}>小额（100 / 200 / 300 / 500 元）</option>
+                        <option value="medium" ${settings.investmentLevel === 'medium' ? 'selected' : ''}>中额（300 / 500 / 800 / 1000 元）</option>
+                        <option value="large"  ${settings.investmentLevel === 'large'  ? 'selected' : ''}>大额（800 / 1000 / 1200 / 1500 / 2000 元）</option>
                     </select>
                 </div>
                 <div style="margin-bottom: 4px;">
@@ -3100,6 +3129,7 @@ function showSettings() {
         const newSettings = {
             fontSize: document.getElementById('font-size').value,
             updateFrequency: document.getElementById('update-frequency').value,
+            investmentLevel: document.getElementById('investment-level').value,
             showDistance: document.getElementById('show-distance').checked,
             showRSI: document.getElementById('show-rsi').checked,
             showAlerts: document.getElementById('show-alerts').checked
@@ -3148,6 +3178,7 @@ function getSettings() {
     const defaultSettings = {
         fontSize: 'medium',
         updateFrequency: '5',
+        investmentLevel: 'small',
         showDistance: true,
         showRSI: true,
         showAlerts: true

@@ -34,7 +34,8 @@ class InvestmentAdvice {
     _forceRefresh() {
         if (this._refreshing) return Promise.resolve(); // 防并发
         this._refreshing = true;
-        return fetch('/api/investment-advice?refresh=1')
+        const _lvl = (() => { try { return JSON.parse(localStorage.getItem('fundTrackerSettings') || '{}').investmentLevel || 'small'; } catch(e) { return 'small'; } })();
+        return fetch('/api/investment-advice?refresh=1&level=' + _lvl)
             .then(r => r.ok ? r.json() : null)
             .then(a => {
                 if (!a) return;
@@ -62,7 +63,8 @@ class InvestmentAdvice {
 
         // 无本地缓存，读云端缓存（快速返回）
         if (window.activeTab === 'investment-advice') this.showLoadingState();
-        fetch('/api/investment-advice')
+        const _lvl2 = (() => { try { return JSON.parse(localStorage.getItem('fundTrackerSettings') || '{}').investmentLevel || 'small'; } catch(e) { return 'small'; } })();
+        fetch('/api/investment-advice?level=' + _lvl2)
             .then(r => { if (r.status === 401) { window.location.href='/login'; return Promise.reject('401'); } return r.json(); })
             .then(a => {
                 const hasData = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
@@ -91,7 +93,7 @@ class InvestmentAdvice {
         const c = document.getElementById('funds-container');
         if (!c) return;
 
-        const actionable  = (advice.holdingsAdvice || []).filter(i => i.action !== '持有');
+        const actionable  = (advice.holdingsAdvice || []).filter(i => !['持有'].includes(i.action));
         const recommended = advice.recommendedFunds || [];
         const now = new Date().toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
 
@@ -139,6 +141,7 @@ class InvestmentAdvice {
 .ia-badge{padding:5px 16px;border-radius:20px;font-size:13px;font-weight:700;white-space:nowrap;letter-spacing:.3px;}
 .ia-buy {background:rgba(220,53,69,.12);color:#dc3545;border:1px solid rgba(220,53,69,.3);}
 .ia-sell{background:rgba(40,167,69,.12);color:#28a745;border:1px solid rgba(40,167,69,.3);}
+.ia-new {background:rgba(0,123,255,.12);color:#007bff;border:1px solid rgba(0,123,255,.3);}
 
 /* 指标格：两行6列 */
 .ia-grid{
@@ -272,17 +275,19 @@ class InvestmentAdvice {
 
     _card(item, index, now) {
         const d = item.indicators || {};
-        const isBuy = item.action === '补仓';
-        const badgeCls = isBuy ? 'ia-buy' : 'ia-sell';
+        const action = item.action;
+        // badge 样式：建仓=蓝色，补仓/轻仓补入=红色，减仓/观望减持=绿色
+        const badgeCls = (action === '建仓')          ? 'ia-new'
+                       : (action === '补仓' || action === '轻仓补入') ? 'ia-buy'
+                       : 'ia-sell';
         // 金额制展示：建议金额 / 预估净值 = 参考份额
-        let badgeTxt = item.action;
-        if (isBuy && item.suggest_amount > 0) {
+        let badgeTxt = action;
+        const isAddAction = action === '补仓' || action === '建仓' || action === '轻仓补入';
+        if (isAddAction && item.suggest_amount > 0) {
             const estNav = item.est_nav_add || d.est_nav || d.nav || 0;
             const approxShares = estNav > 0 ? Math.floor(item.suggest_amount / estNav) : 0;
-            badgeTxt = item.action + ' · ' + item.suggest_amount + '元'
+            badgeTxt = action + ' · ' + item.suggest_amount + '元'
                 + (approxShares > 0 ? '（约' + approxShares + '份）' : '');
-        } else if (item.action === '减仓') {
-            badgeTxt = item.action;
         }
 
         const macd = d.macd || [0,0,0];
