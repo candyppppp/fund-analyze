@@ -13,7 +13,7 @@ from flask import request, jsonify
 
 logger = logging.getLogger(__name__)
 
-RATE_LIMIT        = 200   # 每窗口最大请求数
+RATE_LIMIT        = 120  # 每窗口最大请求数（提高上限，前端已降频，此处作兜底）
 RATE_LIMIT_WINDOW = 60   # 时间窗口（秒）
 _request_counts: dict = {}
 
