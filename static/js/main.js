@@ -53,9 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
     checkLoginStatus();
 
     loadFunds(); // 只加载基金列表，不加载基金预测
-
-    // 启动定期更新
-    startFundUpdateInterval();
+    // 注：定期更新由 updateStrategyManager 统一管理，不再在此单独启动
 
     document.getElementById('add-fund-form').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -519,12 +517,17 @@ function updateFundsInBackground() {
 
     fetch('/api/funds')
         .then(response => {
+            if (response.status === 429) {
+                console.warn('[限流] /api/funds 429，后台更新跳过本次');
+                return null;
+            }
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             return response.json();
         })
         .then(funds => {
+            if (!funds) return; // 429 静默跳过
             // 确保基金数据不为空
             if (funds && funds.length > 0) {
                 // 更新缓存
@@ -579,7 +582,15 @@ function updateFundsInBackground() {
 }
 
 // 为每个基金启动持仓更新定时器
+let _lastHoldingsIntervalStart = 0;
 function startFundHoldingsUpdateIntervals(funds) {
+    // 防抖：60秒内重复调用直接跳过，避免 loadFunds 每次完成都重建定时器
+    const now = Date.now();
+    if (now - _lastHoldingsIntervalStart < 60 * 1000) {
+        return;
+    }
+    _lastHoldingsIntervalStart = now;
+
     // 清除现有的定时器
     for (const code in fundHoldingsUpdateIntervals) {
         clearInterval(fundHoldingsUpdateIntervals[code]);
@@ -607,12 +618,18 @@ function startFundHoldingsUpdateIntervals(funds) {
                     // 只获取持仓数据，基金列表通过定期更新获取
                     fetch(`/api/funds/${fund.code}/holdings`)
                     .then(response => {
+                        if (response.status === 429) {
+                            // 限流：静默跳过，等下次定时器再试，不抛错不重试
+                            console.warn(`[限流] ${fund.code} holdings 429，跳过本次`);
+                            return null;
+                        }
                         if (!response.ok) {
                             throw new Error(`HTTP error! status: ${response.status}`);
                         }
                         return response.json();
                     })
                     .then(holdings => {
+                        if (!holdings) return; // 429 静默跳过
                         // 更新缓存
                         cacheManager.set('fundHoldings', holdings, fund.code);
 
@@ -3272,7 +3289,7 @@ function stopFundAutoUpdate() {
 window.addEventListener('load', function() {
     const settings = getSettings();
     applySettings(settings);
-    startFundAutoUpdate();
+    // startFundAutoUpdate() 已由 updateStrategyManager 替代，此处不再启动
 
     // 监听更新事件
     window.addEventListener('updateFundList', function() {
@@ -3282,8 +3299,10 @@ window.addEventListener('load', function() {
     });
 
     window.addEventListener('updateHoldings', function() {
-        if (typeof updateAllHoldings === 'function') {
-            updateAllHoldings();
+        // updateStrategyManager 触发持仓更新：只在有缓存基金时刷新
+        const cached = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
+        if (cached && cached.length > 0) {
+            startFundHoldingsUpdateIntervals(cached);
         }
     });
 
