@@ -1,5 +1,7 @@
 import cacheManager from './cache-manager.js';
 
+const ADVICE_TTL = 65 * 60 * 1000; // 65分钟，与后端 Supabase 缓存 60 分钟对齐
+
 class InvestmentAdvice {
     constructor() {
         this.cacheKey = 'investmentAdvice';
@@ -42,13 +44,18 @@ class InvestmentAdvice {
                 const hasData = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
                                 (a.recommendedFunds && a.recommendedFunds.length > 0);
                 if (hasData) {
-                    a._cache_time = Date.now();
-                    cacheManager.set(this.cacheKey, a, 65 * 60 * 1000);
+                    if (!a._cache_time) a._cache_time = Date.now();
+                    cacheManager.set(this.cacheKey, a, ADVICE_TTL);
                     if (window.activeTab === 'investment-advice') this.displayAdvice(a);
                 }
             })
             .catch(() => {})
-            .finally(() => { this._refreshing = false; });
+            .finally(() => {
+                this._refreshing = false;
+                // 恢复手动刷新按钮
+                const btn = document.getElementById('ia-manual-refresh-btn');
+                if (btn) { btn.textContent = '手动刷新数据'; btn.disabled = false; }
+            });
     }
 
     loadInvestmentAdvice() {
@@ -64,7 +71,7 @@ class InvestmentAdvice {
             if (window.activeTab === 'investment-advice') this.displayAdvice(cached);
             // 缓存剩余时间不足一半时才触发后台刷新，避免每次点击都发请求
             const remaining = cacheManager.getRemainingTime(this.cacheKey);
-            const halfTTL = 65 * 60 * 1000 / 2;
+            const halfTTL = ADVICE_TTL / 2;
             if (remaining < halfTTL) this.updateInBackground();
             return;
         }
@@ -77,8 +84,9 @@ class InvestmentAdvice {
                 const hasData = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
                                 (a.recommendedFunds && a.recommendedFunds.length > 0);
                 if (hasData) {
-                    a._cache_time = Date.now();
-                    cacheManager.set(this.cacheKey, a, 65 * 60 * 1000);
+                    // 优先使用后端返回的缓存时间（Supabase 缓存命中时），否则用当前时间
+                    if (!a._cache_time) a._cache_time = Date.now();
+                    cacheManager.set(this.cacheKey, a, ADVICE_TTL);
                 }
                 if (window.activeTab === 'investment-advice') this.displayAdvice(a);
             })

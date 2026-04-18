@@ -13,14 +13,12 @@ window.investmentAdvice = investmentAdvice; // 暴露到全局供 onclick 使用
 
 // 缓存键
 const CACHE_KEYS = {
-    INVESTMENT_ADVICE: 'investmentAdvice',
     FUNDS_LIST: 'fundsList'
 };
 
 // 缓存有效期（毫秒）
 const CACHE_EXPIRY = {
-    INVESTMENT_ADVICE: 5 * 60 * 1000, // 5分钟
-    FUNDS_LIST: 2 * 60 * 1000         // 2分钟
+    FUNDS_LIST: 2 * 60 * 1000  // 2分钟
 };
 
 // 当前激活的标签
@@ -234,7 +232,7 @@ function addFundByCode(code) {
                 .then(r => r.json())
                 .then(funds => {
                     cacheManager.set(CACHE_KEYS.FUNDS_LIST, funds, CACHE_EXPIRY.FUNDS_LIST);
-                    try { localStorage.setItem('funds', JSON.stringify(funds)); } catch(e) {}
+                    try { const _slim = funds.map(f => ({id:f.id,code:f.code,name:f.name,predicted_return:f.predicted_return,rsi:f.rsi,volatility:f.volatility,previous_day_return:f.previous_day_return,nav_updated_at:f.nav_updated_at})); localStorage.setItem('funds', JSON.stringify(_slim)); } catch(e) {}
                 })
                 .catch(() => {});
         } else {
@@ -243,7 +241,7 @@ function addFundByCode(code) {
                 .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
                 .then(funds => {
                     cacheManager.set(CACHE_KEYS.FUNDS_LIST, funds, CACHE_EXPIRY.FUNDS_LIST);
-                    try { localStorage.setItem('funds', JSON.stringify(funds)); } catch(e) {}
+                    try { const _slim = funds.map(f => ({id:f.id,code:f.code,name:f.name,predicted_return:f.predicted_return,rsi:f.rsi,volatility:f.volatility,previous_day_return:f.previous_day_return,nav_updated_at:f.nav_updated_at})); localStorage.setItem('funds', JSON.stringify(_slim)); } catch(e) {}
                     return processFunds(funds);
                 })
                 .then(() => {
@@ -372,7 +370,7 @@ function processFunds(funds) {
                 const batch = batches[batchIndex];
                 const batchPromises = batch.map(code => {
                     // 检查持仓数据缓存
-                    const cachedHoldings = cacheManager.get('fundHoldings', code);
+                    const cachedHoldings = cacheManager.get('fundHoldings_' + code);
                     if (cachedHoldings) {
                         const fund = processedFunds.find(f => f.code === code);
                         if (fund) {
@@ -395,8 +393,8 @@ function processFunds(funds) {
                             if (fund) {
                                 fund.stock_holdings = holdings;
                             }
-                            // 缓存持仓数据
-                            cacheManager.set('fundHoldings', holdings, code);
+                            // 缓存持仓数据（key 包含 code，避免所有基金共用同一条缓存）
+                            cacheManager.set('fundHoldings_' + code, holdings);
                             return holdings;
                         })
                         .catch(error => {
@@ -480,9 +478,16 @@ function loadFunds() {
                 .then(funds => {
                     // 更新缓存
                     cacheManager.set(CACHE_KEYS.FUNDS_LIST, funds, CACHE_EXPIRY.FUNDS_LIST);
-                    // 保存到本地存储
+                    // 保存到本地存储（只存基础字段，避免超出 5MB 限制）
                     try {
-                        localStorage.setItem('funds', JSON.stringify(funds));
+                        const slim = funds.map(f => ({
+                            id: f.id, code: f.code, name: f.name,
+                            predicted_return: f.predicted_return,
+                            rsi: f.rsi, volatility: f.volatility,
+                            previous_day_return: f.previous_day_return,
+                            nav_updated_at: f.nav_updated_at,
+                        }));
+                        localStorage.setItem('funds', JSON.stringify(slim));
                     } catch (error) {
                         console.error('保存到本地存储失败:', error);
                         showWarning('本地存储空间不足，数据可能无法持久保存');
@@ -535,9 +540,16 @@ function updateFundsInBackground() {
             if (funds && funds.length > 0) {
                 // 更新缓存
                 cacheManager.set(CACHE_KEYS.FUNDS_LIST, funds, CACHE_EXPIRY.FUNDS_LIST);
-                // 保存到本地存储
+                // 保存到本地存储（轻量版，只存基础字段）
                 try {
-                    localStorage.setItem('funds', JSON.stringify(funds));
+                    const slim = funds.map(f => ({
+                        id: f.id, code: f.code, name: f.name,
+                        predicted_return: f.predicted_return,
+                        rsi: f.rsi, volatility: f.volatility,
+                        previous_day_return: f.previous_day_return,
+                        nav_updated_at: f.nav_updated_at,
+                    }));
+                    localStorage.setItem('funds', JSON.stringify(slim));
                 } catch (error) {
                     console.error('保存到本地存储失败:', error);
                 }
@@ -633,8 +645,8 @@ function startFundHoldingsUpdateIntervals(funds) {
                     })
                     .then(holdings => {
                         if (!holdings) return; // 429 静默跳过
-                        // 更新缓存
-                        cacheManager.set('fundHoldings', holdings, fund.code);
+                        // 更新缓存（key 包含 code，避免共享）
+                        cacheManager.set('fundHoldings_' + fund.code, holdings);
 
                         // 更新基金对象
                         const fundsData = cacheManager.get('funds');
@@ -1039,7 +1051,7 @@ function addFund() {
             .then(funds => {
                 // 更新缓存和本地存储（供下次使用）
                 cacheManager.set(CACHE_KEYS.FUNDS_LIST, funds, CACHE_EXPIRY.FUNDS_LIST);
-                try { localStorage.setItem('funds', JSON.stringify(funds)); } catch(e) {}
+                try { const _slim = funds.map(f => ({id:f.id,code:f.code,name:f.name,predicted_return:f.predicted_return,rsi:f.rsi,volatility:f.volatility,previous_day_return:f.previous_day_return,nav_updated_at:f.nav_updated_at})); localStorage.setItem('funds', JSON.stringify(_slim)); } catch(e) {}
 
                 // 初始化新基金的持仓设置
                 const defaultBuySettings = { date: new Date().toISOString().split('T')[0], shares: 0 };
@@ -3293,13 +3305,15 @@ function stopFundAutoUpdate() {
 function startMarketTicker() {
     const TICKER_INTERVAL = 60 * 1000; // 1分钟刷新
 
-    // 指数显示顺序和短名
-    const INDEX_ORDER = ['上证指数','深证成指','沪深300','创业板指'];
+    // 严格按截图顺序：上证、深证、沪深300、上证50、创业板、科创50
+    const INDEX_ORDER = ['上证指数', '深证成指', '沪深300', '上证50', '创业板指', '科创50'];
     const SHORT_NAME  = {
         '上证指数': '上证',
         '深证成指': '深证',
         '沪深300':  '沪深300',
+        '上证50':   '上证50',
         '创业板指': '创业板',
+        '科创50':   '科创50',
     };
 
     // 时钟（每秒更新）
@@ -3327,8 +3341,8 @@ function startMarketTicker() {
         const day  = bj.getDay();
         const mins = bj.getHours() * 60 + bj.getMinutes();
         const isWeekday = day >= 1 && day <= 5;
-        const isMorning = mins >= 570 && mins < 690;   // 9:30-11:30
-        const isAfternoon = mins >= 780 && mins < 900; // 13:00-15:00
+        const isMorning   = mins >= 570 && mins < 690;   // 9:30-11:30
+        const isAfternoon = mins >= 780 && mins < 900;   // 13:00-15:00
         const isTrading = isWeekday && (isMorning || isAfternoon);
         statusEl.textContent = isTrading ? '● 交易中' : '● 休市';
         statusEl.style.color  = isTrading ? '#28a745'  : '#555';
@@ -3339,15 +3353,12 @@ function startMarketTicker() {
         if (!inner) return;
         const indices = data.indices || {};
         if (!Object.keys(indices).length) {
-            inner.innerHTML = '<span style="font-size:11px;color:#333;">暂无数据</span>';
+            inner.innerHTML = '<span style="font-size:12px;color:#444;">暂无数据</span>';
             return;
         }
 
-        // 按 INDEX_ORDER 排序，其余追加末尾
-        const ordered = [
-            ...INDEX_ORDER.filter(n => indices[n]),
-            ...Object.keys(indices).filter(n => !INDEX_ORDER.includes(n))
-        ];
+        // 按截图顺序排，后端没有的跳过
+        const ordered = INDEX_ORDER.filter(n => indices[n]);
 
         const items = ordered.map((name, i) => {
             const d     = indices[name];
@@ -3356,12 +3367,12 @@ function startMarketTicker() {
             const sign  = chg >= 0 ? '+' : '';
             const price = (d.current_price || 0).toFixed(2);
             const short = SHORT_NAME[name] || name;
-            const sep   = i < ordered.length - 1 ? '<span class="ticker-sep">|</span>' : '';
-            return `<div class="ticker-item">
+            const isLast = i === ordered.length - 1;
+            return `<div class="ticker-item"${isLast ? '' : ' style="border-right:1px solid #1e1e1e;"'}>
                 <span class="ticker-name">${short}</span>
                 <span class="ticker-price">${price}</span>
                 <span class="ticker-chg ${cls}">${sign}${chg.toFixed(2)}%</span>
-            </div>${sep}`;
+            </div>`;
         }).join('');
 
         inner.innerHTML = items;

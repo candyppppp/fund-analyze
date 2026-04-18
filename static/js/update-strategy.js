@@ -9,15 +9,6 @@ class UpdateStrategyManager {
 
         // 当前激活的标签
         this.activeTab = 'fund-prediction';
-
-        // 数据源健康状态（后端管理，前端不直接检查）
-        this.dataSourceHealth = {
-            eastmoney: { status: 'healthy', lastCheck: null, failCount: 0 },
-            sina: { status: 'healthy', lastCheck: null, failCount: 0 },
-        };
-        this.healthThreshold = 3;
-        this.healthCheckInterval = 60 * 60 * 1000;
-        // 数据源健康检查由后端负责，前端不直接请求外部接口
     }
 
     // 判断是否为交易时间
@@ -214,122 +205,6 @@ class UpdateStrategyManager {
             clearInterval(this.investmentAdviceInterval);
             this.investmentAdviceInterval = null;
         }
-    }
-
-    // 数据源健康检查
-    async checkDataSourceHealth(source) {
-        const testCodes = ['000001', '510310']; // 测试用基金代码
-
-        // 跳过会导致 CORS 错误的数据源
-        const corsSources = ['sina', 'eastmoney'];
-        if (corsSources.includes(source)) {
-            console.log(`[数据源健康检查] ${source}: 跳过（CORS 限制）`);
-            // 对于 CORS 受限的数据源，标记为健康，因为它们实际上是可用的
-            this.updateSourceHealth(source, true);
-            return true;
-        }
-
-        try {
-            let url;
-            switch (source) {
-                case 'tencent':
-                    url = `https://qt.gtimg.cn/q=sz${testCodes[0]}`;
-                    break;
-                default:
-                    return false;
-            }
-
-            const startTime = Date.now();
-            const response = await fetch(url, { timeout: 5000 });
-            const latency = Date.now() - startTime;
-
-            if (response.ok) {
-                const data = await response.text();
-
-                // 检查数据是否有效
-                if (data && data.length > 10) {
-                    this.updateSourceHealth(source, true);
-                    console.log(`[数据源健康检查] ${source}: 健康，延迟: ${latency}ms`);
-                    return true;
-                }
-            }
-
-            this.updateSourceHealth(source, false);
-            return false;
-        } catch (error) {
-            this.updateSourceHealth(source, false);
-            console.error(`[数据源健康检查] ${source}: 失败 - ${error.message}`);
-            return false;
-        }
-    }
-
-    // 更新数据源健康状态
-    updateSourceHealth(source, success) {
-        const health = this.dataSourceHealth[source];
-        health.lastCheck = new Date();
-
-        if (success) {
-            health.failCount = 0;
-            health.status = 'healthy';
-        } else {
-            health.failCount++;
-            if (health.failCount >= this.healthThreshold) {
-                health.status = 'unhealthy';
-                console.warn(`[数据源状态] ${source}: 不健康，连续失败 ${health.failCount} 次`);
-            }
-        }
-    }
-
-    // 获取当前可用的最佳数据源
-    getBestDataSource() {
-        const healthySources = Object.entries(this.dataSourceHealth)
-            .filter(([_, health]) => health.status === 'healthy')
-            .map(([name, _]) => name);
-
-        if (healthySources.length === 0) {
-            // 所有数据源都不健康，返回第一个（默认）
-            return 'sina';
-        }
-
-        // 优先顺序: sina > eastmoney > tencent > ths
-        const priority = ['sina', 'eastmoney', 'tencent', 'ths'];
-        for (const source of priority) {
-            if (healthySources.includes(source)) {
-                return source;
-            }
-        }
-
-        return 'sina';
-    }
-
-    // 启动数据源健康检查
-    startDataSourceHealthCheck() {
-        // 数据源由后端管理，前端不做健康检查
-    }
-
-    // 执行健康检查
-    async performHealthCheck() {
-        console.log(`[${new Date().toLocaleTimeString()}] 开始数据源健康检查...`);
-
-        const sources = ['sina', 'eastmoney', 'tencent', 'ths'];
-        const results = await Promise.all(
-            sources.map(source => this.checkDataSourceHealth(source))
-        );
-
-        const healthyCount = results.filter(r => r).length;
-        const bestSource = this.getBestDataSource();
-
-        console.log(`[数据源健康检查] 完成，可用: ${healthyCount}/${sources.length}，推荐: ${bestSource}`);
-    }
-
-    // 获取数据源状态报告
-    getDataSourceStatus() {
-        return {
-            sources: this.dataSourceHealth,
-            bestSource: this.getBestDataSource(),
-            isTradingTime: this.isTradingTime(),
-            currentTime: new Date().toLocaleString()
-        };
     }
 }
 
