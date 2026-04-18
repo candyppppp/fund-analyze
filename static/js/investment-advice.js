@@ -42,6 +42,7 @@ class InvestmentAdvice {
                 const hasData = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
                                 (a.recommendedFunds && a.recommendedFunds.length > 0);
                 if (hasData) {
+                    a._cache_time = Date.now();
                     cacheManager.set(this.cacheKey, a, 65 * 60 * 1000);
                     if (window.activeTab === 'investment-advice') this.displayAdvice(a);
                 }
@@ -51,25 +52,34 @@ class InvestmentAdvice {
     }
 
     loadInvestmentAdvice() {
-        // 先读本地缓存立即展示（不阻塞）
+        const _lvl = (() => { try { return JSON.parse(localStorage.getItem('fundTrackerSettings') || '{}').investmentLevel || 'small'; } catch(e) { return 'small'; } })();
+
+        // 有缓存且有实质数据 → 立即展示，缓存剩余不足一半才后台刷新（不浪费请求）
         const cached = cacheManager.get(this.cacheKey);
         const cacheHasData = cached &&
             ((cached.holdingsAdvice && cached.holdingsAdvice.length > 0) ||
              (cached.recommendedFunds && cached.recommendedFunds.length > 0));
+
         if (cacheHasData) {
             if (window.activeTab === 'investment-advice') this.displayAdvice(cached);
+            // 缓存剩余时间不足一半时才触发后台刷新，避免每次点击都发请求
+            const remaining = cacheManager.getRemainingTime(this.cacheKey);
+            const halfTTL = 65 * 60 * 1000 / 2;
+            if (remaining < halfTTL) this.updateInBackground();
             return;
         }
 
-        // 无本地缓存，读云端缓存（快速返回）
+        // 无缓存：正常加载
         if (window.activeTab === 'investment-advice') this.showLoadingState();
-        const _lvl2 = (() => { try { return JSON.parse(localStorage.getItem('fundTrackerSettings') || '{}').investmentLevel || 'small'; } catch(e) { return 'small'; } })();
-        fetch('/api/investment-advice?level=' + _lvl2)
+        fetch('/api/investment-advice?level=' + _lvl)
             .then(r => { if (r.status === 401) { window.location.href='/login'; return Promise.reject('401'); } return r.json(); })
             .then(a => {
                 const hasData = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
                                 (a.recommendedFunds && a.recommendedFunds.length > 0);
-                if (hasData) cacheManager.set(this.cacheKey, a, 65 * 60 * 1000);
+                if (hasData) {
+                    a._cache_time = Date.now();
+                    cacheManager.set(this.cacheKey, a, 65 * 60 * 1000);
+                }
                 if (window.activeTab === 'investment-advice') this.displayAdvice(a);
             })
             .catch(e => { if (e !== '401' && window.activeTab === 'investment-advice') this.displayDefaultAdvice(); });
@@ -94,7 +104,13 @@ class InvestmentAdvice {
         if (!c) return;
 
         const actionable  = (advice.holdingsAdvice || []).filter(i => !['持有'].includes(i.action));
-        const recommended = advice.recommendedFunds || [];
+        // 推荐基金去重：同一 code 可能因多次评分被重复推荐，保留第一次出现
+        const _seenCodes = new Set();
+        const recommended = (advice.recommendedFunds || []).filter(item => {
+            if (!item.code || _seenCodes.has(item.code)) return false;
+            _seenCodes.add(item.code);
+            return true;
+        });
         const now = new Date().toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
 
         // 计算止盈建议（读 localStorage 持仓成本，纯前端计算）
@@ -225,15 +241,18 @@ class InvestmentAdvice {
 
   <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0 16px;">
     <span style="font-size:11px;color:#3a3a3a;">
-      最后更新时间 ${advice._cache_time ? (() => {
-        const d = new Date(advice._cache_time);
-        return d.toLocaleString('zh-CN', {
-          timeZone: 'Asia/Shanghai',
-          year: 'numeric', month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit', second: '2-digit',
-          hour12: false
-        }).replace(/\//g, '-');
-      })() : '--'}
+      最后更新时间 ${(() => {
+        const ts = advice._cache_time;
+        if (!ts) return '--';
+        try {
+          return new Date(ts).toLocaleString('zh-CN', {
+            timeZone: 'Asia/Shanghai',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+          }).replace(/\//g, '-');
+        } catch(e) { return '--'; }
+      })()}
     </span>
     <button id="ia-manual-refresh-btn"
       onclick="window.investmentAdvice._forceRefresh();this.textContent='刷新中...';this.disabled=true;"

@@ -55,6 +55,9 @@ document.addEventListener('DOMContentLoaded', function() {
     loadFunds(); // 只加载基金列表，不加载基金预测
     // 注：定期更新由 updateStrategyManager 统一管理，不再在此单独启动
 
+    // 启动大盘指数条
+    startMarketTicker();
+
     document.getElementById('add-fund-form').addEventListener('submit', function(e) {
         e.preventDefault();
         addFund();
@@ -3283,6 +3286,107 @@ function stopFundAutoUpdate() {
         clearInterval(fundUpdateInterval);
         fundUpdateInterval = null;
     }
+}
+
+
+// ── 大盘指数条 ──────────────────────────────────────────────────────────────
+function startMarketTicker() {
+    const TICKER_INTERVAL = 60 * 1000; // 1分钟刷新
+
+    // 指数显示顺序和短名
+    const INDEX_ORDER = ['上证指数','深证成指','沪深300','创业板指'];
+    const SHORT_NAME  = {
+        '上证指数': '上证',
+        '深证成指': '深证',
+        '沪深300':  '沪深300',
+        '创业板指': '创业板',
+    };
+
+    // 时钟（每秒更新）
+    function startClock() {
+        const clockEl = document.getElementById('market-clock');
+        if (!clockEl) return;
+        function tick() {
+            const now = new Date();
+            const bj = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
+            const h = String(bj.getHours()).padStart(2, '0');
+            const m = String(bj.getMinutes()).padStart(2, '0');
+            const s = String(bj.getSeconds()).padStart(2, '0');
+            clockEl.textContent = `${h}:${m}:${s}`;
+        }
+        tick();
+        setInterval(tick, 1000);
+    }
+
+    // 市场状态
+    function updateMarketStatus() {
+        const statusEl = document.getElementById('market-status');
+        if (!statusEl) return;
+        const now = new Date();
+        const bj  = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
+        const day  = bj.getDay();
+        const mins = bj.getHours() * 60 + bj.getMinutes();
+        const isWeekday = day >= 1 && day <= 5;
+        const isMorning = mins >= 570 && mins < 690;   // 9:30-11:30
+        const isAfternoon = mins >= 780 && mins < 900; // 13:00-15:00
+        const isTrading = isWeekday && (isMorning || isAfternoon);
+        statusEl.textContent = isTrading ? '● 交易中' : '● 休市';
+        statusEl.style.color  = isTrading ? '#28a745'  : '#555';
+    }
+
+    function renderTicker(data) {
+        const inner = document.getElementById('ticker-inner');
+        if (!inner) return;
+        const indices = data.indices || {};
+        if (!Object.keys(indices).length) {
+            inner.innerHTML = '<span style="font-size:11px;color:#333;">暂无数据</span>';
+            return;
+        }
+
+        // 按 INDEX_ORDER 排序，其余追加末尾
+        const ordered = [
+            ...INDEX_ORDER.filter(n => indices[n]),
+            ...Object.keys(indices).filter(n => !INDEX_ORDER.includes(n))
+        ];
+
+        const items = ordered.map((name, i) => {
+            const d     = indices[name];
+            const chg   = (d.change_ratio || 0) * 100;
+            const cls   = chg > 0.005 ? 'tc-up' : chg < -0.005 ? 'tc-down' : 'tc-flat';
+            const sign  = chg >= 0 ? '+' : '';
+            const price = (d.current_price || 0).toFixed(2);
+            const short = SHORT_NAME[name] || name;
+            const sep   = i < ordered.length - 1 ? '<span class="ticker-sep">|</span>' : '';
+            return `<div class="ticker-item">
+                <span class="ticker-name">${short}</span>
+                <span class="ticker-price">${price}</span>
+                <span class="ticker-chg ${cls}">${sign}${chg.toFixed(2)}%</span>
+            </div>${sep}`;
+        }).join('');
+
+        inner.innerHTML = items;
+        updateMarketStatus();
+    }
+
+    function fetchTicker() {
+        const cached = cacheManager.get('marketData');
+        if (cached) renderTicker(cached);
+
+        fetch('/api/market-data')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data) return;
+                cacheManager.set('marketData', data);
+                renderTicker(data);
+            })
+            .catch(() => {});
+    }
+
+    startClock();
+    updateMarketStatus();
+    setInterval(updateMarketStatus, 30 * 1000); // 每30秒更新状态
+    fetchTicker();
+    setInterval(fetchTicker, TICKER_INTERVAL);
 }
 
 // 页面加载时应用设置并启动自动更新
