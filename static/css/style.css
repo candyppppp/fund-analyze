@@ -14,154 +14,169 @@ body {
     margin: 0 auto;
 }
 
+/* ── Header ──────────────────────────────────────────────────────────────── */
 .header {
-    background-color: #1e1e1e;
-    padding: 14px 24px;
+    background-color: #0d0d0d;
+    padding: 14px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid #1e1e1e;
 }
 
 .header h1 {
-    font-size: 18px;
-    font-weight: bold;
+    font-size: 20px;
+    font-weight: 700;
     margin: 0;
-    letter-spacing: 1px;
-    position: relative;
+    letter-spacing: .5px;
     display: inline-block;
 }
 
 .header h1 .fund-part {
     color: #007bff;
-    position: relative;
-    display: inline-block;
 }
 
 .header h1 .tracker-part {
-    color: white;
-    position: relative;
-    display: inline-block;
+    color: #ffffff;
 }
 
 .header-buttons {
     display: flex;
-    gap: 12px;
+    gap: 10px;
 }
 
 .header-buttons button {
     background-color: #2a2a2a;
-    color: #e0e0e0;
+    color: #c0c0c0;
     border: 1px solid #333;
-    padding: 8px 14px;
-    border-radius: 4px;
-    font-size: 12px;
+    padding: 7px 16px;
+    border-radius: 6px;
+    font-size: 13px;
     cursor: pointer;
+    letter-spacing: .3px;
+    transition: background .15s;
 }
 
 .header-buttons button:hover {
-    background-color: #333;
+    background-color: #383838;
 }
 
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
 .tabs {
-    background-color: #1e1e1e;
-    padding: 10px 24px;
+    background-color: #111;
+    padding: 10px 20px;
     display: flex;
-    gap: 14px;
-    border-bottom: 1px solid #333;
+    gap: 10px;
+    border-bottom: 1px solid #1e1e1e;
 }
 
 .tab {
-    background-color: #2a2a2a;
-    color: #e0e0e0;
-    border: none;
-    padding: 8px 14px;
-    border-radius: 4px;
-    font-size: 12px;
+    background-color: #1e1e1e;
+    color: #999;
+    border: 1px solid #2a2a2a;
+    padding: 7px 18px;
+    border-radius: 6px;
+    font-size: 13px;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 5px;
+    transition: all .15s;
+}
+
+.tab:hover {
+    color: #ccc;
+    border-color: #383838;
 }
 
 .tab.active {
     background-color: #007bff;
     color: white;
+    border-color: #007bff;
 }
 
+/* ── Search / Add ────────────────────────────────────────────────────────── */
 .search-container {
-    background-color: #1e1e1e;
-    padding: 16px 24px;
+    background-color: #111;
+    padding: 14px 20px;
     display: flex;
-    gap: 12px;
+    gap: 10px;
     align-items: center;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid #1e1e1e;
 }
 
 .search-input {
     flex: 1;
-    background-color: #2a2a2a;
+    background-color: #1e1e1e;
     color: #e0e0e0;
-    border: 1px solid #333;
-    padding: 10px 14px;
-    border-radius: 4px;
+    border: 1px solid #2a2a2a;
+    padding: 9px 14px;
+    border-radius: 6px;
     font-size: 14px;
+    outline: none;
+    transition: border-color .15s;
+}
+
+.search-input:focus {
+    border-color: #007bff;
 }
 
 .search-input::placeholder {
-    color: #888;
+    color: #555;
 }
 
 .add-button {
     background-color: #007bff;
     color: white;
     border: none;
-    padding: 10px 18px;
-    border-radius: 4px;
+    padding: 9px 20px;
+    border-radius: 6px;
     font-size: 14px;
-    font-weight: bold;
+    font-weight: 600;
     cursor: pointer;
+    white-space: nowrap;
+    transition: background .15s;
 }
 
 .add-button:hover {
     background-color: #0069d9;
 }
 
+/* ── Group Count ─────────────────────────────────────────────────────────── */
 .group-info {
-    background-color: #1e1e1e;
-    padding: 12px 24px;
+    background-color: #111;
+    padding: 10px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid #333;
-}
-
-.group-info h2 {
-    font-size: 14px;
-    font-weight: normal;
-    margin: 0;
+    border-bottom: 1px solid #1e1e1e;
 }
 
 .group-count {
-    font-weight: bold;
+    font-weight: 700;
     color: #007bff;
     font-size: 14px;
 }
 
+/* ── Fund List ───────────────────────────────────────────────────────────── */
 .fund-list {
-    padding: 14px 24px;
+    padding: 12px 20px;
 }
 
 .fund-item {
-    background-color: #1e1e1e;
+    background-color: #1a1a1a;
     padding: 14px;
-    border-radius: 6px;
+    border-radius: 8px;
     margin-bottom: 8px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border: 1px solid #333;
+    border: 1px solid #252525;
+    transition: border-color .15s;
+}
+
+.fund-item:hover {
+    border-color: #333;
 }
 
 .fund-info {
@@ -170,17 +185,18 @@ body {
 
 .fund-name {
     font-size: 14px;
-    font-weight: bold;
-    color: white;
+    font-weight: 600;
+    color: #e8e8e8;
     margin-bottom: 4px;
 }
 
 .fund-details {
     display: flex;
-    gap: 12px;
+    gap: 8px;
     font-size: 12px;
     color: #aaa;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .fund-detail {
@@ -189,7 +205,7 @@ body {
     gap: 8px;
 }
 
-/* 所有标签统一规格 */
+/* ── Tags ────────────────────────────────────────────────────────────────── */
 .fund-type-tag,
 .fund-detail-box {
     display: inline-flex;
@@ -205,39 +221,36 @@ body {
 }
 
 .fund-type-tag {
-    background-color: #007bff;
-    color: white;
-    border: 1px solid transparent;
-    gap: 0;
+    background-color: rgba(0, 123, 255, .15);
+    color: #4a9eff;
+    border: 1px solid rgba(0, 123, 255, .25);
 }
 
 .fund-detail-box {
-    background-color: #2a2a2a;
-    border: 1px solid #333;
-    color: #ccc;
+    background-color: #222;
+    border: 1px solid #2e2e2e;
+    color: #bbb;
     gap: 4px;
 }
 
-/* 暂未买入标签和其他标签等高 */
 .fund-no-holding {
-    background-color: #2a2a2a;
-    border: 1px solid #333 !important;
+    background-color: #1e1e1e;
+    border: 1px solid #2a2a2a !important;
     color: #555 !important;
 }
+
 .fund-no-holding span {
     color: #555;
     font-size: 11px;
-    line-height: 18px;
 }
 
-.rsi-emoji {
-    font-size: 11px;
-}
+.rsi-emoji { font-size: 11px; }
 
+/* ── Fund Performance ────────────────────────────────────────────────────── */
 .fund-performance {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 14px;
     flex-wrap: nowrap;
 }
 
@@ -257,13 +270,13 @@ body {
     flex-direction: column;
     align-items: flex-end;
     gap: 2px;
-    min-width: 80px;
+    min-width: 76px;
 }
 
 .fund-return {
     font-size: 16px;
-    font-weight: bold;
-    color: #dc3545;
+    font-weight: 700;
+    color: #e84040;
     min-height: 20px;
     text-align: right;
 }
@@ -274,14 +287,16 @@ body {
 
 .fund-return-label {
     font-size: 10px;
-    color: #aaa;
+    color: #888;
     text-align: right;
+    white-space: nowrap;
 }
 
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
 .real-time-btn {
-    background-color: #2a2a2a;
-    color: #e0e0e0;
-    border: 1px solid #333;
+    background-color: #1e1e1e;
+    color: #ccc;
+    border: 1px solid #2e2e2e;
     padding: 6px 10px;
     border-radius: 4px;
     font-size: 10px;
@@ -289,28 +304,30 @@ body {
     display: flex;
     align-items: center;
     gap: 4px;
+    transition: background .15s;
 }
 
-.real-time-btn:hover {
-    background-color: #3a3a5a;
-}
+.real-time-btn:hover { background-color: #2a2a2a; }
 
 .delete-btn {
-    background-color: #dc3545;
-    color: white;
-    border: none;
+    background-color: rgba(220,53,69,.15);
+    color: #dc3545;
+    border: 1px solid rgba(220,53,69,.25);
     padding: 6px 10px;
     border-radius: 4px;
     font-size: 10px;
     cursor: pointer;
+    transition: background .15s;
 }
 
+.delete-btn:hover { background-color: rgba(220,53,69,.25); }
+
+/* ── Charts ──────────────────────────────────────────────────────────────── */
 .fund-charts {
-    background-color: #16213e;
+    background-color: #141414;
     padding: 20px;
     border-radius: 8px;
     margin-top: 10px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 .chart-container {
@@ -326,10 +343,8 @@ body {
     margin-bottom: 15px;
 }
 
-/* 投资建议模块样式 */
-.investment-advice-container {
-    padding: 20px;
-}
+/* ── Investment Advice ───────────────────────────────────────────────────── */
+.investment-advice-container { padding: 20px; }
 
 .investment-advice-container h2 {
     color: #e0e0e0;
@@ -338,66 +353,32 @@ body {
 }
 
 .advice-section {
-    background-color: #1e1e1e;
-    border-radius: 6px;
+    background-color: #1a1a1a;
+    border-radius: 8px;
     padding: 16px;
     margin-bottom: 20px;
-    border: 1px solid #333;
+    border: 1px solid #252525;
 }
 
-.advice-section h3 {
-    color: #007bff;
-    font-size: 14px;
-    margin-bottom: 12px;
-}
+.advice-section h3 { color: #007bff; font-size: 14px; margin-bottom: 12px; }
 
-.advice-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
+.advice-list { display: flex; flex-direction: column; gap: 12px; }
 
 .advice-item {
-    background-color: #2a2a2a;
-    border-radius: 4px;
+    background-color: #222;
+    border-radius: 6px;
     padding: 10px;
-    border: 1px solid #333;
+    border: 1px solid #2a2a2a;
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-.advice-fund {
-    font-weight: bold;
-    color: #e0e0e0;
-    font-size: 14px;
-    line-height: 1.2;
-}
-
-.advice-action-row {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-}
-
-.advice-action {
-    color: #007bff;
-    font-size: 12px;
-    font-weight: bold;
-    line-height: 1.2;
-}
-
-.advice-shares {
-    color: #4CAF50;
-    font-size: 12px;
-    line-height: 1.2;
-}
-
-.advice-reason {
-    color: #aaa;
-    font-size: 12px;
-    line-height: 1.3;
-}
+.advice-fund { font-weight: 600; color: #e0e0e0; font-size: 14px; }
+.advice-action-row { display: flex; gap: 12px; align-items: center; }
+.advice-action { color: #007bff; font-size: 12px; font-weight: 600; }
+.advice-shares { color: #4CAF50; font-size: 12px; }
+.advice-reason { color: #999; font-size: 12px; line-height: 1.4; }
 
 .add-fund-btn {
     background-color: #007bff;
@@ -408,48 +389,48 @@ body {
     font-size: 12px;
     cursor: pointer;
     align-self: flex-start;
+    transition: background .15s;
 }
 
-.add-fund-btn:hover {
-    background-color: #0069d9;
-}
-/* ── 排序按钮 ──────────────────────────────────────────── */
+.add-fund-btn:hover { background-color: #0069d9; }
+
+/* ── Sort Button ─────────────────────────────────────────────────────────── */
 .sort-btn {
     display: inline-flex;
     align-items: center;
     padding: 4px 10px;
     font-size: 12px;
-    color: #888;
+    color: #777;
     background: transparent;
-    border: 1px solid #333;
+    border: 1px solid #2a2a2a;
     border-radius: 6px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all .15s;
     white-space: nowrap;
 }
-.sort-btn:hover { border-color: #555; color: #bbb; }
+
+.sort-btn:hover { border-color: #444; color: #bbb; }
 .sort-btn.sort-active { border-color: #4a9eff; color: #4a9eff; background: rgba(74,158,255,.08); }
 
-
-/* ── 移动端响应式适配 ─────────────────────────────────── */
+/* ── Mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
     body { font-size: 14px; }
 
     .header { padding: 10px 14px; }
-    .header h1 { font-size: 16px; }
+    .header h1 { font-size: 18px; }
+    .header-buttons button { padding: 6px 12px; font-size: 12px; }
 
     .tabs { padding: 8px 14px; gap: 8px; }
-    .tab { padding: 7px 12px; font-size: 12px; }
+    .tab { padding: 7px 14px; font-size: 12px; }
 
     .search-container { padding: 10px 14px; gap: 8px; }
     .search-input { font-size: 13px; padding: 8px 10px; }
-    .add-button { padding: 8px 14px; font-size: 13px; white-space: nowrap; }
+    .add-button { padding: 8px 14px; font-size: 13px; }
 
     #fund-list-header { padding: 6px 14px 4px; }
-
     .fund-list { padding: 10px 14px; }
 
-    /* 卡片改为上下两行布局 */
+    /* 卡片竖向布局 */
     .fund-item {
         flex-direction: column;
         align-items: stretch;
@@ -458,108 +439,32 @@ body {
     }
 
     .fund-name { font-size: 13px; margin-bottom: 6px; }
+    .fund-details { flex-wrap: wrap; gap: 6px; }
+    .fund-detail-box, .fund-type-tag { height: 20px; padding: 0 7px; font-size: 11px; }
 
-    .fund-details {
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-
-    .fund-detail-box,
-    .fund-type-tag {
-        height: 20px;
-        padding: 0 7px;
-        font-size: 11px;
-    }
-
-    /* 数据列：手机上横向铺满4列 */
+    /* 数据行：手机横向4列 */
     .fund-performance {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         gap: 4px;
         width: 100%;
-    }
-
-    .fund-return-container {
-        align-items: center;
-        min-width: unset;
-        padding: 6px 4px;
-        background: #242424;
-        border-radius: 6px;
-    }
-
-    .fund-return {
-        font-size: 13px;
-        text-align: center;
-    }
-
-    .fund-return-label {
-        font-size: 9px;
-        text-align: center;
-        white-space: nowrap;
-    }
-}
-
-/* ── 移动端响应式 ─────────────────────────────────────────────────────────── */
-@media (max-width: 600px) {
-    .container { padding: 0; }
-
-    .header { padding: 10px 14px; }
-    .header h1 { font-size: 20px; }
-    .header button { padding: 6px 10px; font-size: 12px; }
-
-    .tabs { padding: 8px 14px; gap: 8px; }
-    .tab { padding: 7px 16px; font-size: 13px; }
-
-    .search-container { padding: 8px 14px; }
-    .search-input { font-size: 14px; padding: 8px 12px; }
-    .add-button { padding: 8px 14px; font-size: 13px; }
-
-    #fund-list-header { padding: 6px 14px 4px; }
-
-    .fund-list { padding: 8px 14px; }
-
-    /* 基金卡片：竖向布局 */
-    .fund-item {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
-        padding: 12px;
-    }
-
-    .fund-info { width: 100%; }
-
-    .fund-name { font-size: 13px; }
-
-    .fund-details {
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-
-    .fund-detail-box { font-size: 11px; padding: 3px 6px; }
-    .fund-type-tag { font-size: 10px; padding: 3px 6px; }
-
-    /* 右侧数据行：横向4格 */
-    .fund-performance {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 4px;
-        width: 100%;
-        border-top: 1px solid #2a2a2a;
+        border-top: 1px solid #222;
         padding-top: 8px;
     }
 
     .fund-return-container {
         align-items: center;
         min-width: unset;
+        padding: 6px 4px;
+        background: #1e1e1e;
+        border-radius: 6px;
     }
 
     .fund-return { font-size: 13px; text-align: center; }
-    .fund-return-label { font-size: 9px; text-align: center; }
+    .fund-return-label { font-size: 9px; text-align: center; white-space: nowrap; }
 
-    /* 投资建议页移动适配 */
-    .ia-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
-    }
+    /* 投资建议 */
+    .ia-grid { grid-template-columns: repeat(2, 1fr) !important; }
     .ia-card { padding: 14px; }
     .ia-fund-title { font-size: 13px; }
 }
@@ -568,9 +473,9 @@ body {
     .fund-performance { grid-template-columns: repeat(2, 1fr); }
     .fund-return { font-size: 12px; }
 }
-/* ── 弹窗移动端适配 ─────────────────────────────────── */
+
+/* ── Modal Mobile ────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
-    /* 弹窗顶部：标题和 tab 改为上下布局 */
     .modal-content > div:first-child {
         flex-direction: column !important;
         align-items: flex-start !important;
@@ -578,12 +483,7 @@ body {
         padding: 12px 14px !important;
     }
 
-    /* tab 按钮组撑满宽度 */
     .modal-content > div:first-child > div:last-child {
-        width: 100% !important;
-    }
-
-    .modal-content > div:first-child > div:last-child > div {
         width: 100% !important;
         display: flex !important;
     }
@@ -595,7 +495,6 @@ body {
         font-size: 13px !important;
     }
 
-    /* 决策内容：三列改两列，去掉强制不换行 */
     #decision-tab [style*="grid-template-columns: repeat(3"] {
         grid-template-columns: repeat(2, 1fr) !important;
     }
@@ -605,30 +504,17 @@ body {
         word-break: break-all;
     }
 
-    /* 决策智能分析文字块 */
-    #decision-tab p, #decision-tab div {
-        word-break: break-word;
-        overflow-wrap: break-word;
-    }
+    #decision-tab p, #decision-tab div { word-break: break-word; overflow-wrap: break-word; }
 
-    /* 弹窗内边距收窄 */
     #decision-tab > div,
     #details-tab > div,
-    #holding-tab > div {
-        padding: 10px 14px !important;
-    }
-}
+    #holding-tab > div { padding: 10px 14px !important; }
 
-/* 势头信号三列 → 手机单列 */
-@media (max-width: 600px) {
     #decision-tab [style*="grid-template-columns: repeat(3, 1fr)"] {
         grid-template-columns: 1fr !important;
         gap: 12px !important;
     }
-}
 
-/* 决策 tab 数据区：移动端两列 */
-@media (max-width: 600px) {
     #decision-tab .data-grid-3 {
         grid-template-columns: repeat(2, 1fr) !important;
         gap: 12px 16px !important;
