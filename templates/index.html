@@ -24,43 +24,27 @@
             display:flex;
             align-items:center;
             height:42px;
-            overflow:hidden;
             flex-shrink:0;
+            justify-content:center; /* 添加居中 */
         ">
-            <!-- 指数列表（滚动区） -->
-            <div id="ticker-inner" style="
-                display:flex;
-                align-items:stretch;
-                flex:1;
-                overflow-x:auto;
-                scrollbar-width:none;
-                -ms-overflow-style:none;
-                white-space:nowrap;
-                height:100%;
-            ">
-                <span style="font-size:12px;color:#444;align-self:center;padding-left:4px;">加载中...</span>
-            </div>
-            <!-- 右侧：市场状态 + 时间 -->
-            <div id="ticker-status" style="
-                display:flex;
-                flex-direction:column;
-                align-items:flex-end;
-                flex-shrink:0;
-                margin-left:20px;
-                gap:2px;
-            ">
-                <span id="market-status" style="font-size:11px;color:#666;letter-spacing:.3px;">--</span>
-                <span id="market-clock" style="font-size:12px;color:#666;font-variant-numeric:tabular-nums;letter-spacing:.8px;">--:--:--</span>
+            <!-- 指数列表（居中显示）  -->
+        <div id="ticker-inner" style="
+            display:flex;
+            align-items:center;
+            height:100%;
+            gap:16px; /* 可以添加项目间距 */
+        ">
+            <span style="font-size:12px;color:#444;align-self:center;padding-left:4px;">加载中...</span>
             </div>
         </div>
         <style>
-            #ticker-inner::-webkit-scrollbar { display:none; }
             .ticker-item {
                 display:inline-flex;
                 align-items:center;
-                gap:5px;
+                justify-content: center; /* 内容居中 */
+                gap:6px;
                 flex-shrink:0;
-                padding:0 20px;
+                padding:0 12px;
                 height:100%;
                 border-right:1px solid #1a1a1a;
                 box-sizing:border-box;
