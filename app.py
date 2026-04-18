@@ -3,7 +3,7 @@ from flask_cors import CORS
 
 from models.fund import Fund
 
-from models.user import user_manager
+from models.user import user_manager, ADMIN_USERNAME
 
 from utils.indicators import calculate_rsi, calculate_volatility
 
@@ -11,15 +11,17 @@ from utils.data_sources import data_source_manager
 
 from utils.fund_recommender import get_recommended_funds as get_recommended_funds_engine
 
+from middleware import performance_monitor, rate_limit
+
 import time
 import requests
 import json
 import re
+import os
 from datetime import datetime, timedelta
 import logging
 
 from db import supabase, supabase_admin
-import os
 
 # 检查是否在 Vercel 环境中
 is_vercel = os.environ.get('VERCEL') is not None
@@ -39,8 +41,6 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-import os
-
 # 获取应用根目录
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -48,9 +48,8 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__,
             static_folder=os.path.join(base_dir, 'static'),
             template_folder=os.path.join(base_dir, 'templates'))
-import os as _os
 
-_cors_origins = _os.environ.get('CORS_ORIGINS', '').split(',')
+_cors_origins = os.environ.get('CORS_ORIGINS', '').split(',')
 _cors_origins = [o.strip() for o in _cors_origins if o.strip()] or ['*']
 
 import secrets as _secrets
@@ -453,13 +452,20 @@ def get_stock_real_time_data(stock_code):
 
 # 获取市场数据（大盘指数）
 def get_market_data():
-    """获取大盘指数实时数据，使用东方财富 JSON 接口（对境外服务器友好）"""
+    """获取大盘指数实时数据，使用东方财富 JSON 接口
+    包含：上证、深证、沪深300、上证50、创业板、科创50
+    """
     try:
-        # 东方财富批量行情接口
-        # secids: 1.000001=上证, 0.399001=深证, 0.399006=创业板, 1.000300=沪深300
+        # secids:
+        #   1.000001 = 上证指数
+        #   0.399001 = 深证成指
+        #   1.000300 = 沪深300
+        #   1.000016 = 上证50
+        #   0.399006 = 创业板指
+        #   1.000688 = 科创50
         url = ("https://push2.eastmoney.com/api/qt/ulist.np/get"
                "?fltt=2&invt=2&fields=f12,f14,f3,f4,f2"
-               "&secids=1.000001,0.399001,0.399006,1.000300")
+               "&secids=1.000001,0.399001,1.000300,1.000016,0.399006,1.000688")
         headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.eastmoney.com/"}
         resp = requests.get(url, headers=headers, timeout=5)
 
@@ -467,8 +473,10 @@ def get_market_data():
         name_map = {
             '000001': '上证指数',
             '399001': '深证成指',
-            '399006': '创业板指',
             '000300': '沪深300',
+            '000016': '上证50',
+            '399006': '创业板指',
+            '000688': '科创50',
         }
 
         if resp.status_code == 200:
@@ -543,8 +551,8 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        if request.method == 'POST' and not validate_csrf_token():
-            return jsonify({'error': 'CSRF 验证失败'}), 403
+        if not validate_csrf_token():
+            return render_template('login.html', error='请求验证失败，请刷新页面重试')
         username = request.form.get('username')
         password = request.form.get('password')
 
@@ -553,7 +561,7 @@ def login():
         if user:
             # 设置会话
             session['username'] = user.username
-            session['is_admin'] = (username == 'candyp')  # candyp 作为管理员
+            session['is_admin'] = (username == ADMIN_USERNAME)  # 管理员判断
             session.permanent = True  # 使会话持久化
 
             # 加载用户的基金数据
@@ -591,105 +599,54 @@ def account_management():
     error = None
     success = None
 
-    if request.method == 'POST' and not validate_csrf_token():
-        return jsonify({'error': 'CSRF 验证失败'}), 403
     if request.method == 'POST':
-        action = request.form.get('action')
+        if not validate_csrf_token():
+            error = '请求验证失败，请刷新页面重试'
+        else:
+            action = request.form.get('action')
 
-        if action == 'add':
-            # 新增账户
-            new_username = request.form.get('new_username')
-            new_password = request.form.get('new_password')
-            permissions = request.form.getlist('permissions')
+            if action == 'add':
+                # 新增账户
+                new_username = request.form.get('new_username')
+                new_password = request.form.get('new_password')
+                permissions = request.form.getlist('permissions')
 
-            if new_username and new_password:
-                # 创建新用户
-                user = user_manager.create_user(new_username, new_password, permissions)
-                if user:
-                    success = '账户添加成功'
+                if new_username and new_password:
+                    user = user_manager.create_user(new_username, new_password, permissions)
+                    if user:
+                        success = '账户添加成功'
+                    else:
+                        error = '用户名已存在'
                 else:
-                    error = '用户名已存在'
-            else:
-                error = '请填写完整的账户信息'
+                    error = '请填写完整的账户信息'
 
-        elif action == 'delete':
-            # 删除账户
-            username = request.form.get('username')
-            if username and username != 'candyp':  # 不允许删除管理员账户
-                # 找到用户并删除
-                user_to_delete = None
-                for user_id, user in user_manager.users.items():
-                    if user.username == username:
-                        user_to_delete = user_id
-                        break
+            elif action == 'delete':
+                # 删除账户
+                username = request.form.get('username')
+                if username and username != ADMIN_USERNAME:  # 不允许删除管理员账户
+                    user_to_delete = None
+                    for user_id, user in user_manager.users.items():
+                        if user.username == username:
+                            user_to_delete = user_id
+                            break
 
-                if user_to_delete:
-                    user_manager.delete_user(user_to_delete)
-                    success = '账户删除成功'
+                    if user_to_delete:
+                        user_manager.delete_user(user_to_delete)
+                        success = '账户删除成功'
+                    else:
+                        error = '账户不存在'
                 else:
-                    error = '账户不存在'
-            else:
-                error = '无法删除管理员账户'
+                    error = '无法删除管理员账户'
 
     # 获取所有用户
     users = list(user_manager.users.values())
 
-    return render_template('account_management.html', users=users, error=error, success=success)
+    return render_template('account_management.html',
+                           users=users,
+                           error=error,
+                           success=success,
+                           admin_username=ADMIN_USERNAME)
 
-
-# 性能监控装饰器
-import time
-from functools import wraps
-
-
-def performance_monitor(func):
-    """性能监控装饰器"""
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        execution_time = (end_time - start_time) * 1000
-        logger.info(f"{func.__name__} 执行时间: {execution_time:.2f}ms")
-        return result
-
-    return wrapper
-
-
-# 请求限流
-from flask import request, jsonify
-
-# 简单的内存限流实现
-request_counts = {}
-RATE_LIMIT = 60  # 每分钟最大请求数
-RATE_LIMIT_WINDOW = 60  # 时间窗口（秒）
-
-
-def rate_limit(func):
-    """请求限流装饰器"""
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        ip = request.remote_addr
-        now = time.time()
-
-        # 清理过期的请求记录
-        if ip in request_counts:
-            # 过滤出时间窗口内的请求
-            request_counts[ip] = [t for t in request_counts[ip] if now - t < RATE_LIMIT_WINDOW]
-            # 检查是否超过限流
-            if len(request_counts[ip]) >= RATE_LIMIT:
-                logger.warning(f"IP {ip} 请求过于频繁")
-                return jsonify({'error': '请求过于频繁，请稍后再试'}), 429
-        else:
-            request_counts[ip] = []
-
-        # 记录本次请求
-        request_counts[ip].append(now)
-        return func(*args, **kwargs)
-
-    return wrapper
 
 
 @app.route('/api/funds', methods=['GET'])
@@ -1106,12 +1063,44 @@ def get_investment_advice():
         if 'username' not in session:
             return jsonify({'error': '未登录'}), 401
 
-        logger.info('获取投资建议')
+        username = session['username']
+        force_refresh = request.args.get('refresh', '0') == '1'
+
+        # ── 1. 非强制刷新时：优先读 Supabase 缓存 ──────────────────────────
+        if not force_refresh:
+            try:
+                cache_row = supabase.table('investment_advice_cache') \
+                    .select('data,updated_at') \
+                    .eq('username', username) \
+                    .execute()
+                if cache_row.data:
+                    row = cache_row.data[0]
+                    updated_at_str = row.get('updated_at', '')
+                    cached_data = row.get('data')
+                    if updated_at_str and cached_data:
+                        from datetime import timezone
+                        updated_at = datetime.fromisoformat(updated_at_str.replace('Z', '+00:00'))
+                        age_minutes = (datetime.now(timezone.utc) - updated_at).total_seconds() / 60
+                        has_real_data = (
+                            cached_data.get('holdingsAdvice') or
+                            cached_data.get('recommendedFunds')
+                        )
+                        # 缓存未超过 60 分钟且有实质数据 → 直接返回
+                        if age_minutes < 60 and has_real_data:
+                            logger.info(f'投资建议命中 Supabase 缓存（{age_minutes:.1f} 分钟前生成）')
+                            cached_data['_cache_time'] = int(updated_at.timestamp() * 1000)
+                            return jsonify(cached_data)
+                        else:
+                            logger.info(f'Supabase 缓存已过期（{age_minutes:.1f} 分钟），重新生成')
+            except Exception as _ce:
+                logger.warning(f'读取 Supabase 投资建议缓存失败: {_ce}')
+
+        logger.info('获取投资建议（重新生成）')
 
         # Vercel 无状态：确保内存有数据
         global funds
         if not funds:
-            load_funds(session['username'])
+            load_funds(username)
 
         # 并行拉所有基金实时估值，更新 predicted_return
         # 否则从 Supabase 加载的历史值可能全是0，导致全部判断为"持有"
@@ -1253,7 +1242,23 @@ def get_investment_advice():
             logger.error(f'推荐引擎异常: {e}')
             recommendedFunds = []
 
-        return jsonify({'holdingsAdvice': holdingsAdvice, 'recommendedFunds': recommendedFunds})
+        result = {'holdingsAdvice': holdingsAdvice, 'recommendedFunds': recommendedFunds}
+
+        # ── 2. 写回 Supabase 缓存（upsert，只在有实质数据时写）────────────────
+        if holdingsAdvice or recommendedFunds:
+            try:
+                from datetime import timezone as _tz
+                now_utc = datetime.now(_tz.utc).isoformat()
+                supabase_admin.table('investment_advice_cache').upsert({
+                    'username': username,
+                    'data': result,
+                    'updated_at': now_utc,
+                }, on_conflict='username').execute()
+                logger.info('投资建议已写入 Supabase 缓存')
+            except Exception as _se:
+                logger.warning(f'写入 Supabase 投资建议缓存失败（不影响返回）: {_se}')
+
+        return jsonify(result)
     except Exception as e:
         logger.error(f'获取投资建议失败: {e}')
         return jsonify({'holdingsAdvice': [], 'recommendedFunds': []})

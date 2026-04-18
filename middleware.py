@@ -40,6 +40,10 @@ def rate_limit(func):
             logger.warning(f"IP {ip} 请求过频 ({len(timestamps)}/{RATE_LIMIT})")
             return jsonify({'error': '请求过于频繁，请稍后再试'}), 429
         timestamps.append(now)
-        _request_counts[ip] = timestamps
+        if timestamps:
+            _request_counts[ip] = timestamps
+        else:
+            # 清理空键，防止字典无限膨胀
+            _request_counts.pop(ip, None)
         return func(*args, **kwargs)
     return wrapper
