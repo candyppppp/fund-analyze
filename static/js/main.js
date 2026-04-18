@@ -3262,8 +3262,6 @@ function startMarketTicker() {
         const isMorning   = mins >= 570 && mins < 690;   // 9:30-11:30
         const isAfternoon = mins >= 780 && mins < 900;   // 13:00-15:00
         const isTrading = isWeekday && (isMorning || isAfternoon);
-        statusEl.textContent = isTrading ? '● 交易中' : '● 休市';
-        statusEl.style.color  = isTrading ? '#28a745'  : '#555';
     }
 
     function renderTicker(data) {
