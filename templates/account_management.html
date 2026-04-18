@@ -259,7 +259,7 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if user.username != 'candyp' %} <!-- 不允许删除管理员账户 -->
+                                {% if user.username != admin_username %} <!-- 不允许删除管理员账户 -->
                                 <form method="POST" action="{{ url_for('account_management') }}" style="display: inline;">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
                                     <input type="hidden" name="action" value="delete">
