@@ -6,7 +6,40 @@ class InvestmentAdvice {
     constructor() {
         this.cacheKey = 'investmentAdvice';
         this._timer = null;
+        this._warmupPromise = null; // warmup 的 Promise，loadInvestmentAdvice 可以等它
         this._startAutoRefresh();
+        // 页面加载时立即后台预热——不管在哪个 tab，先静默拉一次 Supabase 缓存
+        // 这样用户切换到「基金投资」时大概率已经有数据，不需要等待
+        this._warmup();
+    }
+
+    // 页面加载时静默预热：把结果存到内存缓存，供 loadInvestmentAdvice 直接用
+    _warmup() {
+        const cached = cacheManager.get(this.cacheKey);
+        const hasData = cached &&
+            ((cached.holdingsAdvice && cached.holdingsAdvice.length > 0) ||
+             (cached.recommendedFunds && cached.recommendedFunds.length > 0));
+        if (hasData) {
+            this._warmupPromise = Promise.resolve(cached);
+            return;
+        }
+
+        const _lvl = (() => { try { return JSON.parse(localStorage.getItem('fundTrackerSettings') || '{}').investmentLevel || 'small'; } catch(e) { return 'small'; } })();
+        this._warmupPromise = fetch('/api/investment-advice?level=' + _lvl)
+            .then(r => r.ok ? r.json() : null)
+            .then(a => {
+                if (!a) return null;
+                const ok = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
+                           (a.recommendedFunds && a.recommendedFunds.length > 0);
+                if (ok) {
+                    if (!a._cache_time) a._cache_time = Date.now();
+                    cacheManager.set(this.cacheKey, a, ADVICE_TTL);
+                    if (window.activeTab === 'investment-advice') this.displayAdvice(a);
+                    return a;
+                }
+                return null;
+            })
+            .catch(() => null);
     }
 
     // 判断是否交易时间（周一至周五 9:30-15:00，北京时间）
@@ -61,7 +94,7 @@ class InvestmentAdvice {
     loadInvestmentAdvice() {
         const _lvl = (() => { try { return JSON.parse(localStorage.getItem('fundTrackerSettings') || '{}').investmentLevel || 'small'; } catch(e) { return 'small'; } })();
 
-        // 有缓存且有实质数据 → 立即展示，缓存剩余不足一半才后台刷新（不浪费请求）
+        // ── 内存缓存命中：立即展示 ──────────────────────────────────────────────
         const cached = cacheManager.get(this.cacheKey);
         const cacheHasData = cached &&
             ((cached.holdingsAdvice && cached.holdingsAdvice.length > 0) ||
@@ -69,28 +102,42 @@ class InvestmentAdvice {
 
         if (cacheHasData) {
             if (window.activeTab === 'investment-advice') this.displayAdvice(cached);
-            // 缓存剩余时间不足一半时才触发后台刷新，避免每次点击都发请求
+            // 剩余不足一半 TTL 时后台悄悄刷新
             const remaining = cacheManager.getRemainingTime(this.cacheKey);
-            const halfTTL = ADVICE_TTL / 2;
-            if (remaining < halfTTL) this.updateInBackground();
+            if (remaining < ADVICE_TTL / 2) this.updateInBackground();
             return;
         }
 
-        // 无缓存：正常加载
-        if (window.activeTab === 'investment-advice') this.showLoadingState();
-        fetch('/api/investment-advice?level=' + _lvl)
-            .then(r => { if (r.status === 401) { window.location.href='/login'; return Promise.reject('401'); } return r.json(); })
-            .then(a => {
-                const hasData = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
-                                (a.recommendedFunds && a.recommendedFunds.length > 0);
-                if (hasData) {
-                    // 优先使用后端返回的缓存时间（Supabase 缓存命中时），否则用当前时间
-                    if (!a._cache_time) a._cache_time = Date.now();
-                    cacheManager.set(this.cacheKey, a, ADVICE_TTL);
-                }
-                if (window.activeTab === 'investment-advice') this.displayAdvice(a);
-            })
-            .catch(e => { if (e !== '401' && window.activeTab === 'investment-advice') this.displayDefaultAdvice(); });
+        // ── 无缓存：先等 warmup（页面加载时已经发出去的请求） ──────────────────
+        // warmup 完成后若有数据直接展示，不需要再发一次请求
+        const warmup = this._warmupPromise || Promise.resolve(null);
+        warmup.then(warmupData => {
+            // warmup 可能刚好拿到数据了
+            const nowCached = cacheManager.get(this.cacheKey);
+            const nowHasData = nowCached &&
+                ((nowCached.holdingsAdvice && nowCached.holdingsAdvice.length > 0) ||
+                 (nowCached.recommendedFunds && nowCached.recommendedFunds.length > 0));
+
+            if (nowHasData) {
+                if (window.activeTab === 'investment-advice') this.displayAdvice(nowCached);
+                return;
+            }
+
+            // warmup 也没拿到（首次加载 Supabase 缓存为空），才真正显示 loading 并重新请求
+            if (window.activeTab === 'investment-advice') this.showLoadingState();
+            fetch('/api/investment-advice?level=' + _lvl)
+                .then(r => { if (r.status === 401) { window.location.href='/login'; return Promise.reject('401'); } return r.json(); })
+                .then(a => {
+                    const ok = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
+                               (a.recommendedFunds && a.recommendedFunds.length > 0);
+                    if (ok) {
+                        if (!a._cache_time) a._cache_time = Date.now();
+                        cacheManager.set(this.cacheKey, a, ADVICE_TTL);
+                    }
+                    if (window.activeTab === 'investment-advice') this.displayAdvice(a);
+                })
+                .catch(e => { if (e !== '401' && window.activeTab === 'investment-advice') this.displayDefaultAdvice(); });
+        });
     }
 
     updateInBackground() {

@@ -423,98 +423,46 @@ function processFunds(funds) {
 }
 
 function loadFunds() {
+    // 无条件清掉 localStorage 中的 funds —— 它存的是精简格式（无 prices），
+    // renderFunds 需要完整数据，用它预渲染必然报错。数据来源改为内存缓存 + API。
+    try { localStorage.removeItem('funds'); } catch (e) { /* 忽略 */ }
+
     return new Promise((resolve, reject) => {
-        // 显示加载状态
         showLoading('加载基金数据中...');
 
-        // 检查本地存储
-        let fundsData = null;
-        try {
-            const storedFunds = localStorage.getItem('funds');
-            if (storedFunds) {
-                fundsData = JSON.parse(storedFunds);
-                // 先显示本地数据，提供即时反馈
-                renderFunds(fundsData);
-                hideLoading();
-                // 启动每个基金的持仓更新定时器
-                startFundHoldingsUpdateIntervals(fundsData);
-            }
-        } catch (error) {
-            console.error('读取本地存储失败:', error);
-        }
-
-        // 检查缓存
+        // ── 优先：本次页面内存缓存（含完整 prices/dates）───────────────────────
         const cachedFunds = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
-        if (cachedFunds) {
-            // 显示缓存数据
+        if (cachedFunds && cachedFunds.length > 0) {
             renderFunds(cachedFunds);
             hideLoading();
-            // 启动每个基金的持仓更新定时器
             startFundHoldingsUpdateIntervals(cachedFunds);
-        }
-
-        // 后台更新数据，即使网络不好也不影响显示
-        updateFundsInBackground();
-
-        // 确保至少返回本地存储的数据
-        if (fundsData) {
-            resolve(fundsData);
-        } else if (cachedFunds) {
+            updateFundsInBackground(); // 后台静默更新
             resolve(cachedFunds);
-        } else {
-            // 从API获取最新数据
-            fetch('/api/funds')
-                .then(response => {
-                    if (response.status === 401) {
-                        // 未登录，重定向到登录页面
-                        window.location.href = '/login';
-                        return Promise.reject('未登录');
-                    }
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(funds => {
-                    // 更新缓存
-                    cacheManager.set(CACHE_KEYS.FUNDS_LIST, funds, CACHE_EXPIRY.FUNDS_LIST);
-                    // 保存到本地存储（只存基础字段，避免超出 5MB 限制）
-                    try {
-                        const slim = funds.map(f => ({
-                            id: f.id, code: f.code, name: f.name,
-                            predicted_return: f.predicted_return,
-                            rsi: f.rsi, volatility: f.volatility,
-                            previous_day_return: f.previous_day_return,
-                            nav_updated_at: f.nav_updated_at,
-                        }));
-                        localStorage.setItem('funds', JSON.stringify(slim));
-                    } catch (error) {
-                        console.error('保存到本地存储失败:', error);
-                        showWarning('本地存储空间不足，数据可能无法持久保存');
-                    }
-
-                    // 处理基金数据
-                    return processFunds(funds);
-                })
-                .then(updatedFunds => {
-                    resolve(updatedFunds);
-                })
-                .catch(error => {
-                    console.error('获取基金数据失败:', error);
-                    if (error !== '未登录') {
-                        showError('获取基金数据失败，显示本地缓存数据');
-                        // 如果API调用失败，返回本地存储的数据
-                        if (fundsData) {
-                            resolve(fundsData);
-                        } else {
-                            reject(error);
-                        }
-                    }
-                })
-                .finally(() => {
-                    hideLoading();
-                });
+            return;
         }
+
+        // ── 无内存缓存：直接从 Supabase（via Flask API）拉取 ────────────────────
+        fetch('/api/funds')
+            .then(response => {
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return Promise.reject('未登录');
+                }
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            })
+            .then(funds => {
+                cacheManager.set(CACHE_KEYS.FUNDS_LIST, funds, CACHE_EXPIRY.FUNDS_LIST);
+                return processFunds(funds);
+            })
+            .then(updatedFunds => { resolve(updatedFunds); })
+            .catch(error => {
+                if (error !== '未登录') {
+                    showError('获取基金数据失败，请刷新重试');
+                    reject(error);
+                }
+            })
+            .finally(() => { hideLoading(); });
     });
 }
 
@@ -535,64 +483,34 @@ function updateFundsInBackground() {
             return response.json();
         })
         .then(funds => {
-            if (!funds) return; // 429 静默跳过
-            // 确保基金数据不为空
+            if (!funds) return;
             if (funds && funds.length > 0) {
-                // 更新缓存
                 cacheManager.set(CACHE_KEYS.FUNDS_LIST, funds, CACHE_EXPIRY.FUNDS_LIST);
-                // 保存到本地存储（轻量版，只存基础字段）
-                try {
-                    const slim = funds.map(f => ({
-                        id: f.id, code: f.code, name: f.name,
-                        predicted_return: f.predicted_return,
-                        rsi: f.rsi, volatility: f.volatility,
-                        previous_day_return: f.previous_day_return,
-                        nav_updated_at: f.nav_updated_at,
-                    }));
-                    localStorage.setItem('funds', JSON.stringify(slim));
-                } catch (error) {
-                    console.error('保存到本地存储失败:', error);
-                }
-
-                // 只有在当前显示的是基金预测标签时才重新渲染
                 if (activeTab === 'fund-prediction') {
-                    // 重新渲染以显示最新数据
                     renderFunds(funds);
-                    // 重启持仓更新定时器
                     startFundHoldingsUpdateIntervals(funds);
-
-                    // 为更新的基金添加闪烁效果
                     if (currentFunds) {
-                        funds.forEach((updatedFund, index) => {
+                        funds.forEach(updatedFund => {
                             const currentFund = currentFunds.find(f => f.code === updatedFund.code);
                             if (currentFund) {
-                                // 检查数据是否有变化
                                 const hasChanged =
                                     updatedFund.predicted_return !== currentFund.predicted_return ||
-                                    updatedFund.prediction_confidence !== currentFund.prediction_confidence ||
-                                    updatedFund.real_time_estimated_return !== currentFund.real_time_estimated_return;
-
+                                    updatedFund.prediction_confidence !== currentFund.prediction_confidence;
                                 if (hasChanged) {
-                                    // 为变化的基金添加闪烁效果，使用随机延迟，实现散状的不规则更新
-                                    // 生成0-60秒的随机延迟，让基金在不同时间闪烁
-                                    const randomDelay = Math.floor(Math.random() * 60000); // 0-60000ms 的随机延迟
+                                    const delay = Math.floor(Math.random() * 60000);
                                     setTimeout(() => {
-                                        const fundElement = document.getElementById(`fund-${updatedFund.id}`);
-                                        if (fundElement) {
-                                            flashCard(fundElement);
-                                        }
-                                    }, randomDelay);
+                                        const el = document.getElementById(`fund-${updatedFund.id}`);
+                                        if (el) flashCard(el);
+                                    }, delay);
                                 }
                             }
                         });
                     }
                 }
-            } else {
             }
         })
         .catch(error => {
             console.error('后台更新基金数据失败:', error);
-            // 网络错误时不更新数据，保持使用缓存
         });
 }
 
@@ -3344,8 +3262,8 @@ function startMarketTicker() {
         const isMorning   = mins >= 570 && mins < 690;   // 9:30-11:30
         const isAfternoon = mins >= 780 && mins < 900;   // 13:00-15:00
         const isTrading = isWeekday && (isMorning || isAfternoon);
-        // statusEl.textContent = isTrading ? '● 交易中' : '● 休市';
-        // statusEl.style.color  = isTrading ? '#28a745'  : '#555';
+        statusEl.textContent = isTrading ? '● 交易中' : '● 休市';
+        statusEl.style.color  = isTrading ? '#28a745'  : '#555';
     }
 
     function renderTicker(data) {
@@ -3353,22 +3271,19 @@ function startMarketTicker() {
         if (!inner) return;
         const indices = data.indices || {};
         if (!Object.keys(indices).length) {
-            inner.innerHTML = '<span style="font-size:12px;color:#444;">暂无数据</span>';
+            inner.innerHTML = '<span class="ticker-loading">暂无数据</span>';
             return;
         }
 
-        // 按截图顺序排，后端没有的跳过
         const ordered = INDEX_ORDER.filter(n => indices[n]);
-
-        const items = ordered.map((name, i) => {
-            const d     = indices[name];
-            const chg   = (d.change_ratio || 0) * 100;
-            const cls   = chg > 0.005 ? 'tc-up' : chg < -0.005 ? 'tc-down' : 'tc-flat';
-            const sign  = chg >= 0 ? '+' : '';
+        const items = ordered.map(name => {
+            const d    = indices[name];
+            const chg  = (d.change_ratio || 0) * 100;
+            const cls  = chg > 0.005 ? 'tc-up' : chg < -0.005 ? 'tc-down' : 'tc-flat';
+            const sign = chg >= 0 ? '+' : '';
             const price = (d.current_price || 0).toFixed(2);
             const short = SHORT_NAME[name] || name;
-            const isLast = i === ordered.length - 1;
-            return `<div class="ticker-item"${isLast ? '' : ' style="border-right:1px solid #1e1e1e;"'}>
+            return `<div class="ticker-item">
                 <span class="ticker-name">${short}</span>
                 <span class="ticker-price">${price}</span>
                 <span class="ticker-chg ${cls}">${sign}${chg.toFixed(2)}%</span>
@@ -3376,6 +3291,11 @@ function startMarketTicker() {
         }).join('');
 
         inner.innerHTML = items;
+
+        // 手机跑马灯：同步克隆内容，保证无缝循环
+        const clone = document.getElementById('ticker-inner-clone');
+        if (clone) clone.innerHTML = items;
+
         updateMarketStatus();
     }
 
