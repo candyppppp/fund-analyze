@@ -17,45 +17,104 @@
         </div>
 
         <!-- 大盘指数条 -->
-        <div id="market-ticker" style="
-            background:#0d0d0d;
-            border-bottom:1px solid #1a1a1a;
-            padding:0 8px;
-            display:flex;
-            align-items:center;
-            height:42px;
-            flex-shrink:0;
-            justify-content:center; /* 添加居中 */
-        ">
-            <!-- 指数列表（居中显示）  -->
-        <div id="ticker-inner" style="
-            display:flex;
-            align-items:center;
-            height:100%;
-            gap:16px; /* 可以添加项目间距 */
-        ">
-            <span style="font-size:12px;color:#444;align-self:center;padding-left:4px;">加载中...</span>
+        <div id="market-ticker">
+            <!-- 桌面：静态展示；手机：跑马灯容器 -->
+            <div id="ticker-scroll-wrap">
+                <div id="ticker-inner">
+                    <span class="ticker-loading">加载中...</span>
+                </div>
+                <!-- 手机跑马灯时复制一份，实现无缝循环 -->
+                <div id="ticker-inner-clone" aria-hidden="true"></div>
+            </div>
+            <!-- 右侧：市场状态 + 时间 -->
+            <div id="ticker-status">
+                <span id="market-status">--</span>
+                <span id="market-clock">--:--:--</span>
             </div>
         </div>
         <style>
-            .ticker-item {
-                display:inline-flex;
-                align-items:center;
-                justify-content: center; /* 内容居中 */
-                gap:6px;
-                flex-shrink:0;
-                padding:0 12px;
-                height:100%;
-                border-right:1px solid #1a1a1a;
-                box-sizing:border-box;
+        /* ── Ticker 基础 ── */
+        #market-ticker {
+            background: #0d0d0d;
+            border-bottom: 1px solid #1a1a1a;
+            padding: 0 16px 0 0;
+            display: flex;
+            align-items: center;
+            height: 42px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        #ticker-scroll-wrap {
+            flex: 1;
+            display: flex;
+            align-items: stretch;
+            overflow: hidden;
+            height: 100%;
+            min-width: 0;
+        }
+        #ticker-inner, #ticker-inner-clone {
+            display: flex;
+            align-items: center;
+            height: 100%;
+            flex-shrink: 0;
+        }
+        #ticker-inner-clone { display: none; }   /* 桌面隐藏克隆 */
+        .ticker-loading { font-size:12px; color:#444; padding-left:20px; }
+
+        .ticker-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+            padding: 0 20px;
+            height: 100%;
+            border-right: 1px solid #1a1a1a;
+            box-sizing: border-box;
+        }
+        .ticker-item:last-child { border-right: none; }
+        .ticker-name  { font-size: 13px; color: #aaa; font-weight: 400; }
+        .ticker-price { font-size: 14px; font-weight: 500; color: #e8e8e8;
+                        letter-spacing: .3px; font-variant-numeric: tabular-nums; }
+        .ticker-chg   { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+        .tc-up   { color: #e84040; }
+        .tc-down { color: #28a745; }
+        .tc-flat { color: #666; }
+
+        #ticker-status {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            flex-shrink: 0;
+            margin-left: 12px;
+            gap: 2px;
+        }
+        #market-status { font-size: 11px; color: #666; letter-spacing: .3px; white-space: nowrap; }
+        #market-clock  { font-size: 12px; color: #666; font-variant-numeric: tabular-nums;
+                         letter-spacing: .8px; white-space: nowrap; }
+
+        /* ── 手机端：跑马灯 ── */
+        @media (max-width: 600px) {
+            #market-ticker { padding: 0 8px 0 0; }
+            #ticker-status { display: none; }   /* 手机空间不够，隐藏时间状态 */
+
+            #ticker-scroll-wrap {
+                /* 手机上让内容无缝循环滚动 */
+                overflow: visible;
+                position: relative;
             }
-            .ticker-item:last-child { border-right:none; }
-            .ticker-name  { font-size:11px; color:#aaa; font-weight:400; }
-            .ticker-price { font-size:11px; font-weight:500; color:#e8e8e8; letter-spacing:.3px; font-variant-numeric:tabular-nums; }
-            .ticker-chg   { font-size:11px; font-weight:500; font-variant-numeric:tabular-nums; }
-            .tc-up   { color:#e84040; }
-            .tc-down { color:#28a745; }
-            .tc-flat { color:#666; }
+            #ticker-inner-clone { display: flex; }  /* 显示克隆 */
+            #ticker-inner, #ticker-inner-clone {
+                animation: ticker-scroll 22s linear infinite;
+            }
+            #ticker-inner-clone {
+                animation-delay: -11s;  /* 错开一半，实现无缝 */
+            }
+        }
+
+        @keyframes ticker-scroll {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
         </style>
 
         <div class="tabs">
