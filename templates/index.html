@@ -63,7 +63,10 @@
             border-right: 1px solid #1a1a1a;
             box-sizing: border-box;
         }
-        .ticker-item:last-child { border-right: none; }
+        /* 桌面端最后一个 item 去掉右边框；手机跑马灯中每个 item 都保留（作为无缝循环的分隔线）*/
+        @media (min-width: 601px) {
+            .ticker-item:last-child { border-right: none; }
+        }
         .ticker-name  { font-size: 11px; color: #aaa; font-weight: 400; }
         .ticker-price { font-size: 12px; font-weight: 500; color: #e8e8e8;
                         letter-spacing: .3px; font-variant-numeric: tabular-nums; }
