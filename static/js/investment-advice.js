@@ -63,13 +63,21 @@ class InvestmentAdvice {
         return day >= 1 && day <= 5 && mins >= 570 && mins < 900; // 9:30-15:00
     }
 
-    // 启动定时刷新（用 setTimeout 链式调用，避免 setInterval 嵌套导致定时器泄漏）
+    // 启动定时刷新（setTimeout 链式调用，避免 setInterval 嵌套）
     _startAutoRefresh() {
         if (this._timer) clearTimeout(this._timer);
         const schedule = () => {
-            const interval = this._isTradingTime() ? 10 * 60 * 1000 : 60 * 60 * 1000;
+            const trading = this._isTradingTime();
+            const interval = trading ? 10 * 60 * 1000 : 60 * 60 * 1000;
             this._timer = setTimeout(() => {
-                this._forceRefresh().finally(() => schedule()); // 请求完成后再安排下一次
+                if (trading) {
+                    // 交易时间：强制刷新（获取最新实时估值）
+                    this._forceRefresh().finally(() => schedule());
+                } else {
+                    // 非交易时间：读 Supabase 缓存即可，不触发重新计算
+                    this.updateInBackground();
+                    schedule();
+                }
             }, interval);
         };
         schedule();
@@ -121,37 +129,63 @@ class InvestmentAdvice {
         // ── 无缓存：先等 warmup（页面加载时已经发出去的请求） ──────────────────
         // warmup 完成后若有数据直接展示，不需要再发一次请求
         const warmup = this._warmupPromise || Promise.resolve(null);
-        warmup.then(warmupData => {
-            // warmup 可能刚好拿到数据了
+        warmup.then(() => {
+            // 检查 warmup 是否已把数据写入缓存
             const nowCached = cacheManager.get(this.cacheKey);
             const nowHasData = nowCached &&
                 ((nowCached.holdingsAdvice && nowCached.holdingsAdvice.length > 0) ||
                  (nowCached.recommendedFunds && nowCached.recommendedFunds.length > 0));
 
             if (nowHasData) {
+                // 无论此时在哪个 tab，都展示（用户可能在等待时切回来了）
                 if (window.activeTab === 'investment-advice') this.displayAdvice(nowCached);
                 return;
             }
 
-            // warmup 也没拿到（首次加载 Supabase 缓存为空），才真正显示 loading 并重新请求
+            // warmup 也没拿到（首次加载 Supabase 缓存为空），才真正 loading + 请求
             if (window.activeTab === 'investment-advice') this.showLoadingState();
             fetch('/api/investment-advice?level=' + _lvl)
-                .then(r => { if (r.status === 401) { window.location.href='/login'; return Promise.reject('401'); } return r.json(); })
+                .then(r => {
+                    if (r.status === 401) { window.location.href='/login'; return Promise.reject('401'); }
+                    return r.json();
+                })
                 .then(a => {
                     const ok = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
                                (a.recommendedFunds && a.recommendedFunds.length > 0);
                     if (ok) {
                         if (!a._cache_time) a._cache_time = Date.now();
-                        cacheManager.set(this.cacheKey, a, ADVICE_TTL);
+                        cacheManager.set(this.cacheKey, a, ADVICE_TTL); // 无论 tab，都写缓存
                     }
+                    // 只在当前 tab 是投资建议时渲染（用户没切走才渲染）
                     if (window.activeTab === 'investment-advice') this.displayAdvice(a);
                 })
-                .catch(e => { if (e !== '401' && window.activeTab === 'investment-advice') this.displayDefaultAdvice(); });
+                .catch(e => {
+                    if (e !== '401' && window.activeTab === 'investment-advice') this.displayDefaultAdvice();
+                });
         });
     }
 
     updateInBackground() {
-        this._forceRefresh();
+        // 交易时间强制刷新（需要最新实时估值）；非交易时间只读 Supabase 缓存，不重算
+        if (this._isTradingTime()) {
+            this._forceRefresh();
+        } else {
+            // 非交易时间：静默读一次缓存即可，不用 ?refresh=1
+            const _lvl = (() => { try { return JSON.parse(localStorage.getItem('fundTrackerSettings') || '{}').investmentLevel || 'small'; } catch(e) { return 'small'; } })();
+            fetch('/api/investment-advice?level=' + _lvl)
+                .then(r => r.ok ? r.json() : null)
+                .then(a => {
+                    if (!a) return;
+                    const ok = (a.holdingsAdvice && a.holdingsAdvice.length > 0) ||
+                               (a.recommendedFunds && a.recommendedFunds.length > 0);
+                    if (ok) {
+                        if (!a._cache_time) a._cache_time = Date.now();
+                        cacheManager.set(this.cacheKey, a, ADVICE_TTL);
+                        if (window.activeTab === 'investment-advice') this.displayAdvice(a);
+                    }
+                })
+                .catch(() => {});
+        }
     }
 
     showLoadingState() {

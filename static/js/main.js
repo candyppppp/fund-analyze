@@ -410,17 +410,57 @@ function loadFunds() {
             })
             .then(funds => {
                 cacheManager.set(CACHE_KEYS.FUNDS_LIST, funds, CACHE_EXPIRY.FUNDS_LIST);
-                return processFunds(funds);
+                // 立即渲染——不等持仓数据，让用户先看到基金列表
+                renderFunds(funds);
+                hideLoading();
+                startFundHoldingsUpdateIntervals(funds);
+                resolve(funds);
+                // 后台异步加载持仓数据，完成后静默刷新
+                _loadHoldingsInBackground(funds);
             })
-            .then(updatedFunds => { resolve(updatedFunds); })
             .catch(error => {
                 if (error !== '未登录') {
                     showError('获取基金数据失败，请刷新重试');
                     reject(error);
                 }
-            })
-            .finally(() => { hideLoading(); });
+                hideLoading();
+            });
     });
+}
+
+// 后台异步加载持仓数据（不阻塞基金列表渲染）
+function _loadHoldingsInBackground(funds) {
+    if (!funds || !funds.length) return;
+    const fundCodes = funds.map(f => f.code);
+    const batchSize = 5;
+    let idx = 0;
+
+    function nextBatch() {
+        if (idx >= fundCodes.length) return;
+        const batch = fundCodes.slice(idx, idx + batchSize);
+        idx += batchSize;
+        batch.forEach(code => {
+            const cached = cacheManager.get('fundHoldings_' + code);
+            if (cached) return; // 已有缓存跳过
+            fetch(`/api/funds/${code}/holdings`)
+                .then(r => r.ok ? r.json() : null)
+                .then(holdings => {
+                    if (!holdings) return;
+                    cacheManager.set('fundHoldings_' + code, holdings);
+                    // 静默更新缓存中的基金数据
+                    const cached = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
+                    if (cached) {
+                        const updated = cached.map(f => f.code === code ? {...f, stock_holdings: holdings} : f);
+                        cacheManager.set(CACHE_KEYS.FUNDS_LIST, updated, CACHE_EXPIRY.FUNDS_LIST);
+                    }
+                })
+                .catch(() => {});
+        });
+        if (idx < fundCodes.length) {
+            setTimeout(nextBatch, 500); // 批次间500ms避免请求集中
+        }
+    }
+    nextBatch();
 }
 
 // 后台更新基金数据
@@ -716,10 +756,11 @@ function renderFunds(funds) {
         fundItem.id = `fund-${fund.id}`;
         fundItem.style.cursor = 'pointer';
 
-        // 计算距高点
-        const maxPrice = Math.max(...fund.prices);
-        const currentPrice = fund.prices[fund.prices.length - 1];
-        const distanceFromHigh = ((currentPrice - maxPrice) / maxPrice * 100).toFixed(2);
+        // 防御：prices 可能为 null/空（Supabase 缓存直接返回时）
+        const prices = fund.prices && fund.prices.length > 0 ? fund.prices : [0];
+        const maxPrice = Math.max(...prices);
+        const currentPrice = prices[prices.length - 1];
+        const distanceFromHigh = maxPrice > 0 ? ((currentPrice - maxPrice) / maxPrice * 100).toFixed(2) : '0.00';
 
         // 生成唯一的图表ID
         const priceChartId = `price-chart-${fund.id}`;
@@ -733,7 +774,7 @@ function renderFunds(funds) {
         // 结算后：用最新净值变化率（previous_day_return）× 份数 × 前一日净值 —— 实际收益
         // 交易中：用 predicted_return（实时估值）× 份数 × 最新净值 —— 预估收益
         let estimatedReturn = null;
-        const latestNav = fund.prices[fund.prices.length - 1];
+        const latestNav = prices[prices.length - 1] || 0;
         if (buySettings.shares > 0) {
             if (settled) {
                 // 结算后显示实际收益：使用 previous_day_return（单位%）
@@ -779,17 +820,15 @@ function renderFunds(funds) {
         const rsiStatus = getRSIStatus(fund.rsi);
 
         // 计算上一个交易日的净值变化率
+        // fund.returns[] 是小数形式（如 0.0123 = 1.23%），直接使用
+        // fund.previous_day_return 是百分比形式（如 1.23），需 /100 转换
         let previousDayReturn = 0;
         if (fund.returns && fund.returns.length > 0) {
-            let returnValue = fund.returns[fund.returns.length - 1];
-            // 检查返回值是否已经是百分比形式（大于1或小于-1）
-            if (Math.abs(returnValue) > 1) {
-                // 如果是百分比形式，转换为小数
-                previousDayReturn = returnValue / 100;
-            } else {
-                // 如果已经是小数形式，直接使用
-                previousDayReturn = returnValue;
-            }
+            // returns[] 已经是小数，直接用
+            previousDayReturn = fund.returns[fund.returns.length - 1] || 0;
+        } else if (fund.previous_day_return != null) {
+            // 降级：用 previous_day_return（百分比转小数）
+            previousDayReturn = (fund.previous_day_return || 0) / 100;
         } else if (fund.prices && fund.prices.length >= 2) {
             previousDayReturn = (fund.prices[fund.prices.length - 1] - fund.prices[fund.prices.length - 2]) / fund.prices[fund.prices.length - 2];
         }
@@ -1948,19 +1987,9 @@ function isNavSettled() {
 // 存储每个基金的当前时间周期选择
 const fundTimeRange = {};
 
-// 根据交易时间获取缓存过期时间
+// 根据交易时间获取持仓缓存过期时间（用北京时间判断）
 function getStockHoldingsCacheExpiry() {
-    const now = new Date();
-    const hour = now.getHours();
-    const minute = now.getMinutes();
-    const dayOfWeek = now.getDay();
-
-    // 周一到周五，9:30-11:30 和 13:00-15:00 为交易时间
-    const isTradingTime = dayOfWeek >= 1 && dayOfWeek <= 5 &&
-                        ((hour === 9 && minute >= 30) || (hour === 10) || (hour === 11 && minute < 30) ||
-                        (hour === 13) || (hour === 14) || (hour === 15 && minute === 0));
-
-    return isTradingTime ? 15 : 28800; // 交易时间15秒，非交易时间8小时
+    return isTradingTime() ? 15 : 28800; // 交易时间15秒，非交易时间8小时
 }
 
 // 检查是否在开市时间内（统一用北京时间，避免境外设备时区偏差）
@@ -3156,30 +3185,38 @@ function stopFundAutoUpdate() {
 
 // ── 大盘指数条 ──────────────────────────────────────────────────────────────
 function startMarketTicker() {
-    const TICKER_INTERVAL = 60 * 1000; // 1分钟刷新
+    const TICKER_INTERVAL = 60 * 1000;
+    const SCROLL_SPEED    = 50;   // px/s，可调
 
-    // 严格按截图顺序：上证、深证、沪深300、上证50、创业板、科创50
     const INDEX_ORDER = ['上证指数', '深证成指', '沪深300', '上证50', '创业板指', '科创50'];
     const SHORT_NAME  = {
-        '上证指数': '上证',
-        '深证成指': '深证',
-        '沪深300':  '沪深300',
-        '上证50':   '上证50',
-        '创业板指': '创业板',
-        '科创50':   '科创50',
+        '上证指数': '上证', '深证成指': '深证', '沪深300': '沪深300',
+        '上证50': '上证50', '创业板指': '创业板', '科创50': '科创50',
     };
 
-    function renderTicker(data) {
-        const inner = document.getElementById('ticker-inner');
-        if (!inner) return;
-        const indices = data.indices || {};
-        if (!Object.keys(indices).length) {
-            inner.innerHTML = '<span class="ticker-loading">暂无数据</span>';
-            return;
-        }
+    // 跑马灯状态
+    let _raf = null;      // requestAnimationFrame handle
+    let _offset = 0;      // 当前 translateX（负值，向左移动）
+    let _lastTs = null;   // 上一帧时间戳
+    let _isMobile = window.innerWidth <= 600;
 
+    // 检测是否手机端（resize 时重新判断）
+    window.addEventListener('resize', () => {
+        const nowMobile = window.innerWidth <= 600;
+        if (nowMobile !== _isMobile) {
+            _isMobile = nowMobile;
+            // 切换模式时重置偏移
+            _offset = 0;
+            const track = document.getElementById('ticker-track');
+            if (track) track.style.transform = '';
+            if (!_isMobile && _raf) { cancelAnimationFrame(_raf); _raf = null; }
+            else if (_isMobile) startScroll();
+        }
+    });
+
+    function buildItems(indices) {
         const ordered = INDEX_ORDER.filter(n => indices[n]);
-        const items = ordered.map(name => {
+        return ordered.map(name => {
             const d    = indices[name];
             const chg  = (d.change_ratio || 0) * 100;
             const cls  = chg > 0.005 ? 'tc-up' : chg < -0.005 ? 'tc-down' : 'tc-flat';
@@ -3192,13 +3229,70 @@ function startMarketTicker() {
                 <span class="ticker-chg ${cls}">${sign}${chg.toFixed(2)}%</span>
             </div>`;
         }).join('');
-
-        inner.innerHTML = items;
-
-        // 手机跑马灯：同步克隆内容，保证无缝循环
-        const clone = document.getElementById('ticker-inner-clone');
-        if (clone) clone.innerHTML = items;
     }
+
+    function renderTicker(data) {
+        const inner = document.getElementById('ticker-inner');
+        const clone = document.getElementById('ticker-inner-clone');
+        if (!inner) return;
+
+        const indices = data.indices || {};
+        if (!Object.keys(indices).length) {
+            inner.innerHTML = '<span class="ticker-loading">暂无数据</span>';
+            if (clone) clone.innerHTML = '';
+            return;
+        }
+
+        const html = buildItems(indices);
+        inner.innerHTML = html;
+        // 克隆始终保持内容同步（手机跑马灯需要，桌面 CSS 隐藏掉）
+        if (clone) clone.innerHTML = html;
+
+        // 内容更新后，如果是手机端且跑马灯还没启动，启动它
+        if (_isMobile && !_raf) {
+            _offset = 0;
+            startScroll();
+        }
+    }
+
+    // ── JS 驱动跑马灯（requestAnimationFrame，按像素精确控制）────────────────
+    // 原理：track = [inner][clone]，总宽 = inner.width * 2
+    //       offset 每帧减少 speed * dt，当 |offset| >= inner.width 时重置为 0
+    //       视觉上 clone 头部刚好接上 inner 尾部，完全无缝
+    function startScroll() {
+        if (_raf) cancelAnimationFrame(_raf);
+        _lastTs = null;
+
+        function step(ts) {
+            if (!_isMobile) { _raf = null; return; }
+
+            const inner = document.getElementById('ticker-inner');
+            const track = document.getElementById('ticker-track');
+            if (!inner || !track) { _raf = null; return; }
+
+            const innerW = inner.offsetWidth;
+            if (innerW === 0) {
+                // 内容还没渲染出来，稍等
+                _raf = requestAnimationFrame(step);
+                return;
+            }
+
+            if (_lastTs !== null) {
+                const dt = Math.min((ts - _lastTs) / 1000, 0.1); // 秒，最大0.1避免跳帧
+                _offset -= SCROLL_SPEED * dt;
+                // 当第一份内容完全滑出屏幕左侧时，重置到原点——无缝！
+                if (_offset <= -innerW) _offset += innerW;
+            }
+            _lastTs = ts;
+
+            track.style.transform = `translateX(${_offset.toFixed(2)}px)`;
+            _raf = requestAnimationFrame(step);
+        }
+        _raf = requestAnimationFrame(step);
+    }
+
+    // 手机端初始化跑马灯
+    if (_isMobile) startScroll();
 
     function fetchTicker() {
         const cached = cacheManager.get('marketData');

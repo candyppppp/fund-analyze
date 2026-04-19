@@ -11,41 +11,30 @@ class UpdateStrategyManager {
         this.activeTab = 'fund-prediction';
     }
 
-    // 判断是否为交易时间
-    isTradingTime() {
+    // 统一用北京时间判断，避免境外设备时区偏差
+    _bjTime() {
         const now = new Date();
-        const day = now.getDay();
-        const hour = now.getHours();
-        const minute = now.getMinutes();
-
-        // 周一到周五
-        if (day >= 1 && day <= 5) {
-            // 上午: 9:30 - 11:30
-            if (hour === 9 && minute >= 30 || (hour > 9 && hour < 11) || (hour === 11 && minute <= 30)) {
-                return true;
-            }
-            // 下午: 13:00 - 15:00
-            if (hour >= 13 && hour < 15) {
-                return true;
-            }
-        }
-        return false;
+        const bj = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
+        return { day: bj.getDay(), hour: bj.getHours(), minute: bj.getMinutes() };
     }
 
-    // 判断是否为盘前时间 (9:00 - 9:30)
+    // 判断是否为交易时间（北京时间 周一至周五 9:30-15:00）
+    isTradingTime() {
+        const { day, hour, minute } = this._bjTime();
+        if (day < 1 || day > 5) return false;
+        const mins = hour * 60 + minute;
+        return (mins >= 570 && mins < 690) || (mins >= 780 && mins < 900);
+    }
+
+    // 判断是否为盘前时间（北京时间 9:00-9:30）
     isPreMarketTime() {
-        const now = new Date();
-        const day = now.getDay();
-        const hour = now.getHours();
-        const minute = now.getMinutes();
+        const { day, hour, minute } = this._bjTime();
         return day >= 1 && day <= 5 && hour === 9 && minute < 30;
     }
 
-    // 判断是否为盘后时间 (15:00 - 16:00)
+    // 判断是否为盘后时间（北京时间 15:00-16:00）
     isAfterMarketTime() {
-        const now = new Date();
-        const day = now.getDay();
-        const hour = now.getHours();
+        const { day, hour } = this._bjTime();
         return day >= 1 && day <= 5 && hour >= 15 && hour < 16;
     }
 
