@@ -7,6 +7,7 @@ user.py — 用户模型与用户管理器
 
 import hashlib
 import logging
+import os
 from datetime import datetime
 
 import sys, os
@@ -28,10 +29,32 @@ class User:
         self.permissions  = permissions or []
 
     def _hash_password(self, password: str) -> str:
-        return hashlib.sha256(password.encode()).hexdigest()
+        """使用 scrypt + 随机 salt 哈希密码，格式: scrypt$<hex_salt>$<hex_hash>"""
+        salt = os.urandom(16)
+        h = hashlib.scrypt(password.encode(), salt=salt, n=16384, r=8, p=1, dklen=32)
+        return f"scrypt${salt.hex()}${h.hex()}"
 
     def check_password(self, password: str) -> bool:
-        return self.password_hash == self._hash_password(password)
+        """验证密码，兼容旧版裸 SHA-256 哈希（自动迁移）"""
+        stored = self.password_hash
+        if stored.startswith('scrypt$'):
+            # 新格式
+            try:
+                _, salt_hex, hash_hex = stored.split('$')
+                salt = bytes.fromhex(salt_hex)
+                expected = bytes.fromhex(hash_hex)
+                actual = hashlib.scrypt(password.encode(), salt=salt, n=16384, r=8, p=1, dklen=32)
+                return actual == expected
+            except Exception:
+                return False
+        else:
+            # 旧格式（裸 SHA-256）：验证通过后升级
+            old_hash = hashlib.sha256(password.encode()).hexdigest()
+            if stored == old_hash:
+                # 验证通过，静默升级到 scrypt
+                self.password_hash = self._hash_password(password)
+                return True
+            return False
 
     def to_dict(self) -> dict:
         return {
@@ -88,7 +111,15 @@ class UserManager:
 
     def authenticate(self, username: str, password: str):
         user = self.get_user(username)
-        return user if (user and user.check_password(password)) else None
+        if not (user and user.check_password(password)):
+            return None
+        # check_password 可能已把旧 SHA-256 哈希升级为 scrypt，持久化新哈希
+        if user.password_hash.startswith('scrypt$'):
+            try:
+                self._upsert_user(user)
+            except Exception as e:
+                logger.warning(f'升级密码哈希持久化失败: {e}')
+        return user
 
     def create_user(self, username: str, password: str,
                     permissions: list = None):
