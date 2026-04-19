@@ -18,35 +18,32 @@
 
         <!-- 大盘指数条 -->
         <div id="market-ticker">
-            <!-- 桌面：静态展示；手机：跑马灯容器 -->
-            <div id="ticker-scroll-wrap">
+            <!-- ticker-track 是唯一移动的容器，JS 控制 translateX -->
+            <div id="ticker-track">
                 <div id="ticker-inner">
                     <span class="ticker-loading">加载中...</span>
                 </div>
-                <!-- 手机跑马灯时复制一份，实现无缝循环 -->
+                <!-- 克隆节点紧跟其后，实现无缝循环 -->
                 <div id="ticker-inner-clone" aria-hidden="true"></div>
             </div>
-
         </div>
         <style>
-        /* ── Ticker 基础 ── */
+        /* ── Ticker 容器 ── */
         #market-ticker {
             background: #0d0d0d;
             border-bottom: 1px solid #1a1a1a;
-            padding: 0;
-            display: flex;
-            align-items: center;
             height: 42px;
             overflow: hidden;
             flex-shrink: 0;
+            position: relative;
         }
-        #ticker-scroll-wrap {
-            flex: 1;
+        /* track 是真正移动的层，宽度由内容撑开 */
+        #ticker-track {
             display: flex;
-            align-items: stretch;
-            overflow: hidden;
+            align-items: center;
             height: 100%;
-            min-width: 0;
+            width: max-content;   /* 撑开到内容宽度 */
+            will-change: transform;
         }
         #ticker-inner, #ticker-inner-clone {
             display: flex;
@@ -54,50 +51,39 @@
             height: 100%;
             flex-shrink: 0;
         }
-        #ticker-inner-clone { display: none; }   /* 桌面隐藏克隆 */
         .ticker-loading { font-size:12px; color:#444; padding-left:20px; }
 
         .ticker-item {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
             flex-shrink: 0;
-            padding: 0 14px;
+            padding: 0 20px;
             height: 100%;
             border-right: 1px solid #1a1a1a;
             box-sizing: border-box;
-            justify-content:center; /* 添加居中 */
         }
         .ticker-item:last-child { border-right: none; }
-        .ticker-name  { font-size: 11px; color: #aaa; font-weight: 400; }
-        .ticker-price { font-size: 12px; font-weight: 500; color: #e8e8e8;
+        .ticker-name  { font-size: 13px; color: #aaa; font-weight: 400; }
+        .ticker-price { font-size: 14px; font-weight: 500; color: #e8e8e8;
                         letter-spacing: .3px; font-variant-numeric: tabular-nums; }
-        .ticker-chg   { font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; }
+        .ticker-chg   { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
         .tc-up   { color: #e84040; }
         .tc-down { color: #28a745; }
         .tc-flat { color: #666; }
 
-
-        /* ── 手机端：跑马灯 ── */
-        @media (max-width: 600px) {
-            #market-ticker { padding: 0 8px 0 0; }
-            #ticker-scroll-wrap {
-                /* 手机上让内容无缝循环滚动 */
-                overflow: visible;
-                position: relative;
+        /* 桌面：ticker-track 撑满屏幕宽度，inner 静态排列（内容不足时居左） */
+        @media (min-width: 601px) {
+            #ticker-track {
+                width: 100%;          /* 桌面充满容器 */
+                overflow-x: hidden;   /* 超出部分隐藏 */
             }
-            #ticker-inner-clone { display: flex; }  /* 显示克隆 */
-            #ticker-inner, #ticker-inner-clone {
-                animation: ticker-scroll 22s linear infinite;
+            #ticker-inner {
+                width: 100%;          /* inner 同样充满 track */
+                flex-wrap: nowrap;
+                overflow-x: hidden;
             }
-            #ticker-inner-clone {
-                animation-delay: -11s;  /* 错开一半，实现无缝 */
-            }
-        }
-
-        @keyframes ticker-scroll {
-            0%   { transform: translateX(0); }
-            100% { transform: translateX(-100%); }
+            #ticker-inner-clone { display: none; }
         }
         </style>
 
