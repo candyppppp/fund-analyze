@@ -1,91 +1,98 @@
 // 缓存管理模块
+//
+// 设计原则：
+//   - 所有数据都存内存（页面生命周期内有效，刷新后丢失）
+//   - 体积较小的数据（< SIZE_THRESHOLD）才持久化到 localStorage
+//   - fundsList 含完整 prices/dates，体积大，只存内存，避免 QuotaExceededError
+//   - investmentAdvice、marketData 等体积小，可持久化，跨刷新复用
+
+const SIZE_THRESHOLD = 50 * 1024; // 50KB：超过此大小只存内存
 
 class CacheManager {
     constructor() {
-        // 使用 localStorage 存储缓存
         this.storageKey = 'fundTrackerCache';
-        this.cache = this.loadFromStorage();
+        this.memCache = {};
+        this._loadFromStorage();
     }
 
-    // 从 localStorage 加载缓存
-    loadFromStorage() {
+    _loadFromStorage() {
         try {
-            const cached = localStorage.getItem(this.storageKey);
-            if (cached) {
-                return JSON.parse(cached);
+            const raw = localStorage.getItem(this.storageKey);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                const now = Date.now();
+                for (const [key, item] of Object.entries(parsed)) {
+                    if (now - item.timestamp <= item.expiry) {
+                        this.memCache[key] = item;
+                    }
+                }
             }
-        } catch (error) {
-            console.error('加载缓存失败:', error);
+        } catch (e) {
+            console.warn('[CacheManager] 加载 localStorage 失败，使用空缓存');
         }
-        return {};
     }
 
-    // 保存缓存到 localStorage
-    saveToStorage() {
+    _saveToStorage() {
         try {
-            localStorage.setItem(this.storageKey, JSON.stringify(this.cache));
-        } catch (error) {
-            console.error('保存缓存失败:', error);
+            const toSave = {};
+            for (const [key, item] of Object.entries(this.memCache)) {
+                if (!item._memOnly) toSave[key] = item;
+            }
+            localStorage.setItem(this.storageKey, JSON.stringify(toSave));
+        } catch (e) {
+            if (e.name === 'QuotaExceededError' || e.code === 22) {
+                console.warn('[CacheManager] localStorage 空间不足，清除旧缓存');
+                try { localStorage.removeItem(this.storageKey); } catch (_) {}
+            }
         }
     }
 
-    // 获取缓存
     get(key) {
-        const item = this.cache[key];
+        const item = this.memCache[key];
         if (!item) return null;
-
-        const { data, timestamp, expiry } = item;
-        
-        // 检查是否过期
-        if (Date.now() - timestamp > expiry) {
-            delete this.cache[key];
-            this.saveToStorage();
+        if (Date.now() - item.timestamp > item.expiry) {
+            delete this.memCache[key];
+            this._saveToStorage();
             return null;
         }
-
-        return data;
+        return item.data;
     }
 
-    // 设置缓存
-    set(key, data, expiry = 5 * 60 * 1000) { // 默认5分钟
-        this.cache[key] = {
-            data,
-            timestamp: Date.now(),
-            expiry
-        };
-        this.saveToStorage();
+    set(key, data, expiry = 5 * 60 * 1000) {
+        let memOnly = false;
+        try {
+            if (JSON.stringify(data).length > SIZE_THRESHOLD) memOnly = true;
+        } catch (_) { memOnly = true; }
+
+        this.memCache[key] = { data, timestamp: Date.now(), expiry, _memOnly: memOnly };
+        if (!memOnly) this._saveToStorage();
     }
 
-    // 删除缓存
     delete(key) {
-        delete this.cache[key];
-        this.saveToStorage();
+        delete this.memCache[key];
+        this._saveToStorage();
     }
 
-    // 清空所有缓存
-    clear() {
-        this.cache = {};
-        this.saveToStorage();
+    clear(prefix) {
+        if (prefix) {
+            for (const key of Object.keys(this.memCache)) {
+                if (key.startsWith(prefix)) delete this.memCache[key];
+            }
+        } else {
+            this.memCache = {};
+        }
+        this._saveToStorage();
     }
 
-    // 获取缓存的剩余有效期（毫秒）
     getRemainingTime(key) {
-        const item = this.cache[key];
+        const item = this.memCache[key];
         if (!item) return 0;
-
-        const { timestamp, expiry } = item;
-        const remaining = expiry - (Date.now() - timestamp);
+        const remaining = item.expiry - (Date.now() - item.timestamp);
         return remaining > 0 ? remaining : 0;
     }
 
-    // 检查缓存是否存在且有效
-    has(key) {
-        return this.get(key) !== null;
-    }
+    has(key) { return this.get(key) !== null; }
 }
 
-// 创建全局缓存管理器实例
 const cacheManager = new CacheManager();
-
-// 导出缓存管理器
 export default cacheManager;

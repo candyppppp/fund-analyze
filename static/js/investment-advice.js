@@ -42,6 +42,16 @@ class InvestmentAdvice {
             .catch(() => null);
     }
 
+    // 净值是否已结算（收盘后6小时=21:00后，或周末）—— 同 main.js isNavSettled()
+    _isNavSettled() {
+        const now = new Date();
+        const bj = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
+        const day  = bj.getDay();
+        const mins = bj.getHours() * 60 + bj.getMinutes();
+        if (day === 0 || day === 6) return true;          // 周末全天
+        return mins >= 21 * 60 || mins < 9 * 60 + 30;    // 工作日 21:00后 或 9:30前
+    }
+
     // 判断是否交易时间（周一至周五 9:30-15:00，北京时间）
     _isTradingTime() {
         // 用 Asia/Shanghai 时区判断，避免用户设备时区影响
@@ -384,17 +394,32 @@ class InvestmentAdvice {
         const p1w = this._pct(d.chg_1w);
         const p2w = this._pct(d.chg_2w);
         const p4w = this._pct(d.chg_4w);
-        const pe  = this._pct(d.est_return);
+
+        const settled = this._isNavSettled();
+
+        // 结算后：预估收益率/净值改为实际值（previous_day_return 是百分比，如 +1.23）
+        let pe, estNavLbl, estReturnLbl, estNavVal, estReturnVal;
+        if (settled) {
+            // 已结算：显示实际当日收益率和净值
+            const pdr = d.previous_day_return;  // 百分比值，如 1.23
+            pe = this._pct(pdr);
+            estNavLbl     = '最新净值';
+            estReturnLbl  = '当日收益率 · 实际';
+            estNavVal     = this._v(d.nav, 4);
+            estReturnVal  = pe.txt;
+        } else {
+            pe = this._pct(d.est_return);
+            estNavLbl    = d.has_realtime ? '预估净值 · 实时' : '预估净值 · 估算';
+            estReturnLbl = d.has_realtime ? '预估收益率 · 实时' : '预估收益率 · 估算';
+            estNavVal    = this._v(d.est_nav, 4);
+            estReturnVal = pe.txt;
+        }
 
         const cells = [
             // 行一
-            { lbl:'最新净值',   val: this._v(d.nav, 4),    cls:'neu' },
-            { lbl: d.has_realtime ? '预估净值 · 实时' : '预估净值 · 估算',
-              val: this._v(d.est_nav, 4), cls:'neu' },
-            { lbl: d.has_realtime
-                    ? '预估收益率 · 实时'
-                    : '预估收益率 · 估算',
-              val: pe.txt, cls: pe.cls },
+            { lbl:'最新净值',   val: this._v(d.nav, 4),  cls:'neu' },
+            { lbl: estNavLbl,   val: estNavVal,           cls:'neu' },
+            { lbl: estReturnLbl, val: estReturnVal,       cls: pe.cls },
             { lbl:'近1周涨跌',  val: p1w.txt,               cls: p1w.cls },
             { lbl:'近2周涨跌',  val: p2w.txt,               cls: p2w.cls },
             { lbl:'近4周涨跌',  val: p4w.txt,               cls: p4w.cls },
@@ -486,7 +511,10 @@ class InvestmentAdvice {
 
                 const avgCost = buyCost / buyShares; // 平均买入成本
                 const d         = item.indicators || {};
-                const currentNav = (d.has_realtime && d.est_nav) ? d.est_nav : (d.nav || 0);
+                // 结算后用实际最新净值；交易中用实时预估净值
+                const currentNav = (this._isNavSettled() || !d.has_realtime || !d.est_nav)
+                    ? (d.nav || 0)
+                    : d.est_nav;
                 if (!currentNav || !avgCost) return;
 
                 const gainPct    = (currentNav - avgCost) / avgCost * 100;
@@ -600,7 +628,7 @@ class InvestmentAdvice {
 
                     '<div class="ia-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px;">' +
                     '<div class="ia-cell"><div class="ia-cell-lbl">持仓均价</div><div class="ia-cell-val neu">' + avgCost.toFixed(4) + '</div></div>' +
-                    '<div class="ia-cell"><div class="ia-cell-lbl">' + (d.has_realtime ? '预估净值' : '最新净值') + '</div><div class="ia-cell-val neu">' + currentNav.toFixed(4) + '</div></div>' +
+                    '<div class="ia-cell"><div class="ia-cell-lbl">' + (this._isNavSettled() ? '最新净值' : (d.has_realtime ? '预估净值' : '最新净值')) + '</div><div class="ia-cell-val neu">' + currentNav.toFixed(4) + '</div></div>' +
                     '<div class="ia-cell"><div class="ia-cell-lbl">累计收益率</div><div class="ia-cell-val pos">+' + gainPct.toFixed(2) + '%</div></div>' +
                     '<div class="ia-cell"><div class="ia-cell-lbl">浮动盈亏</div><div class="ia-cell-val pos">+' + totalProfit.toFixed(2) + '元</div></div>' +
                     '</div>' +
