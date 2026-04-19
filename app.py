@@ -1171,7 +1171,7 @@ def get_investment_advice():
         # ── 1. 非强制刷新时：优先读 Supabase 缓存 ──────────────────────────
         if not force_refresh:
             try:
-                cache_row = supabase.table('investment_advice_cache') \
+                cache_row = supabase.table('advice_cache') \
                     .select('data,updated_at') \
                     .eq('username', username) \
                     .execute()
@@ -1345,19 +1345,28 @@ def get_investment_advice():
         result = {'holdingsAdvice': holdingsAdvice, 'recommendedFunds': []}
 
         if holdingsAdvice:
-            try:
-                from datetime import timezone as _tz
-                now_utc = datetime.now(_tz.utc).isoformat()
-                supabase_admin.table('investment_advice_cache').upsert({
-                    'username': username,
-                    'data': result,
-                    'updated_at': now_utc,
-                }, on_conflict='username').execute()
-                logger.info('investment advice written to Supabase')
-                result['_cache_time'] = int(datetime.now(_tz.utc).timestamp() * 1000)
-                result['_advice_updated_at'] = now_utc
-            except Exception as _se:
-                logger.warning(f'Supabase write failed: {_se}')
+            _write_ok = False
+            if not supabase_admin:
+                logger.error('advice_cache write skipped: supabase_admin is None (SUPABASE_SERVICE_ROLE_KEY missing?)')
+            else:
+                try:
+                    from datetime import timezone as _tz
+                    now_utc = datetime.now(_tz.utc).isoformat()
+                    # 先尝试 update 已有行
+                    upd = supabase_admin.table('advice_cache')                         .update({'data': result, 'updated_at': now_utc})                         .eq('username', username).execute()
+                    if upd.data:
+                        _write_ok = True
+                        logger.info(f'advice_cache updated for {username}')
+                    else:
+                        # 没有已有行，insert
+                        ins = supabase_admin.table('advice_cache')                             .insert({'username': username, 'data': result, 'updated_at': now_utc})                             .execute()
+                        _write_ok = bool(ins.data)
+                        logger.info(f'advice_cache inserted for {username}: {_write_ok}')
+                    if _write_ok:
+                        result['_cache_time'] = int(datetime.now(_tz.utc).timestamp() * 1000)
+                        result['_advice_updated_at'] = now_utc
+                except Exception as _se:
+                    logger.error(f'advice_cache write FAILED: {_se}')
 
         return jsonify(result)
     except Exception as e:
@@ -1413,19 +1422,22 @@ def get_recommended_funds_api():
 
         # ── 3. Write to recommended_funds_cache ───────────────────────────────
         if recommended:
-            try:
-                from datetime import timezone as _tz
-                now_utc = datetime.now(_tz.utc).isoformat()
-                supabase_admin.table('recommended_funds_cache').upsert({
-                    'username': username,
-                    'data': result,
-                    'updated_at': now_utc,
-                }, on_conflict='username').execute()
-                logger.info(f'recommended funds: written {len(recommended)} funds to Supabase')
-                result['_rec_updated_at'] = now_utc
-                result['_rec_cache_time'] = int(datetime.now(_tz.utc).timestamp() * 1000)
-            except Exception as _se:
-                logger.warning(f'recommended funds Supabase write failed: {_se}')
+            if not supabase_admin:
+                logger.error('recommended_funds_cache write skipped: supabase_admin is None')
+            else:
+                try:
+                    from datetime import timezone as _tz
+                    now_utc = datetime.now(_tz.utc).isoformat()
+                    upd = supabase_admin.table('recommended_funds_cache')                         .update({'data': result, 'updated_at': now_utc})                         .eq('username', username).execute()
+                    if upd.data:
+                        logger.info(f'recommended_funds_cache updated: {len(recommended)} funds')
+                    else:
+                        ins = supabase_admin.table('recommended_funds_cache')                             .insert({'username': username, 'data': result, 'updated_at': now_utc})                             .execute()
+                        logger.info(f'recommended_funds_cache inserted: {bool(ins.data)}')
+                    result['_rec_updated_at'] = now_utc
+                    result['_rec_cache_time'] = int(datetime.now(_tz.utc).timestamp() * 1000)
+                except Exception as _se:
+                    logger.error(f'recommended_funds_cache write FAILED: {_se}')
 
         return jsonify(result)
     except Exception as e:
