@@ -48,9 +48,9 @@ class UpdateStrategyManager {
             case 'fundList':
                 // 基金列表更新频率
                 if (isTrading) {
-                    return 3 * 60 * 1000; // 交易时间: 3分钟
+                    return 2 * 60 * 1000; // 交易时间: 2分钟
                 } else if (isPreMarket || isAfterMarket) {
-                    return 10 * 60 * 1000; // 盘前盘后: 10分钟
+                    return 5 * 60 * 1000; // 盘前盘后: 5分钟
                 } else {
                     return 30 * 60 * 1000; // 非交易时间: 30分钟
                 }
@@ -58,11 +58,11 @@ class UpdateStrategyManager {
             case 'holdings':
                 // 股票持仓更新频率（持仓数据变化慢，无需高频）
                 if (isTrading) {
-                    return 5 * 60 * 1000; // 交易时间: 5分钟
+                    return 2 * 60 * 1000; // 交易时间: 2分钟
                 } else if (isPreMarket || isAfterMarket) {
                     return 10 * 60 * 1000; // 盘前盘后: 10分钟
                 } else {
-                    return 30 * 60 * 1000; // 非交易时间: 30分钟
+                    return 60 * 60 * 1000; // 非交易时间: 60分钟
                 }
 
             case 'investmentAdvice':
