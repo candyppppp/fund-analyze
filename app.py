@@ -26,6 +26,24 @@ from db import supabase, supabase_admin
 # 检查是否在 Vercel 环境中
 is_vercel = os.environ.get('VERCEL') is not None
 
+
+def _is_trading_time_bj():
+    from datetime import timezone, timedelta
+    bj = datetime.now(timezone(timedelta(hours=8)))
+    day  = bj.weekday()   # 0=Mon .. 4=Fri
+    mins = bj.hour * 60 + bj.minute
+    return day < 5 and 570 <= mins < 900   # 9:30-15:00
+
+
+def _is_nav_settled_bj():
+    from datetime import timezone, timedelta
+    bj = datetime.now(timezone(timedelta(hours=8)))
+    day  = bj.weekday()
+    mins = bj.hour * 60 + bj.minute
+    if day >= 5:
+        return True           # weekend
+    return mins >= 1260 or mins < 570  # after 21:00 or before 9:30
+
 # 配置日志处理器
 handlers = [logging.StreamHandler()]
 
@@ -657,27 +675,50 @@ def get_funds():
         if 'username' not in session:
             return jsonify({'error': '未登录'}), 401
 
+        username = session['username']
+
+        # basic_only 提前判断：只需 id/code/name，直接查 Supabase，不走完整 load_funds
         basic_only = request.args.get('basic', 'false').lower() == 'true'
-
         if basic_only:
-            basic_funds = [{'id': f.id, 'code': f.code, 'name': f.name} for f in funds]
-            return jsonify(basic_funds)
+            try:
+                rows = supabase.table('funds').select('id,code,name').eq('username', username).execute()
+                return jsonify([{'id': r['id'], 'code': r['code'], 'name': r['name']} for r in (rows.data or [])])
+            except Exception as e:
+                logger.error(f'basic 查询失败: {e}')
+                return jsonify([])
 
-        logger.info('获取基金列表')
+        # -- Fast path: non-trading / settled -> return Supabase data directly
+        # This avoids slow external API calls when market is closed
+        if _is_nav_settled_bj():
+            try:
+                rows = supabase.table('funds').select('*').eq('username', username).execute()
+                if rows.data:
+                    logger.info(f'nav settled, returning Supabase cache: {len(rows.data)} funds')
+                    return jsonify(rows.data)
+            except Exception as _e:
+                logger.warning(f'Supabase cache read failed, falling back: {_e}')
+
+        # -- Full path: trading hours -> fetch external API, update Supabase
+        global funds
+        load_funds(username)
+        user_funds = [f for f in funds if getattr(f, 'username', None) == username]
+
+        logger.info(f'get funds user={username} count={len(user_funds)}')
         today = datetime.now().strftime('%Y-%m-%d')
         updated_funds = []
 
         try:
             from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
+            import copy
 
             market_data = get_market_data()
 
             def _update_one(fund):
-                """单只基金并发更新"""
+                """单只基金并发更新 - 操作独立副本，避免多线程竞争修改共享对象"""
                 try:
                     already_updated_today = (
-                            fund.nav_updated_at is not None and
-                            str(fund.nav_updated_at)[:10] == today
+                        fund.nav_updated_at is not None and
+                        str(fund.nav_updated_at)[:10] == today
                     )
                     if already_updated_today:
                         rt = data_source_manager.get_fund_estimated_return(fund.code)
@@ -685,19 +726,21 @@ def get_funds():
                         name, new_prices, new_dates, new_returns = get_fund_data(fund.code)
                         rt = data_source_manager.get_fund_estimated_return(fund.code)
                         if new_prices and new_dates:
+                            # 用本地变量合并，不直接 append 到 fund 对象（线程安全）
                             existing = set(fund.dates)
-                            added = 0
+                            merged_dates = list(fund.dates)
+                            merged_prices = list(fund.prices)
+                            merged_returns = list(fund.returns)
                             for d, p, r in zip(new_dates, new_prices, new_returns):
                                 if d not in existing:
-                                    fund.dates.append(d)
-                                    fund.prices.append(p)
-                                    fund.returns.append(r)
+                                    merged_dates.append(d)
+                                    merged_prices.append(p)
+                                    merged_returns.append(r)
                                     existing.add(d)
-                                    added += 1
-                            if added > 0:
-                                combined = sorted(zip(fund.dates, fund.prices, fund.returns))
-                                fund.dates = [x[0] for x in combined]
-                                fund.prices = [x[1] for x in combined]
+                            if len(merged_dates) > len(fund.dates):
+                                combined = sorted(zip(merged_dates, merged_prices, merged_returns))
+                                fund.dates   = [x[0] for x in combined]
+                                fund.prices  = [x[1] for x in combined]
                                 fund.returns = [x[2] for x in combined]
                         fund.update_prices(fund.prices, fund.dates, fund.returns,
                                            market_data=market_data)
@@ -708,9 +751,9 @@ def get_funds():
                         fund.predicted_return = fund.calculate_predicted_return(
                             stock_holdings=holdings, market_data=market_data,
                             real_time_estimated_return=rt)
-                        fund.gszzl = rt.get('gszzl')
-                        fund.gsz = rt.get('gsz')
-                        fund.gztime = rt.get('gztime')
+                        fund.gszzl      = rt.get('gszzl')
+                        fund.gsz        = rt.get('gsz')
+                        fund.gztime     = rt.get('gztime')
                         fund.est_source = rt.get('source', '')
                         fund.has_realtime = True
                     else:
@@ -725,39 +768,27 @@ def get_funds():
                     logger.error(f'更新基金 {fund.code} 失败: {e}')
                     return fund.to_dict()
 
-            # 并发更新所有基金（最多6个线程）
             with ThreadPoolExecutor(max_workers=6) as executor:
-                futures = {executor.submit(_update_one, fund): fund for fund in funds}
+                futures = {executor.submit(_update_one, fund): fund for fund in user_funds}
                 for future in _as_completed(futures):
                     result = future.result()
                     if result:
                         updated_funds.append(result)
 
-            save_funds(session['username'])
+            save_funds(username)
             logger.info('基金数据更新完成')
 
         except Exception as e:
             logger.error(f'批量更新基金失败: {e}')
-            updated_funds = [f.to_dict() for f in funds]
+            updated_funds = [f.to_dict() for f in user_funds]
 
         if not updated_funds:
-            try:
-                load_funds(session['username'])
-                updated_funds = [f.to_dict() for f in funds]
-            except Exception as e:
-                logger.error(f'加载基金数据失败: {e}')
+            updated_funds = [f.to_dict() for f in user_funds]
 
         return jsonify(updated_funds or [])
 
     except Exception as e:
         logger.error(f'获取基金列表失败: {e}')
-        try:
-            current_funds = [f.to_dict() for f in funds]
-            if current_funds:
-                return jsonify(current_funds)
-        except Exception as _e:
-
-            logger.warning(f"caught exception: {_e}")
         return jsonify([]), 500
 
 
@@ -991,7 +1022,6 @@ def get_fund_details(code):
             try:
                 # 解析JS格式数据
                 data_str = response.text
-                import re
 
                 # 提取基金基本信息
                 fund_details = {
@@ -1634,8 +1664,6 @@ def get_fund_holdings_api(code):
 
 
 if __name__ == '__main__':
-    import os
-
     port = int(os.environ.get('PORT', 8003))
     logger.debug(f'Starting Flask server on port {port}...')
     logger.debug(f'Server will run on http://localhost:{port}')
