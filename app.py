@@ -1187,10 +1187,12 @@ def get_investment_advice():
                             cached_data.get('holdingsAdvice') or
                             cached_data.get('recommendedFunds')
                         )
-                        # 缓存未超过 60 分钟且有实质数据 → 直接返回
-                        if age_minutes < 60 and has_real_data:
+                        # 缓存 TTL：交易时间15分钟，非交易时间60分钟
+                        _advice_ttl = 15 if _is_trading_time_bj() else 60
+                        if age_minutes < _advice_ttl and has_real_data:
                             logger.info(f'投资建议命中 Supabase 缓存（{age_minutes:.1f} 分钟前生成）')
                             cached_data['_cache_time'] = int(updated_at.timestamp() * 1000)
+                            cached_data['_advice_updated_at'] = updated_at_str
                             return jsonify(cached_data)
                         else:
                             logger.info(f'Supabase 缓存已过期（{age_minutes:.1f} 分钟），重新生成')
@@ -1337,17 +1339,12 @@ def get_investment_advice():
                 }
             })
 
-        try:
-            recommendedFunds = get_recommended_funds_engine(market_snapshot=market_data, top_per_tier=5)
-            logger.info(f'推荐引擎返回 {len(recommendedFunds)} 只基金')
-        except Exception as e:
-            logger.error(f'推荐引擎异常: {e}')
-            recommendedFunds = []
+        # recommendedFunds moved to /api/recommended-funds (separate endpoint)
+        # The recommender engine takes 60+ seconds, exceeding Vercel 10s timeout,
+        # causing Supabase write to never execute. holdingsAdvice alone is fast.
+        result = {'holdingsAdvice': holdingsAdvice, 'recommendedFunds': []}
 
-        result = {'holdingsAdvice': holdingsAdvice, 'recommendedFunds': recommendedFunds}
-
-        # ── 2. 写回 Supabase 缓存（upsert，只在有实质数据时写）────────────────
-        if holdingsAdvice or recommendedFunds:
+        if holdingsAdvice:
             try:
                 from datetime import timezone as _tz
                 now_utc = datetime.now(_tz.utc).isoformat()
@@ -1356,14 +1353,84 @@ def get_investment_advice():
                     'data': result,
                     'updated_at': now_utc,
                 }, on_conflict='username').execute()
-                logger.info('投资建议已写入 Supabase 缓存')
+                logger.info('investment advice written to Supabase')
+                result['_cache_time'] = int(datetime.now(_tz.utc).timestamp() * 1000)
+                result['_advice_updated_at'] = now_utc
             except Exception as _se:
-                logger.warning(f'写入 Supabase 投资建议缓存失败（不影响返回）: {_se}')
+                logger.warning(f'Supabase write failed: {_se}')
 
         return jsonify(result)
     except Exception as e:
         logger.error(f'获取投资建议失败: {e}')
         return jsonify({'holdingsAdvice': [], 'recommendedFunds': []})
+
+
+@app.route('/api/recommended-funds', methods=['GET'])
+@performance_monitor
+@rate_limit
+def get_recommended_funds_api():
+    """Recommended funds endpoint - separate from investment advice to avoid Vercel timeout.
+    Uses its own Supabase table (recommended_funds_cache) with 6h TTL.
+    Returns up to 20 funds (10 stable + 10 balanced).
+    """
+    try:
+        if 'username' not in session:
+            return jsonify({'error': '未登录'}), 401
+
+        username = session['username']
+        force_refresh = request.args.get('refresh', '0') == '1'
+
+        # ── 1. Try Supabase cache first (6h TTL) ──────────────────────────────
+        if not force_refresh:
+            try:
+                rec_row = supabase.table('recommended_funds_cache')                     .select('data,updated_at')                     .eq('username', username)                     .execute()
+                if rec_row.data:
+                    row = rec_row.data[0]
+                    updated_at_str = row.get('updated_at', '')
+                    cached_data = row.get('data')
+                    if updated_at_str and cached_data and cached_data.get('recommendedFunds'):
+                        from datetime import timezone
+                        updated_at = datetime.fromisoformat(updated_at_str.replace('Z', '+00:00'))
+                        age_hours = (datetime.now(timezone.utc) - updated_at).total_seconds() / 3600
+                        _rec_ttl = 1 if _is_trading_time_bj() else 3
+                        if age_hours < _rec_ttl:
+                            logger.info(f'recommended funds: Supabase cache hit ({age_hours:.1f}h old)')
+                            cached_data['_rec_updated_at'] = updated_at_str
+                            cached_data['_rec_cache_time'] = int(updated_at.timestamp() * 1000)
+                            return jsonify(cached_data)
+                        else:
+                            logger.info(f'recommended funds: cache expired ({age_hours:.1f}h), refreshing')
+            except Exception as _ce:
+                logger.warning(f'recommended funds cache read failed: {_ce}')
+
+        # ── 2. Generate fresh recommendations (20 funds: 10 stable + 10 balanced) ──
+        logger.info('recommended funds: generating fresh recommendations')
+        market_data = get_market_data()
+        recommended = get_recommended_funds_engine(market_snapshot=market_data, top_per_tier=10)
+        logger.info(f'recommended funds: got {len(recommended)} funds')
+
+        result = {'recommendedFunds': recommended}
+
+        # ── 3. Write to recommended_funds_cache ───────────────────────────────
+        if recommended:
+            try:
+                from datetime import timezone as _tz
+                now_utc = datetime.now(_tz.utc).isoformat()
+                supabase_admin.table('recommended_funds_cache').upsert({
+                    'username': username,
+                    'data': result,
+                    'updated_at': now_utc,
+                }, on_conflict='username').execute()
+                logger.info(f'recommended funds: written {len(recommended)} funds to Supabase')
+                result['_rec_updated_at'] = now_utc
+                result['_rec_cache_time'] = int(datetime.now(_tz.utc).timestamp() * 1000)
+            except Exception as _se:
+                logger.warning(f'recommended funds Supabase write failed: {_se}')
+
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f'recommended funds failed: {e}')
+        return jsonify({'recommendedFunds': []})
 
 
 def _calc_action(fund, pr: float, market_data: dict, investment_level: str = 'small') -> tuple:
