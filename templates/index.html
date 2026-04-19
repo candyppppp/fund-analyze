@@ -26,19 +26,19 @@
                 <!-- 手机跑马灯时复制一份，实现无缝循环 -->
                 <div id="ticker-inner-clone" aria-hidden="true"></div>
             </div>
+
         </div>
         <style>
         /* ── Ticker 基础 ── */
         #market-ticker {
             background: #0d0d0d;
             border-bottom: 1px solid #1a1a1a;
-            padding: 0 16px 0 0;
+            padding: 0;
             display: flex;
             align-items: center;
             height: 42px;
             overflow: hidden;
             flex-shrink: 0;
-            justify-content:center; /* 添加居中 */
         }
         #ticker-scroll-wrap {
             flex: 1;
@@ -60,39 +60,26 @@
         .ticker-item {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
             flex-shrink: 0;
-            padding: 0 14px;
+            padding: 0 20px;
             height: 100%;
             border-right: 1px solid #1a1a1a;
             box-sizing: border-box;
         }
         .ticker-item:last-child { border-right: none; }
-        .ticker-name  { font-size: 11px; color: #aaa; font-weight: 400; }
-        .ticker-price { font-size: 12px; font-weight: 500; color: #e8e8e8;
+        .ticker-name  { font-size: 13px; color: #aaa; font-weight: 400; }
+        .ticker-price { font-size: 14px; font-weight: 500; color: #e8e8e8;
                         letter-spacing: .3px; font-variant-numeric: tabular-nums; }
-        .ticker-chg   { font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; }
+        .ticker-chg   { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
         .tc-up   { color: #e84040; }
         .tc-down { color: #28a745; }
         .tc-flat { color: #666; }
 
-        #ticker-status {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            flex-shrink: 0;
-            margin-left: 12px;
-            gap: 2px;
-        }
-        #market-status { font-size: 11px; color: #666; letter-spacing: .3px; white-space: nowrap; }
-        #market-clock  { font-size: 12px; color: #666; font-variant-numeric: tabular-nums;
-                         letter-spacing: .8px; white-space: nowrap; }
 
         /* ── 手机端：跑马灯 ── */
         @media (max-width: 600px) {
             #market-ticker { padding: 0 8px 0 0; }
-            #ticker-status { display: none; }   /* 手机空间不够，隐藏时间状态 */
-
             #ticker-scroll-wrap {
                 /* 手机上让内容无缝循环滚动 */
                 overflow: visible;
