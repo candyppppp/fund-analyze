@@ -688,12 +688,84 @@ def get_funds():
                 return jsonify([])
 
         # -- Fast path: non-trading / settled -> return Supabase data directly
-        # This avoids slow external API calls when market is closed
+        # Avoids slow external API calls when market is closed.
+        # After returning cached data, if data is stale (>24h), trigger a background
+        # refresh to keep Supabase up-to-date even without a cron job.
         if _is_nav_settled_bj():
             try:
                 rows = supabase.table('funds').select('*').eq('username', username).execute()
                 if rows.data:
                     logger.info(f'nav settled, returning Supabase cache: {len(rows.data)} funds')
+
+                    # Check staleness: if any fund hasn't been updated in >24h, refresh async
+                    _needs_refresh = False
+                    _cutoff = datetime.now() - timedelta(hours=24)
+                    for row in rows.data:
+                        nav_ts = row.get('nav_updated_at')
+                        if not nav_ts:
+                            _needs_refresh = True
+                            break
+                        try:
+                            _ts = datetime.strptime(str(nav_ts)[:10], '%Y-%m-%d')
+                            if _ts < _cutoff:
+                                _needs_refresh = True
+                                break
+                        except Exception:
+                            pass
+
+                    if _needs_refresh:
+                        logger.info('Supabase data stale (>24h), triggering background refresh')
+                        import threading
+                        def _bg_refresh():
+                            try:
+                                global funds
+                                load_funds(username)
+                                user_funds = [f for f in funds if getattr(f, 'username', None) == username]
+                                if not user_funds:
+                                    return
+                                from concurrent.futures import ThreadPoolExecutor, as_completed as _ac
+                                market_data = get_market_data()
+                                today = datetime.now().strftime('%Y-%m-%d')
+                                def _upd(fund):
+                                    try:
+                                        name, new_prices, new_dates, new_returns = get_fund_data(fund.code)
+                                        if new_prices and new_dates:
+                                            existing = set(fund.dates)
+                                            merged_dates, merged_prices, merged_returns = list(fund.dates), list(fund.prices), list(fund.returns)
+                                            for d, p, r in zip(new_dates, new_prices, new_returns):
+                                                if d not in existing:
+                                                    merged_dates.append(d); merged_prices.append(p); merged_returns.append(r); existing.add(d)
+                                            if len(merged_dates) > len(fund.dates):
+                                                combined = sorted(zip(merged_dates, merged_prices, merged_returns))
+                                                fund.dates = [x[0] for x in combined]; fund.prices = [x[1] for x in combined]; fund.returns = [x[2] for x in combined]
+                                        fund.update_prices(fund.prices, fund.dates, fund.returns, market_data=market_data)
+                                        fund.nav_updated_at = today
+                                        fund.prediction_confidence = fund.calculate_prediction_confidence()
+                                    except Exception as _e:
+                                        logger.warning(f'bg refresh {fund.code}: {_e}')
+                                with ThreadPoolExecutor(max_workers=4) as ex:
+                                    list(ex.map(_upd, user_funds))
+                                # 节流保护：直接写而不走 save_funds 的60秒限制
+                                for fund in user_funds:
+                                    try:
+                                        supabase_admin.table('funds').update({
+                                            'prices': fund.prices, 'dates': fund.dates, 'returns': fund.returns,
+                                            'rsi': fund.rsi, 'volatility': fund.volatility,
+                                            'macd': list(fund.macd) if fund.macd else [0,0,0],
+                                            'kdj': list(fund.kdj) if fund.kdj else [0,0,0],
+                                            'bollinger_bands': list(fund.bollinger_bands) if fund.bollinger_bands else [0,0,0],
+                                            'predicted_return': fund.predicted_return,
+                                            'prediction_confidence': fund.prediction_confidence,
+                                            'previous_day_return': fund.previous_day_return,
+                                            'nav_updated_at': fund.nav_updated_at,
+                                        }).eq('id', fund.id).execute()
+                                    except Exception as _e:
+                                        logger.warning(f'bg save {fund.code}: {_e}')
+                                logger.info(f'bg refresh complete: {len(user_funds)} funds updated')
+                            except Exception as _e:
+                                logger.error(f'bg refresh failed: {_e}')
+                        threading.Thread(target=_bg_refresh, daemon=True).start()
+
                     return jsonify(rows.data)
             except Exception as _e:
                 logger.warning(f'Supabase cache read failed, falling back: {_e}')
