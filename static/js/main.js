@@ -780,85 +780,72 @@ function renderFunds(funds) {
 
         // 获取买入设置
         const buySettings = getBuySettings(fund.id);
-        const settled = isNavSettled(); // 净值是否已结算（非交易时间且收盘超6小时）
-
-        // 计算今日收益金额
-        // 结算后：用最新净值变化率（previous_day_return）× 份数 × 前一日净值 —— 实际收益
-        // 交易中：用 predicted_return（实时估值）× 份数 × 最新净值 —— 预估收益
-        let estimatedReturn = null;
+        const settled = isNavSettled();
         const latestNav = prices[prices.length - 1] || 0;
-        if (buySettings.shares > 0) {
-            if (settled) {
-                // 结算后显示实际收益：使用 previous_day_return（单位%）
-                const pdReturn = fund.previous_day_return || 0;
-                // previous_day_return 后端存的是百分比值，如 +1.23 表示 1.23%
-                estimatedReturn = latestNav * (pdReturn / 100) * buySettings.shares;
-            } else {
-                // 交易中显示预估收益
-                const predictedReturn = fund.predicted_return || 0;
-                estimatedReturn = latestNav * predictedReturn * buySettings.shares;
-            }
-        }
-
-        // 计算预测准确性（与实际收益的对比）
-        function calculatePredictionAccuracy(fund) {
-            if (fund.returns && fund.returns.length > 1) {
-                // 取最近的实际收益和预测收益进行对比
-                const actualReturn = fund.returns[fund.returns.length - 1];
-                const predictedReturn = fund.predicted_return || 0;
-                const difference = Math.abs(actualReturn - predictedReturn);
-                const accuracy = Math.max(0, 1 - difference / Math.max(Math.abs(actualReturn), 0.01)) * 100;
-                return accuracy.toFixed(2);
-            }
-            return 'N/A';
-        }
-
-        // 获取预测置信度
         const confidence = fund.prediction_confidence || 0.5;
 
-        // 获取RSI状态和emoji
-        function getRSIStatus(rsi) {
-            if (rsi > 70) {
-                return { status: '过热', emoji: '🔥' };
-            } else if (rsi < 30) {
-                return { status: '过冷', emoji: '❄️' };
-            } else if (rsi > 60 || rsi < 40) {
-                return { status: '波动', emoji: '🌪️' };
-            } else {
-                return { status: '正常', emoji: '📊' };
-            }
+        // ── "有净值"判断 ──────────────────────────────────────────────────────
+        // 当天净值是否已入库：dates[-1] == 今天北京时间日期
+        // 非交易日（周末）：dates[-1] == 最近工作日即为有净值
+        const _bjNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
+        const _bjToday = `${_bjNow.getFullYear()}-${String(_bjNow.getMonth()+1).padStart(2,'0')}-${String(_bjNow.getDate()).padStart(2,'0')}`;
+        const _latestNavDate = (fund.dates && fund.dates.length > 0) ? fund.dates[fund.dates.length - 1] : '';
+        // 非交易日：找上一个工作日作为"应有净值日"
+        const _dow = _bjNow.getDay();
+        let _expectedNavDate = _bjToday;
+        if (_dow === 0) { // 周日 → 周五
+            const _d = new Date(_bjNow); _d.setDate(_d.getDate() - 2);
+            _expectedNavDate = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
+        } else if (_dow === 6) { // 周六 → 周五
+            const _d = new Date(_bjNow); _d.setDate(_d.getDate() - 1);
+            _expectedNavDate = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
         }
+        const hasNav = _latestNavDate >= _expectedNavDate;
 
-        const rsiStatus = getRSIStatus(fund.rsi);
-
-        // ── 第一列显示逻辑 ─────────────────────────────────────────────────────
-        // 交易时间：上一交易日实际涨跌（previous_day_return），标签带日期
-        // 结算后有净值：当日实际涨跌（previous_day_return），标签带日期
-        // 结算后无净值：当日预估涨跌（predicted_return），标签标注"预估"
-        //
-        // 说明：previous_day_return 由后台刷新写入，始终是最新已结算净值日的涨跌
-        // 交易时间它就是昨天的，结算后后台更新完就是今天的
-
-        // 最新净值日期（MM-DD格式）
-        const _navDate = (fund.dates && fund.dates.length > 0)
-            ? fund.dates[fund.dates.length - 1].slice(5)
-            : '';
-
+        // ── 第一列：实际涨跌 or 预估涨跌 ────────────────────────────────────
+        // 交易时间（9:30-15:00）：显示上一交易日实际涨跌（previous_day_return）
+        // 其他时段有净值：显示最新净值日实际涨跌
+        // 其他时段无净值：显示当日预估涨跌（predicted_return）
         let col1Value = 0;
         let col1Label = '';
         let col1IsEstimate = false;
-
-        // 有实际净值涨跌就用（无论交易时间还是结算后）
-        if (fund.previous_day_return != null && fund.previous_day_return !== 0) {
+        if (!settled || hasNav) {
+            // 交易时间 or 有净值：用 previous_day_return（实际）
             col1Value = (fund.previous_day_return || 0) / 100;
             col1Label = 'Previous Day';
             col1IsEstimate = false;
         } else {
-            // 无实际净值，降级用预估（结算后无净值场景）
+            // 结算后无净值：降级用预估
             col1Value = fund.predicted_return || 0;
             col1Label = 'Est. Return';
             col1IsEstimate = true;
         }
+
+        // ── 第四列：收益金额 ─────────────────────────────────────────────────
+        // 有净值（或交易时间）且有持仓：用实际/预估对应的涨跌计算
+        // 无净值：用预估涨跌计算
+        let estimatedReturn = null;
+        if (buySettings.shares > 0) {
+            if (!settled) {
+                // 交易时间：当日预估收益
+                estimatedReturn = latestNav * (fund.predicted_return || 0) * buySettings.shares;
+            } else if (hasNav) {
+                // 结算后有净值：真实收益
+                estimatedReturn = latestNav * ((fund.previous_day_return || 0) / 100) * buySettings.shares;
+            } else {
+                // 结算后无净值：预估收益
+                estimatedReturn = latestNav * (fund.predicted_return || 0) * buySettings.shares;
+            }
+        }
+
+        // RSI 状态
+        function getRSIStatus(rsi) {
+            if (rsi > 70)       return { status: '过热', emoji: '🔥' };
+            else if (rsi < 30)  return { status: '过冷', emoji: '❄️' };
+            else if (rsi > 60 || rsi < 40) return { status: '波动', emoji: '🌪️' };
+            else                return { status: '正常', emoji: '📊' };
+        }
+        const rsiStatus = getRSIStatus(fund.rsi);
 
         fundItem.innerHTML = `
             <div class="fund-info">
@@ -917,7 +904,7 @@ function renderFunds(funds) {
                         ` : `
                             <div class="fund-return" style="color:#555;">--</div>
                         `}
-                        <div class="fund-return-label">${settled ? 'Actual Profit' : 'Live Profit'}</div>
+                        <div class="fund-return-label">${(!settled || !hasNav) ? 'Live Profit' : 'Actual Profit'}</div>
                     </div>
                 </div>
         `;
