@@ -697,17 +697,20 @@ def get_funds():
                 if rows.data:
                     logger.info(f'nav settled, returning Supabase cache: {len(rows.data)} funds')
 
-                    # Check staleness: if any fund hasn't been updated in >24h, refresh async
+                    # Check staleness: trigger refresh if any fund's data is not from today (BJ time)
+                    # Bug fix: previous logic used >24h which could miss same-day refreshes
+                    # e.g. data updated at 15:00 yesterday, opened at 21:00 today = only 6h gap, no refresh
+                    from datetime import timezone as _tz2
+                    _bj_today = datetime.now(_tz2(timedelta(hours=8))).strftime('%Y-%m-%d')
                     _needs_refresh = False
-                    _cutoff = datetime.now() - timedelta(hours=24)
                     for row in rows.data:
                         nav_ts = row.get('nav_updated_at')
                         if not nav_ts:
                             _needs_refresh = True
                             break
                         try:
-                            _ts = datetime.strptime(str(nav_ts)[:10], '%Y-%m-%d')
-                            if _ts < _cutoff:
+                            # If nav_updated_at date < today (BJ), data is stale
+                            if str(nav_ts)[:10] < _bj_today:
                                 _needs_refresh = True
                                 break
                         except Exception:
@@ -725,7 +728,8 @@ def get_funds():
                                     return
                                 from concurrent.futures import ThreadPoolExecutor, as_completed as _ac
                                 market_data = get_market_data()
-                                today = datetime.now().strftime('%Y-%m-%d')
+                                from datetime import timezone as _tz_bg, timedelta as _td_bg
+                                today = datetime.now(_tz_bg(_td_bg(hours=8))).strftime('%Y-%m-%d')
                                 def _upd(fund):
                                     try:
                                         name, new_prices, new_dates, new_returns = get_fund_data(fund.code)
@@ -766,7 +770,58 @@ def get_funds():
                                 logger.error(f'bg refresh failed: {_e}')
                         threading.Thread(target=_bg_refresh, daemon=True).start()
 
-                    return jsonify(rows.data)
+                    # ── 同步修正今日净值 ──────────────────────────────────────
+                    # 如果 Supabase 数据的最新日期不是今天（北京时间），
+                    # 同步拉取今天的净值更新 previous_day_return，不依赖异步后台
+                    from datetime import timezone as _tz3
+                    _bj_today = datetime.now(_tz3(timedelta(hours=8))).strftime('%Y-%m-%d')
+                    _result_rows = list(rows.data)  # copy to modify
+                    _any_stale = any(
+                        (r.get('dates') or [''])[-1] < _bj_today
+                        for r in _result_rows
+                        if r.get('dates')
+                    )
+                    if _any_stale:
+                        logger.info(f'dates stale, fetching today nav for {len(_result_rows)} funds')
+                        def _fetch_today_nav(row):
+                            try:
+                                dates = row.get('dates') or []
+                                if dates and dates[-1] >= _bj_today:
+                                    return  # already today
+                                code = row.get('code')
+                                if not code:
+                                    return
+                                # 用 get_fund_latest_nav 获取最新净值日期和净值（非估算值）
+                                rt = data_source_manager.get_fund_latest_nav(code)
+                                if not rt:
+                                    return
+                                new_date = rt.get('jzrq')   # 净值公布日期，如 2026-04-20
+                                new_nav  = rt.get('dwjz')   # 实际净值
+                                if not new_date or not new_nav:
+                                    return
+                                new_nav = float(new_nav)
+                                if new_date > (dates[-1] if dates else ''):
+                                    prices = list(row.get('prices') or [])
+                                    ret_arr = list(row.get('returns') or [])
+                                    if prices:
+                                        pdr = (new_nav / prices[-1] - 1) * 100
+                                        row['previous_day_return'] = round(pdr, 4)
+                                        prices.append(new_nav)
+                                        ret_arr.append(new_nav / prices[-2] - 1 if len(prices) >= 2 else 0)
+                                        dates.append(new_date)
+                                        row['prices'] = prices
+                                        row['returns'] = ret_arr
+                                        row['dates'] = dates
+                                        row['nav_updated_at'] = _bj_today
+                                        logger.info(f'{code}: updated to {new_date} nav={new_nav} pdr={pdr:.2f}%')
+                            except Exception as _ne:
+                                logger.warning(f'fetch today nav failed for {row.get("code")}: {_ne}')
+
+                        from concurrent.futures import ThreadPoolExecutor as _TPE
+                        with _TPE(max_workers=8) as _ex:
+                            list(_ex.map(_fetch_today_nav, _result_rows))
+
+                    return jsonify(_result_rows)
             except Exception as _e:
                 logger.warning(f'Supabase cache read failed, falling back: {_e}')
 
@@ -776,7 +831,8 @@ def get_funds():
         user_funds = [f for f in funds if getattr(f, 'username', None) == username]
 
         logger.info(f'get funds user={username} count={len(user_funds)}')
-        today = datetime.now().strftime('%Y-%m-%d')
+        from datetime import timezone as _tz_gf, timedelta as _td_gf
+        today = datetime.now(_tz_gf(_td_gf(hours=8))).strftime('%Y-%m-%d')
         updated_funds = []
 
         try:
