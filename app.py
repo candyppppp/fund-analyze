@@ -1446,99 +1446,105 @@ def get_recommended_funds_api():
 
 
 def _calc_action(fund, pr: float, market_data: dict, investment_level: str = 'small') -> tuple:
-    """
-    多维度综合决策引擎，替代单纯依赖当日 predicted_return 的简单判断。
+    # 技术面多维度综合决策引擎
+    #
+    # 设计原则：决策以技术指标为主，实时估值仅作辅助参考（权重与其他指标相同）
+    # 需多项技术指标同向共识才触发操作，避免单一指标误判
+    #
+    # 评分结构（满分约 ±8）：
+    #   技术主体：5日趋势、20日均线、MACD、RSI、KDJ-J、布林带 各±1（共±6）
+    #   辅助参考：实时估值±1（与技术指标平权，仅作辅助）
+    #   环境修正：大盘涨跌±1（门槛提高至2%）
+    #
+    # 决策阈值（需多项技术信号共识）：
+    #   补仓 ≥+4，轻仓补入 ≥+3，持有 -2~+2，观望减持 ≤-3，减仓 ≤-4
 
-    决策逻辑分三层：
-      1. 5日净值趋势（主信号）：用近5日均值方向代替单日涨跌，过滤噪音
-      2. 多技术指标共识（门槛）：补仓/减仓需至少2项技术指标同向确认
-      3. 强度分级输出：综合得分决定操作力度，避免频繁翻转
-
-    返回: (action: str, suggest_amount: int)
-    """
     prices = getattr(fund, 'prices', []) or []
     rsi    = getattr(fund, 'rsi', 50) or 50
     macd   = getattr(fund, 'macd', [0, 0, 0]) or [0, 0, 0]
     kdj    = getattr(fund, 'kdj', [0, 0, 0]) or [0, 0, 0]
     bb     = getattr(fund, 'bollinger_bands', [0, 0, 0]) or [0, 0, 0]
 
-    # ── 1. 5日净值趋势（主方向）──────────────────────────────────────────────
-    # 用近5日平均涨跌幅代替今日单点，平滑日内噪音
+    # ── 1. 5日净值趋势（近5日日均涨跌幅，平滑单日噪音）──────────────────────
     trend_5d = 0.0
     if len(prices) >= 6:
-        daily_returns = [
-            (prices[-i] / prices[-i - 1] - 1)
-            for i in range(1, 6)
-        ]
+        daily_returns = [(prices[-i] / prices[-i-1] - 1) for i in range(1, 6)]
         trend_5d = sum(daily_returns) / len(daily_returns)
 
-    # ── 2. 多技术指标打分（每项 -1/0/+1）────────────────────────────────────
-    score = 0  # 正=看多，负=看空
+    # ── 2. 20日均线方向（中期趋势过滤）─────────────────────────────────────
+    ma20_signal = 0
+    if len(prices) >= 21:
+        ma20 = sum(prices[-20:]) / 20
+        if prices[-1] > ma20 * 1.002:    # 站上均线0.2%确认多头
+            ma20_signal = 1
+        elif prices[-1] < ma20 * 0.998:  # 跌破均线0.2%确认空头
+            ma20_signal = -1
 
-    # 2a. 今日实时估值（权重最高，有实时数据才计入）
-    has_realtime = getattr(fund, 'has_realtime', False)
-    if has_realtime and abs(pr) > 0.005:
-        score += 2 if pr > 0 else -2   # 实时信号权重×2
+    # ── 3. 技术指标打分（每项 -1/0/+1）─────────────────────────────────────
+    score = 0
 
-    # 2b. 5日趋势
-    if trend_5d > 0.003:
+    # 3a. 5日趋势（门槛0.1%，贴合基金日常波动；原0.3%门槛过高）
+    if trend_5d > 0.001:
         score += 1
-    elif trend_5d < -0.003:
+    elif trend_5d < -0.001:
         score -= 1
 
-    # 2c. MACD
+    # 3b. 20日均线方向
+    score += ma20_signal
+
+    # 3c. MACD（金叉+红柱 / 死叉+绿柱）
     ml, sl, hist = macd[0], macd[1], macd[2]
     if ml > sl and hist > 0:
-        score += 1   # 金叉+红柱
-    elif ml < sl and hist < 0:
-        score -= 1   # 死叉+绿柱
-
-    # 2d. RSI
-    if rsi < 35:
-        score += 1   # 超卖
-    elif rsi > 65:
-        score -= 1   # 超买
-
-    # 2e. KDJ（J值）
-    j = kdj[2]
-    if j < 20:
         score += 1
-    elif j > 80:
+    elif ml < sl and hist < 0:
         score -= 1
 
-    # 2f. 布林带位置
+    # 3d. RSI（放宽至40/60；原35/65对基金过于极端，日常难触发）
+    if rsi < 40:
+        score += 1
+    elif rsi > 60:
+        score -= 1
+
+    # 3e. KDJ-J（放宽至30/70；原20/80过于极端）
+    j = kdj[2]
+    if j < 30:
+        score += 1
+    elif j > 70:
+        score -= 1
+
+    # 3f. 布林带位置（放宽至30%/70%；原20%/80%区间太窄）
     if bb[0] != bb[2] and prices:
         bb_pct = (prices[-1] - bb[2]) / (bb[0] - bb[2])
-        if bb_pct < 0.2:
-            score += 1   # 靠近下轨，超卖
-        elif bb_pct > 0.8:
-            score -= 1   # 靠近上轨，超买
+        if bb_pct < 0.3:
+            score += 1
+        elif bb_pct > 0.7:
+            score -= 1
 
-    # ── 3. 大盘环境修正（市场逆风时降低多头得分）────────────────────────────
+    # ── 4. 实时估值辅助（权重与技术指标相同，不主导决策）──────────────────
+    # 预估值有一定误差，门槛0.3%过滤日内微小噪音
+    has_realtime = getattr(fund, 'has_realtime', False)
+    if has_realtime and abs(pr) > 0.003:
+        score += 1 if pr > 0 else -1
+
+    # ── 5. 大盘环境修正（门槛提高至2%，避免小幅波动频繁触发）─────────────
     if market_data:
         indices = market_data.get('indices', {})
         if indices:
             avg_market = sum(v.get('change_ratio', 0) for v in indices.values()) / len(indices)
-            if avg_market < -0.015:   # 大盘跌超1.5%，多头信号打折
+            if avg_market < -0.02:
                 score -= 1
-            elif avg_market > 0.015:  # 大盘涨超1.5%，空头信号打折
+            elif avg_market > 0.02:
                 score += 1
 
-    # ── 4. 决策输出（需足够强的共识才触发操作）──────────────────────────────
-    # 评分范围约 -7 ~ +7
-    # 补仓：score >= 3（多项指标共同看多）
-    # 减仓：score <= -3（多项指标共同看空）
-    # 持有：其他（信号混乱或不足，不贸然操作）
-    # ── 5. 按投资档位选取金额梯度表 ─────────────────────────────────────────
+    # ── 6. 决策输出 ──────────────────────────────────────────────────────────
     AMOUNT_TABLE = {
-        'small':  [100, 200, 300, 500],   # 小额：score 4/5/6/7+
-        'medium': [300, 500, 800, 1000],  # 中额
-        'large':  [800, 1000, 1200, 1500, 2000],  # 大额：score 4/5/6/7/8+
+        'small':  [100, 200, 300, 500],
+        'medium': [300, 500, 800, 1000],
+        'large':  [800, 1000, 1200, 1500, 2000],
     }
     amounts = AMOUNT_TABLE.get(investment_level, AMOUNT_TABLE['small'])
 
     def pick_amount(sc, tbl):
-        # score 从4开始对应 tbl[0], 超出上限取最后一档
         idx = max(0, sc - 4)
         return tbl[min(idx, len(tbl) - 1)]
 
@@ -1550,7 +1556,7 @@ def _calc_action(fund, pr: float, market_data: dict, investment_level: str = 'sm
         suggest_amount = 0
     elif score >= 3:
         action = '轻仓补入'
-        suggest_amount = amounts[0]   # 最小档
+        suggest_amount = amounts[0]
     elif score <= -3:
         action = '观望减持'
         suggest_amount = 0
@@ -1560,11 +1566,10 @@ def _calc_action(fund, pr: float, market_data: dict, investment_level: str = 'sm
 
     logger.debug(
         f"[决策] {getattr(fund, 'code', '?')} score={score} "
-        f"pr={pr:.3f} trend5d={trend_5d:.4f} rsi={rsi:.1f} → {action}"
+        f"trend5d={trend_5d:.4f} ma20={ma20_signal} rsi={rsi:.1f} "
+        f"macd={'up' if ml>sl else 'dn'} kdj_j={j:.1f} bb={bb_pct if bb[0]!=bb[2] and prices else 'n/a'} → {action}"
     )
     return action, suggest_amount
-
-
 def generate_holding_reason(fund, action: str, market_data: dict) -> str:
     """
     基于基金实际指标数据生成结构化分析原因。
