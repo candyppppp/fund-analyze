@@ -48,8 +48,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 60000);
 
     // 登录状态由后端 Flask session 管理，无需前端检查
-    // startUpdatesForTab 会立即触发一次 updateFundList 事件，内部调用 loadFunds
-    // 所以不需要在这里再单独 loadFunds()，避免初始化时双重请求
+    // 先注册事件监听，再启动 updateStrategyManager（它会立即 dispatch 事件）
+    window.addEventListener('updateFundList', function() {
+        if (typeof loadFunds === 'function') loadFunds();
+    });
+    window.addEventListener('updateHoldings', function() {
+        const cached = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
+        if (cached && cached.length > 0) startFundHoldingsUpdateIntervals(cached);
+    });
+
     updateStrategyManager.startUpdatesForTab('fund-prediction');
 
     // 启动大盘指数条
@@ -3309,22 +3316,4 @@ function startMarketTicker() {
 window.addEventListener('load', function() {
     const settings = getSettings();
     applySettings(settings);
-    // startFundAutoUpdate() 已由 updateStrategyManager 替代，此处不再启动
-
-    // 监听更新事件
-    window.addEventListener('updateFundList', function() {
-        if (typeof loadFunds === 'function') {
-            loadFunds();
-        }
-    });
-
-    window.addEventListener('updateHoldings', function() {
-        // updateStrategyManager 触发持仓更新：只在有缓存基金时刷新
-        const cached = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
-        if (cached && cached.length > 0) {
-            startFundHoldingsUpdateIntervals(cached);
-        }
-    });
-
-    // updateInvestmentAdvice 事件已废弃（investment-advice.js 自管定时器），监听已移除
 });
