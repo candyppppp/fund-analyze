@@ -35,7 +35,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (cached && cached.length) renderFunds(cached);
         }
     });
-    setTimeout(() => migrateBuyRecordsToCloud(), 3000); // 等基金列表加载完再迁移
 
     // 排序固定为持仓优先，无需按钮事件
 
@@ -49,10 +48,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 60000);
 
     // 登录状态由后端 Flask session 管理，无需前端检查
-    loadFunds(); // 初始加载一次基金列表
-
-    // 启动基金自选 tab 的定时更新（初始在基金自选 tab，需要立即启动）
-    // switchTab 只在切换时触发，初始 tab 需要手动启动
+    // startUpdatesForTab 会立即触发一次 updateFundList 事件，内部调用 loadFunds
+    // 所以不需要在这里再单独 loadFunds()，避免初始化时双重请求
     updateStrategyManager.startUpdatesForTab('fund-prediction');
 
     // 启动大盘指数条
@@ -95,7 +92,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 基金投资标签
                 activeTab = 'investment-advice';
                 window.activeTab = activeTab;
-                showLoadingState('正在加载基金投资建议，请稍候...');
+                // 有内存缓存时不显示 loading，loadInvestmentAdvice 内部会直接渲染
+                const _adviceCached = cacheManager.get('investmentAdvice');
+                if (!_adviceCached || !_adviceCached.holdingsAdvice || !_adviceCached.holdingsAdvice.length) {
+                    showLoadingState('正在加载基金投资建议，请稍候...');
+                }
                 investmentAdvice.loadInvestmentAdvice();
                 updateStrategyManager.switchTab('investment-advice');
             }
@@ -2397,7 +2398,7 @@ async function deleteBuyRecord(recordId, fundId) {
 }
 
 // 迁移已完成，函数保留为空体以兼容调用方
-async function migrateBuyRecordsToCloud() {}
+// migrateBuyRecordsToCloud 已废弃（云端迁移已完成），函数已移除
 
 
 
@@ -3307,9 +3308,5 @@ window.addEventListener('load', function() {
         }
     });
 
-    window.addEventListener('updateInvestmentAdvice', function() {
-        if (typeof investmentAdvice !== 'undefined' && investmentAdvice && typeof investmentAdvice.loadInvestmentAdvice === 'function') {
-            investmentAdvice.loadInvestmentAdvice();
-        }
-    });
+    // updateInvestmentAdvice 事件已废弃（investment-advice.js 自管定时器），监听已移除
 });
