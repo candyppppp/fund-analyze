@@ -791,29 +791,32 @@ def get_funds():
                                 code = row.get('code')
                                 if not code:
                                     return
-                                # 用 get_fund_latest_nav 获取最新净值日期和净值（非估算值）
-                                rt = data_source_manager.get_fund_latest_nav(code)
-                                if not rt:
+                                # 用 get_fund_data 拉完整历史数据（比 get_fund_latest_nav 更可靠）
+                                # get_fund_latest_nav 对部分数据源有延迟，可能仍返回旧日期
+                                _, new_prices, new_dates, new_returns = get_fund_data(code)
+                                if not new_prices or not new_dates:
                                     return
-                                new_date = rt.get('jzrq')   # 净值公布日期，如 2026-04-20
-                                new_nav  = rt.get('dwjz')   # 实际净值
-                                if not new_date or not new_nav:
-                                    return
-                                new_nav = float(new_nav)
+                                new_date = new_dates[-1]
+                                new_nav  = float(new_prices[-1])
                                 if new_date > (dates[-1] if dates else ''):
                                     prices = list(row.get('prices') or [])
                                     ret_arr = list(row.get('returns') or [])
                                     if prices:
                                         pdr = (new_nav / prices[-1] - 1) * 100
                                         row['previous_day_return'] = round(pdr, 4)
-                                        prices.append(new_nav)
-                                        ret_arr.append(new_nav / prices[-2] - 1 if len(prices) >= 2 else 0)
-                                        dates.append(new_date)
+                                        # 合并新数据（去重）
+                                        existing = set(dates)
+                                        for d, p, r in zip(new_dates, new_prices, new_returns):
+                                            if d not in existing:
+                                                dates.append(d)
+                                                prices.append(float(p))
+                                                ret_arr.append(r)
+                                                existing.add(d)
                                         row['prices'] = prices
                                         row['returns'] = ret_arr
                                         row['dates'] = dates
                                         row['nav_updated_at'] = _bj_today
-                                        logger.info(f'{code}: updated to {new_date} nav={new_nav} pdr={pdr:.2f}%')
+                                        logger.info(f'{code}: synced to {new_date} nav={new_nav} pdr={pdr:.2f}%')
                             except Exception as _ne:
                                 logger.warning(f'fetch today nav failed for {row.get("code")}: {_ne}')
 
