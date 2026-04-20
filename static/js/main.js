@@ -39,17 +39,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 排序固定为持仓优先，无需按钮事件
 
-    // ── 定时闪烁（即使没数据更新也有视觉活跃感，每20秒随机闪一只卡片）──────
+    // ── 定时闪烁（交易时间每60秒随机闪一只卡片，非交易时间不闪）──────────
     setInterval(() => {
+        if (!isTradingTime()) return; // 非交易时间不闪烁
         const cards = document.querySelectorAll('.fund-item');
         if (!cards.length) return;
         const idx = Math.floor(Math.random() * cards.length);
         flashCard(cards[idx]);
-    }, 20000);
+    }, 60000);
 
     // 登录状态由后端 Flask session 管理，无需前端检查
-    loadFunds(); // 只加载基金列表，不加载基金预测
-    // 注：定期更新由 updateStrategyManager 统一管理，不再在此单独启动
+    loadFunds(); // 初始加载一次基金列表
+
+    // 启动基金自选 tab 的定时更新（初始在基金自选 tab，需要立即启动）
+    // switchTab 只在切换时触发，初始 tab 需要手动启动
+    updateStrategyManager.startUpdatesForTab('fund-prediction');
 
     // 启动大盘指数条
     startMarketTicker();
@@ -80,7 +84,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 基金自选标签
                 activeTab = 'fund-prediction';
                 window.activeTab = activeTab;
-                showLoadingState('正在加载基金自选列表...');
+                // 有内存缓存时直接渲染，不显示 loading 避免闪烁
+                const _cached = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
+                if (!_cached || !_cached.length) {
+                    showLoadingState('正在加载基金自选列表...');
+                }
                 loadFunds();
                 updateStrategyManager.switchTab('fund-prediction');
             } else if (index === 1) {
@@ -527,7 +535,10 @@ function startFundHoldingsUpdateIntervals(funds) {
     }
     fundHoldingsUpdateIntervals = {};
 
-    // 为每个基金设置独立的更新定时器
+    // 非交易时间不需要持仓定时器（持仓数据不变）
+    if (!isTradingTime()) return;
+
+    // 为每个基金设置独立的更新定时器（仅交易时间）
     funds.forEach((fund, index) => {
         // 持仓股票价格5分钟更新一次（降低请求频率，避免429）
         const interval = 5 * 60 * 1000;
@@ -535,16 +546,15 @@ function startFundHoldingsUpdateIntervals(funds) {
         // 随机延迟0-5分钟，错开各基金请求时间
         const randomDelay = Math.floor(Math.random() * 5 * 60 * 1000);
 
-        // 先延迟一段时间，然后开始更新
         setTimeout(() => {
             fundHoldingsUpdateIntervals[fund.code] = setInterval(() => {
-                // 检查是否为交易时间（使用北京时间，避免境外设备时区错误）
-                const _bj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
-                const _day = _bj.getDay();
-                const _mins = _bj.getHours() * 60 + _bj.getMinutes();
-                const _isTrading = _day >= 1 && _day <= 5 && ((_mins >= 570 && _mins < 690) || (_mins >= 780 && _mins < 900));
-
-                if (_isTrading) {
+                // 每次触发时再检查交易时间（可能已过收盘）
+                if (!isTradingTime()) {
+                    clearInterval(fundHoldingsUpdateIntervals[fund.code]);
+                    delete fundHoldingsUpdateIntervals[fund.code];
+                    return;
+                }
+                {
                     // 只获取持仓数据，基金列表通过定期更新获取
                     fetch(`/api/funds/${fund.code}/holdings`)
                     .then(response => {
@@ -686,35 +696,7 @@ if (!document.getElementById('_notification_style')) {
     document.head.appendChild(_ns);
 }
 
-// 定期更新基金数据
-function startFundUpdateInterval() {
-    // 清除现有的定时器
-    if (fundUpdateInterval) {
-        clearInterval(fundUpdateInterval);
-    }
-
-    // 复用 isTradingTime()，保证北京时区一致
-    function getUpdateInterval() {
-        return isTradingTime() ? 180000 : 1800000;
-    }
-
-    // 初始设置更新间隔
-    let interval = getUpdateInterval();
-
-    fundUpdateInterval = setInterval(() => {
-        loadFunds();
-
-        // 重新计算更新间隔（如果时间发生变化）
-        const newInterval = getUpdateInterval();
-        if (newInterval !== interval) {
-            clearInterval(fundUpdateInterval);
-            interval = newInterval;
-            fundUpdateInterval = setInterval(() => {
-                loadFunds();
-            }, interval);
-        }
-    }, interval);
-}
+// startFundUpdateInterval 已由 updateStrategyManager 替代，已移除
 
 function _sortFunds(funds) {
     // 持仓优先，持仓内按当日预估收益从高到低，未持仓按原顺序
