@@ -30,10 +30,11 @@ document.addEventListener('DOMContentLoaded', function() {
     fetchAllBuyRecords().then(records => {
         if (records && records.length > 0) {
             window._cloudBuyRecords = records;
-            // 云端数据加载完后重新渲染，确保持仓数据正确显示
-            const cached = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
-            if (cached && cached.length) renderFunds(cached);
         }
+        // 无论云端记录是否有数据，都尝试重新渲染（确保排序正确）
+        // 如果基金列表还没加载完，cached 为空，renderFunds 不会执行
+        const cached = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
+        if (cached && cached.length) renderFunds(cached);
     });
 
     // 排序固定为持仓优先，无需按钮事件
@@ -850,12 +851,12 @@ function renderFunds(funds) {
         // 有实际净值涨跌就用（无论交易时间还是结算后）
         if (fund.previous_day_return != null && fund.previous_day_return !== 0) {
             col1Value = (fund.previous_day_return || 0) / 100;
-            col1Label = _navDate ? `${_navDate} 涨跌` : '净值涨跌';
+            col1Label = 'Previous Day';
             col1IsEstimate = false;
         } else {
             // 无实际净值，降级用预估（结算后无净值场景）
             col1Value = fund.predicted_return || 0;
-            col1Label = _navDate ? `${_navDate} 预估` : '预估涨跌';
+            col1Label = 'Est. Return';
             col1IsEstimate = true;
         }
 
@@ -894,7 +895,7 @@ function renderFunds(funds) {
                                 ${fund.predicted_return >= 0 ? '+' : ''}${(fund.predicted_return * 100).toFixed(2)}%
                             </div>
                         `}
-                        <div class="fund-return-label">${settled ? '--' : '实时预估'}</div>
+                        <div class="fund-return-label">${settled ? '--' : 'Real-time'}</div>
                     </div>
                     <!-- 第三列（Confidence）：交易时间显示，结算时显示 -- -->
                     <div class="fund-return-container">
@@ -905,7 +906,7 @@ function renderFunds(funds) {
                                 ${(confidence * 100).toFixed(0)}%
                             </div>
                         `}
-                        <div class="fund-return-label">${settled ? '--' : 'Confidence'}</div>
+                        <div class="fund-return-label">Confidence</div>
                     </div>
                     <!-- Live Profit：结算后显示实际收益，交易时间显示预估收益 -->
                     <div class="fund-return-container">
@@ -916,7 +917,7 @@ function renderFunds(funds) {
                         ` : `
                             <div class="fund-return" style="color:#555;">--</div>
                         `}
-                        <div class="fund-return-label">${settled ? '实际盈亏' : '预估盈亏'}</div>
+                        <div class="fund-return-label">${settled ? 'Actual Profit' : 'Live Profit'}</div>
                     </div>
                 </div>
         `;
