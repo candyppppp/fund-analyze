@@ -2,8 +2,8 @@ import cacheManager from './cache-manager.js';
 
 // 投资建议（holdingsAdvice）缓存TTL：65分钟，与后端 Supabase 60分钟对齐
 const ADVICE_TTL = 65 * 60 * 1000;
-// 推荐基金（recommendedFunds）缓存TTL：6小时，与后端 Supabase 6小时对齐
-const REC_TTL = 60 * 60 * 1000; // 前端内存1小时，后端按交易/非交易动态判断(1h/3h)
+// 推荐基金（recommendedFunds）前端内存TTL：1小时（后端 Supabase 按交易/非交易动态判断 1h/3h）
+const REC_TTL = 60 * 60 * 1000;
 // 推荐基金内存缓存 key
 const REC_CACHE_KEY = 'recommendedFunds';
 

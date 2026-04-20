@@ -5,7 +5,6 @@ class UpdateStrategyManager {
         // 定时器引用
         this.fundListInterval = null;
         this.holdingsInterval = null;
-        this.investmentAdviceInterval = null;
 
         // 当前激活的标签
         this.activeTab = 'fund-prediction';
@@ -48,9 +47,9 @@ class UpdateStrategyManager {
             case 'fundList':
                 // 基金列表更新频率
                 if (isTrading) {
-                    return 2 * 60 * 1000; // 交易时间: 2分钟
+                    return 3 * 60 * 1000; // 交易时间: 3分钟
                 } else if (isPreMarket || isAfterMarket) {
-                    return 5 * 60 * 1000; // 盘前盘后: 5分钟
+                    return 10 * 60 * 1000; // 盘前盘后: 10分钟
                 } else {
                     return 30 * 60 * 1000; // 非交易时间: 30分钟
                 }
@@ -58,19 +57,11 @@ class UpdateStrategyManager {
             case 'holdings':
                 // 股票持仓更新频率（持仓数据变化慢，无需高频）
                 if (isTrading) {
-                    return 2 * 60 * 1000; // 交易时间: 2分钟
+                    return 5 * 60 * 1000; // 交易时间: 5分钟
                 } else if (isPreMarket || isAfterMarket) {
                     return 10 * 60 * 1000; // 盘前盘后: 10分钟
                 } else {
-                    return 60 * 60 * 1000; // 非交易时间: 60分钟
-                }
-
-            case 'investmentAdvice':
-                // 投资建议更新频率
-                if (isTrading) {
-                    return 10 * 60 * 1000; // 交易时间: 10分钟
-                } else {
-                    return 60 * 60 * 1000; // 非交易时间: 1小时
+                    return 30 * 60 * 1000; // 非交易时间: 30分钟
                 }
 
             default:
@@ -100,8 +91,7 @@ class UpdateStrategyManager {
                 break;
 
             case 'investment-advice':
-                // 投资建议标签：启动投资建议更新
-                this.startInvestmentAdviceUpdate();
+                // investment-advice.js 内部自管定时器，此处无需额外启动
                 break;
         }
     }
@@ -125,8 +115,6 @@ class UpdateStrategyManager {
         // 设置定时器
         this.fundListInterval = setInterval(update, this.getUpdateInterval('fundList'));
 
-        // 监听交易时间变化，重新设置定时器
-        this.checkAndResetInterval('fundList', this.fundListInterval);
     }
 
     // 启动持仓更新
@@ -149,36 +137,9 @@ class UpdateStrategyManager {
         this.holdingsInterval = setInterval(update, this.getUpdateInterval('holdings'));
     }
 
-    // 启动投资建议更新
-    startInvestmentAdviceUpdate() {
-        if (this.investmentAdviceInterval) {
-            clearInterval(this.investmentAdviceInterval);
-        }
 
-        const update = () => {
-            console.log(`[${new Date().toLocaleTimeString()}] 投资建议更新，间隔: ${this.getUpdateInterval('investmentAdvice') / 1000}秒`);
-            // 使用事件触发投资建议更新
-            const event = new CustomEvent('updateInvestmentAdvice');
-            window.dispatchEvent(event);
-        };
 
-        // 立即执行一次
-        update();
 
-        // 设置定时器
-        this.investmentAdviceInterval = setInterval(update, this.getUpdateInterval('investmentAdvice'));
-    }
-
-    // 检查并重置定时器（交易时间变化时）
-    checkAndResetInterval(type, currentInterval) {
-        const checkInterval = 60 * 1000; // 每分钟检查一次
-
-        setInterval(() => {
-            const newInterval = this.getUpdateInterval(type);
-            // 如果时间间隔变化了，重新启动更新
-            // 这里可以添加更复杂的逻辑
-        }, checkInterval);
-    }
 
     // 停止所有更新
     stopAllUpdates() {
@@ -190,10 +151,7 @@ class UpdateStrategyManager {
             clearInterval(this.holdingsInterval);
             this.holdingsInterval = null;
         }
-        if (this.investmentAdviceInterval) {
-            clearInterval(this.investmentAdviceInterval);
-            this.investmentAdviceInterval = null;
-        }
+
     }
 }
 

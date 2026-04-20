@@ -209,7 +209,8 @@ function addFundByCode(code) {
                 .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
                 .then(funds => {
                     cacheManager.set(CACHE_KEYS.FUNDS_LIST, funds, CACHE_EXPIRY.FUNDS_LIST);
-                    return processFunds(funds);
+                    renderFunds(funds);
+                    _loadHoldingsInBackground(funds);
                 })
                 .then(() => {
                     document.getElementById('add-fund-form') && document.getElementById('add-fund-form').reset();
@@ -393,17 +394,36 @@ function loadFunds() {
         showLoading('加载基金数据中...');
 
         // ── 优先：本次页面内存缓存（含完整 prices/dates）───────────────────────
-        // 注：缓存命中时仍走 processFunds，确保持仓数据和市场数据得到更新
         const cachedFunds = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
         if (cachedFunds && cachedFunds.length > 0) {
-            // 先立即渲染，让用户秒看到数据
-            renderFunds(cachedFunds);
-            hideLoading();
-            startFundHoldingsUpdateIntervals(cachedFunds);
-            // 同时后台更新（含持仓+市场数据），完成后静默刷新
-            updateFundsInBackground();
-            resolve(cachedFunds);
-            return;
+            // 结算后检查缓存数据是否是今天的：如果不是今天，丢弃缓存强制重拉
+            // 避免显示昨天的 previous_day_return
+            if (isNavSettled()) {
+                const _bjToday = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
+                const _todayStr = `${_bjToday.getFullYear()}-${String(_bjToday.getMonth()+1).padStart(2,'0')}-${String(_bjToday.getDate()).padStart(2,'0')}`;
+                const _sampleFund = cachedFunds[0];
+                const _cachedDate = _sampleFund && _sampleFund.nav_updated_at ? String(_sampleFund.nav_updated_at).slice(0,10) : '';
+                if (_cachedDate && _cachedDate < _todayStr) {
+                    // 缓存是昨天或更早的数据，丢弃，走 API 重新拉取
+                    cacheManager.delete(CACHE_KEYS.FUNDS_LIST);
+                    // 继续走下面的 fetch('/api/funds') 分支
+                } else {
+                    renderFunds(cachedFunds);
+                    hideLoading();
+                    startFundHoldingsUpdateIntervals(cachedFunds);
+                    updateFundsInBackground();
+                    resolve(cachedFunds);
+                    return;
+                }
+            } else {
+                // 非结算状态直接用缓存
+                renderFunds(cachedFunds);
+                hideLoading();
+                startFundHoldingsUpdateIntervals(cachedFunds);
+                updateFundsInBackground();
+                resolve(cachedFunds);
+                return;
+            }
         }
 
         // ── 无内存缓存：直接从 Supabase（via Flask API）拉取 ────────────────────
@@ -801,16 +821,14 @@ function renderFunds(funds) {
 
         const rsiStatus = getRSIStatus(fund.rsi);
 
-        // 计算上一个交易日的净值变化率
-        // fund.returns[] 是小数形式（如 0.0123 = 1.23%），直接使用
-        // fund.previous_day_return 是百分比形式（如 1.23），需 /100 转换
+        // 计算当日（最新净值日）涨跌幅
+        // 优先用 previous_day_return（后端实时同步修正过的值，百分比转小数）
+        // 降级用 returns[-1]（历史数组末位，小数形式）
         let previousDayReturn = 0;
-        if (fund.returns && fund.returns.length > 0) {
-            // returns[] 已经是小数，直接用
-            previousDayReturn = fund.returns[fund.returns.length - 1] || 0;
-        } else if (fund.previous_day_return != null) {
-            // 降级：用 previous_day_return（百分比转小数）
+        if (fund.previous_day_return != null && fund.previous_day_return !== 0) {
             previousDayReturn = (fund.previous_day_return || 0) / 100;
+        } else if (fund.returns && fund.returns.length > 0) {
+            previousDayReturn = fund.returns[fund.returns.length - 1] || 0;
         } else if (fund.prices && fund.prices.length >= 2) {
             previousDayReturn = (fund.prices[fund.prices.length - 1] - fund.prices[fund.prices.length - 2]) / fund.prices[fund.prices.length - 2];
         }
@@ -955,7 +973,8 @@ function addFund() {
                 localStorage.setItem(`fundBuyRecords_${data.id}`, JSON.stringify([]));
 
                 // 立即渲染，用户马上看到新基金
-                return processFunds(funds);
+                renderFunds(funds);
+                _loadHoldingsInBackground(funds);
             })
             .then(() => {
                 document.getElementById('add-fund-form').reset();
@@ -3135,34 +3154,7 @@ function loadFundManagement(container) {
 }
 
 // 启动基金数据自动更新
-function startFundAutoUpdate() {
-    // 清除之前的定时器
-    if (fundUpdateInterval) {
-        clearInterval(fundUpdateInterval);
-    }
-
-    // 获取更新频率设置
-    const settings = getSettings();
-    const updateMinutes = parseInt(settings.updateFrequency) || 5;
-    const updateIntervalMs = updateMinutes * 60 * 1000;
-
-    // 设置新的定时器
-    fundUpdateInterval = setInterval(() => {
-        const _bj2 = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
-        const _d2 = _bj2.getDay();
-        const _m2 = _bj2.getHours() * 60 + _bj2.getMinutes();
-        const _t2 = _d2 >= 1 && _d2 <= 5 && ((_m2 >= 570 && _m2 < 690) || (_m2 >= 780 && _m2 < 900));
-        if (_t2) loadFunds();
-    }, updateIntervalMs);
-}
-
-// 停止基金数据自动更新
-function stopFundAutoUpdate() {
-    if (fundUpdateInterval) {
-        clearInterval(fundUpdateInterval);
-        fundUpdateInterval = null;
-    }
-}
+// startFundAutoUpdate / stopFundAutoUpdate 已由 updateStrategyManager 替代，已删除
 
 
 // ── 大盘指数条 ──────────────────────────────────────────────────────────────
