@@ -402,10 +402,26 @@ function loadFunds() {
             if (isNavSettled()) {
                 const _bjToday = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
                 const _todayStr = `${_bjToday.getFullYear()}-${String(_bjToday.getMonth()+1).padStart(2,'0')}-${String(_bjToday.getDate()).padStart(2,'0')}`;
+                // 用 dates[-1] 判断：比 nav_updated_at 更准确（直接反映净值数据实际日期）
+                // 计算最近应有净值的工作日（18:00后认为今天净值已出）
+                const _hour = _bjToday.getHours();
+                const _dayOfWeek = _bjToday.getDay(); // 0=周日
+                const _isWeekday = _dayOfWeek >= 1 && _dayOfWeek <= 5;
+                // 18:00后的工作日：期待今天净值；否则期待上一个工作日净值
+                let _expectedDate = _todayStr;
+                if (!_isWeekday || _hour < 18) {
+                    // 往前找最近工作日
+                    const _d = new Date(_bjToday);
+                    _d.setDate(_d.getDate() - (!_isWeekday ? (_dayOfWeek === 0 ? 2 : 1) : 1));
+                    while (_d.getDay() === 0 || _d.getDay() === 6) _d.setDate(_d.getDate() - 1);
+                    _expectedDate = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
+                }
                 const _sampleFund = cachedFunds[0];
-                const _cachedDate = _sampleFund && _sampleFund.nav_updated_at ? String(_sampleFund.nav_updated_at).slice(0,10) : '';
-                if (_cachedDate && _cachedDate < _todayStr) {
-                    // 缓存是昨天或更早的数据，丢弃，走 API 重新拉取
+                const _cachedNavDate = _sampleFund && _sampleFund.dates && _sampleFund.dates.length > 0
+                    ? String(_sampleFund.dates[_sampleFund.dates.length - 1]).slice(0,10)
+                    : (_sampleFund && _sampleFund.nav_updated_at ? String(_sampleFund.nav_updated_at).slice(0,10) : '');
+                if (_cachedNavDate && _cachedNavDate < _expectedDate) {
+                    // 缓存的净值日期早于期望日期，丢弃缓存强制重拉
                     cacheManager.delete(CACHE_KEYS.FUNDS_LIST);
                     // 继续走下面的 fetch('/api/funds') 分支
                 } else {
@@ -822,9 +838,8 @@ function renderFunds(funds) {
 
         const rsiStatus = getRSIStatus(fund.rsi);
 
-        // 计算当日（最新净值日）涨跌幅
-        // 优先用 previous_day_return（后端实时同步修正过的值，百分比转小数）
-        // 降级用 returns[-1]（历史数组末位，小数形式）
+        // 计算最新已结算净值日的涨跌幅
+        // 优先用 previous_day_return（后端同步修正的值，百分比转小数）
         let previousDayReturn = 0;
         if (fund.previous_day_return != null && fund.previous_day_return !== 0) {
             previousDayReturn = (fund.previous_day_return || 0) / 100;
@@ -833,6 +848,12 @@ function renderFunds(funds) {
         } else if (fund.prices && fund.prices.length >= 2) {
             previousDayReturn = (fund.prices[fund.prices.length - 1] - fund.prices[fund.prices.length - 2]) / fund.prices[fund.prices.length - 2];
         }
+
+        // 最新净值日期，用于标签显示（让用户知道是哪天的数据）
+        const _navDate = (fund.dates && fund.dates.length > 0)
+            ? fund.dates[fund.dates.length - 1].slice(5)  // MM-DD 格式
+            : '';
+        const _prevDayLabel = _navDate ? `${_navDate} 收益` : 'Previous Day';
 
         fundItem.innerHTML = `
             <div class="fund-info">
@@ -858,7 +879,7 @@ function renderFunds(funds) {
                         <div class="fund-return ${previousDayReturn < 0 ? 'negative' : ''}">
                             ${previousDayReturn >= 0 ? '+' : ''}${(previousDayReturn * 100).toFixed(2)}%
                         </div>
-                        <div class="fund-return-label">Previous Day</div>
+                        <div class="fund-return-label">${_prevDayLabel}</div>
                     </div>
                     <!-- Real-time Return：结算后显示 --，交易时间显示预估 -->
                     <div class="fund-return-container">
