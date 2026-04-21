@@ -56,9 +56,9 @@
         .ticker-item {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
             flex-shrink: 0;
-            padding: 0 16px;
+            padding: 0 20px;
             height: 100%;
             border-right: 1px solid #1a1a1a;
             box-sizing: border-box;
@@ -67,10 +67,10 @@
         @media (min-width: 601px) {
             .ticker-item:last-child { border-right: none; }
         }
-        .ticker-name  { font-size: 11px; color: #aaa; font-weight: 400; }
-        .ticker-price { font-size: 12px; font-weight: 500; color: #e8e8e8;
+        .ticker-name  { font-size: 13px; color: #aaa; font-weight: 400; }
+        .ticker-price { font-size: 14px; font-weight: 500; color: #e8e8e8;
                         letter-spacing: .3px; font-variant-numeric: tabular-nums; }
-        .ticker-chg   { font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; }
+        .ticker-chg   { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
         .tc-up   { color: #e84040; }
         .tc-down { color: #28a745; }
         .tc-flat { color: #666; }
@@ -93,6 +93,7 @@
         <div class="tabs">
             <button class="tab active">基金自选</button>
             <button class="tab">基金投资</button>
+            <button class="tab">博主追踪</button>
         </div>
 
         <div class="search-container">
@@ -112,6 +113,8 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/blogger-tracker.js') }}"></script>
 </body>
 </html>
