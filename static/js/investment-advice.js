@@ -57,18 +57,40 @@ class InvestmentAdvice {
                 })
                 .catch(() => null);
 
+        // 推荐基金：内存缓存 → localStorage → 网络请求，按优先级降级
+        let _recFromStorage = null;
+        if (!recCached || !recCached.length) {
+            try {
+                const _raw = localStorage.getItem('recFundsCache');
+                if (_raw) {
+                    const { data, ts, ttl } = JSON.parse(_raw);
+                    if (Date.now() - ts < (ttl || 6 * 60 * 60 * 1000) && data && data.length) {
+                        _recFromStorage = data;
+                        cacheManager.set(REC_CACHE_KEY, data, REC_TTL); // 恢复到内存
+                    }
+                }
+            } catch(_) {}
+        }
+
         const recPromise = (recCached && recCached.length > 0)
             ? Promise.resolve(recCached)
-            : fetch('/api/recommended-funds')
-                .then(r => r.ok ? r.json() : null)
-                .then(d => {
-                    if (d && d.recommendedFunds && d.recommendedFunds.length > 0) {
-                        cacheManager.set(REC_CACHE_KEY, d.recommendedFunds, REC_TTL);
-                        return d.recommendedFunds;
-                    }
-                    return null;
-                })
-                .catch(() => null);
+            : _recFromStorage
+                ? Promise.resolve(_recFromStorage)  // localStorage 命中，无需网络请求
+                : fetch('/api/recommended-funds')
+                    .then(r => r.ok ? r.json() : null)
+                    .then(d => {
+                        if (d && d.recommendedFunds && d.recommendedFunds.length > 0) {
+                            cacheManager.set(REC_CACHE_KEY, d.recommendedFunds, REC_TTL);
+                            try {
+                                localStorage.setItem('recFundsCache', JSON.stringify({
+                                    data: d.recommendedFunds, ts: Date.now(), ttl: 6 * 60 * 60 * 1000
+                                }));
+                            } catch(_) {}
+                            return d.recommendedFunds;
+                        }
+                        return null;
+                    })
+                    .catch(() => null);
 
         // 任意一个完成都尝试渲染
         advicePromise.then(a => {
@@ -147,6 +169,12 @@ class InvestmentAdvice {
             .then(d => {
                 if (!d || !d.recommendedFunds || !d.recommendedFunds.length) return;
                 cacheManager.set(REC_CACHE_KEY, d.recommendedFunds, REC_TTL);
+                // 同时持久化到 localStorage（6小时，对齐后端 Supabase TTL）
+                try {
+                    localStorage.setItem('recFundsCache', JSON.stringify({
+                        data: d.recommendedFunds, ts: Date.now(), ttl: 6 * 60 * 60 * 1000
+                    }));
+                } catch(_) {}
                 // 合并到持仓建议缓存并刷新页面
                 const advice = cacheManager.get(this.cacheKey);
                 if (advice) {
@@ -508,8 +536,16 @@ class InvestmentAdvice {
   <!-- 分析依据 -->
   <div class="ia-reason-box">
     <div class="ia-reason-lbl">分析依据</div>
-    <div class="ia-reason-txt">${item.reason}</div>
+    <div class="ia-reason-txt">${_fmtReason(item.reason)}</div>
   </div>
+
+  <!-- 博主实盘提示 -->
+  ${item.blogger_hint ? `
+  <div style="margin-top:10px;padding:7px 12px;background:rgba(255,193,7,.08);
+    border-left:3px solid #ffc107;border-radius:0 6px 6px 0;
+    font-size:12px;color:#ffc107;line-height:1.5;">
+    近7天：${item.blogger_hint}
+  </div>` : ''}
 
   <!-- 底部 -->
   <div class="ia-foot">
@@ -764,11 +800,19 @@ class InvestmentAdvice {
   <!-- 推荐理由 -->
   <div class="ia-reason-box" style="margin-bottom:14px;">
     <div class="ia-reason-lbl">推荐理由</div>
-    <div class="ia-reason-txt">${item.reason}</div>
+    <div class="ia-reason-txt">${_fmtReason(item.reason)}</div>
   </div>
 
+  <!-- 博主实盘提示 -->
+  ${item.blogger_hint ? `
+  <div style="margin-top:10px;padding:7px 12px;background:rgba(255,193,7,.08);
+    border-left:3px solid #ffc107;border-radius:0 6px 6px 0;
+    font-size:12px;color:#ffc107;line-height:1.5;">
+    补充：近7天 ${item.blogger_hint}
+  </div>` : ''}
+
   <!-- 底部操作 -->
-  <div style="display:flex;justify-content:flex-end;">
+  <div style="display:flex;justify-content:flex-end;margin-top:12px;">
     <button class="ia-add-btn" data-code="${item.code}">＋ 加入自选</button>
   </div>
 </div>`;
@@ -778,6 +822,17 @@ class InvestmentAdvice {
         const c = document.getElementById('funds-container');
         if (c) c.innerHTML = '<div style="padding:40px;text-align:center;color:#444;font-size:13px;">获取投资建议失败，请稍后重试</div>';
     }
+}
+
+// 把 reason 里的【xxx】段落折成独立行
+function _fmtReason(text) {
+    if (!text) return '';
+    // 按【分割，每段单独一行，保留【标记
+    const parts = text.split(/(?=【)/);
+    if (parts.length <= 1) return text;
+    return parts.map(p => p.trim()).filter(Boolean)
+        .map(p => `<div style="margin-bottom:6px">${p}</div>`)
+        .join('');
 }
 
 export default InvestmentAdvice;

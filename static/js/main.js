@@ -17,8 +17,16 @@ const CACHE_KEYS = {
 };
 
 // 缓存有效期（毫秒）
+// 交易时间（9:30-15:00）：5分钟，需要跟上实时行情
+// 非交易时间：30分钟，数据不变，减少重复请求
+function _getFundsListExpiry() {
+    const bj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
+    const day = bj.getDay(), mins = bj.getHours() * 60 + bj.getMinutes();
+    const trading = day >= 1 && day <= 5 && ((mins >= 570 && mins < 690) || (mins >= 780 && mins < 900));
+    return trading ? 5 * 60 * 1000 : 30 * 60 * 1000;
+}
 const CACHE_EXPIRY = {
-    FUNDS_LIST: 2 * 60 * 1000  // 2分钟
+    get FUNDS_LIST() { return _getFundsListExpiry(); }
 };
 
 // 当前激活的标签
@@ -100,13 +108,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 基金投资标签
                 activeTab = 'investment-advice';
                 window.activeTab = activeTab;
-                // 有内存缓存时不显示 loading，loadInvestmentAdvice 内部会直接渲染
                 const _adviceCached = cacheManager.get('investmentAdvice');
                 if (!_adviceCached || !_adviceCached.holdingsAdvice || !_adviceCached.holdingsAdvice.length) {
                     showLoadingState('正在加载基金投资建议，请稍候...');
                 }
                 investmentAdvice.loadInvestmentAdvice();
                 updateStrategyManager.switchTab('investment-advice');
+            } else if (index === 2) {
+                // 博主追踪标签
+                activeTab = 'blogger-tracker';
+                window.activeTab = activeTab;
+                updateStrategyManager.switchTab('blogger-tracker');
+                if (window.bloggerTracker) window.bloggerTracker.show();
             }
         });
     });
@@ -395,11 +408,23 @@ function processFunds(funds) {
 }
 
 function loadFunds() {
-    // 无条件清掉 localStorage 中的 funds —— 它存的是精简格式（无 prices），
-    // renderFunds 需要完整数据，用它预渲染必然报错。数据来源改为内存缓存 + API。
-    try { localStorage.removeItem('funds'); } catch (e) { /* 忽略 */ }
+    try { localStorage.removeItem('funds'); } catch (e) {}
 
     return new Promise((resolve, reject) => {
+        // 优先用 localStorage 精简版做骨架渲染（无需等网络，提升首屏速度）
+        if (!cacheManager.get(CACHE_KEYS.FUNDS_LIST)) {
+            try {
+                const raw = localStorage.getItem('fundsSlim');
+                if (raw) {
+                    const { data: slim, ts } = JSON.parse(raw);
+                    // 30分钟内的精简缓存可用于骨架渲染
+                    if (Date.now() - ts < 30 * 60 * 1000 && slim && slim.length > 0) {
+                        renderFunds(slim); // 骨架渲染：有名称/涨跌，无完整 prices
+                        hideLoading();
+                    }
+                }
+            } catch(_) {}
+        }
         showLoading('加载基金数据中...');
 
         // ── 优先：本次页面内存缓存（含完整 prices/dates）───────────────────────
@@ -448,6 +473,17 @@ function loadFunds() {
             })
             .then(funds => {
                 cacheManager.set(CACHE_KEYS.FUNDS_LIST, funds, CACHE_EXPIRY.FUNDS_LIST);
+                // 存精简版到 localStorage（只存渲染必要字段，供下次刷新快速骨架渲染）
+                try {
+                    const slim = funds.map(f => ({
+                        id: f.id, code: f.code, name: f.name,
+                        previous_day_return: f.previous_day_return,
+                        predicted_return: f.predicted_return,
+                        rsi: f.rsi, nav_updated_at: f.nav_updated_at,
+                        dates: f.dates ? [f.dates[f.dates.length - 1]] : [],
+                    }));
+                    localStorage.setItem('fundsSlim', JSON.stringify({ data: slim, ts: Date.now() }));
+                } catch(_) {}
                 // 立即渲染——不等持仓数据，让用户先看到基金列表
                 renderFunds(funds);
                 hideLoading();
@@ -862,6 +898,19 @@ function renderFunds(funds) {
                         <span>RSI ${fund.rsi.toFixed(1)}</span>
                         <span class="rsi-emoji">${rsiStatus.emoji}</span>
                     </div>
+                    ${(() => {
+                        // 博主实盘标签：7天内有博主操作该基金则显示
+                        const _sigs = window._bloggerSignals || [];
+                        const _bj = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Shanghai'}));
+                        const _7dAgo = new Date(_bj); _7dAgo.setDate(_7dAgo.getDate() - 7);
+                        const _cutoff = `${_7dAgo.getFullYear()}-${String(_7dAgo.getMonth()+1).padStart(2,'0')}-${String(_7dAgo.getDate()).padStart(2,'0')}`;
+                        const _matched = _sigs.filter(r => String(r.fund_code) === String(fund.code) && r.date >= _cutoff);
+                        if (_matched.length === 0) return '';
+                        const _buyN  = _matched.filter(r => r.action === '买入' || r.action === '定投').length;
+                        const _sellN = _matched.filter(r => r.action === '卖出').length;
+                        const _tip   = [_buyN ? `${_buyN}买` : '', _sellN ? `${_sellN}卖` : ''].filter(Boolean).join('/');
+                        return '<div class="fund-detail-box fund-blogger-tag"><span>博主实盘 ' + _tip + '</span></div>';
+                    })()}
                     ${buySettings.shares <= 0 ? '<div class="fund-detail-box fund-no-holding"><span>暂未买入</span></div>' : ''}
                 </div>
             </div>
@@ -1665,6 +1714,21 @@ function showFundDetails(fund) {
     document.body.appendChild(modal);
 
     // 点击空白区域关闭弹窗
+    // 绑定设置弹窗内的博主实盘上传
+    const _settingsBloggerFile = modal.querySelector('#settings-blogger-file');
+    if (_settingsBloggerFile) {
+        _settingsBloggerFile.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            e.target.value = '';
+            const msgEl = modal.querySelector('#settings-blogger-msg');
+            if (msgEl) msgEl.textContent = '正在解析...';
+            if (window.bloggerTracker) {
+                window.bloggerTracker._parseAndUploadFromSettings(file, msgEl);
+            }
+        });
+    }
+
     modal.addEventListener('click', function(e) {
         if (e.target === modal) {
             // 清除股票更新定时器
@@ -3018,6 +3082,25 @@ function showSettings() {
             </div>
         </div>
         
+        <!-- 博主实盘数据 -->
+        <div style="margin-bottom: 16px;">
+            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">博主实盘数据</h3>
+            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
+                <div style="font-size: 11px; color: #888; margin-bottom: 10px; line-height: 1.6;">
+                    上传博主实盘 xlsx 文件（需包含基金代码列），有效期 7 天。
+                </div>
+                <input type="file" id="settings-blogger-file" accept=".xlsx,.xls" style="display:none">
+                <button id="settings-blogger-upload-btn" style="
+                    background:#007bff;color:#fff;border:none;
+                    padding:6px 14px;border-radius:4px;font-size:11px;cursor:pointer;
+                    width:100%;margin-bottom:8px;
+                " onclick="document.getElementById('settings-blogger-file').click()">
+                    上传 xlsx 文件
+                </button>
+                <div id="settings-blogger-msg" style="font-size:11px;color:#888;min-height:16px;line-height:1.5;"></div>
+            </div>
+        </div>
+
         <div style="margin-bottom: 16px;">
             <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">基金管理</h3>
             <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
@@ -3282,18 +3365,19 @@ function startMarketTicker() {
     // 手机端初始化跑马灯
     if (_isMobile) startScroll();
 
+    const MARKET_CACHE_TTL = 60 * 60 * 1000; // 市场数据缓存1小时，失败时用旧缓存
     function fetchTicker() {
         const cached = cacheManager.get('marketData');
-        if (cached) renderTicker(cached);
+        if (cached) renderTicker(cached); // 立即渲染缓存，不等网络
 
         fetch('/api/market-data')
             .then(r => r.ok ? r.json() : null)
             .then(data => {
-                if (!data) return;
-                cacheManager.set('marketData', data);
+                if (!data || !data.indices || !Object.keys(data.indices).length) return; // 失败时不覆盖旧缓存
+                cacheManager.set('marketData', data, MARKET_CACHE_TTL);
                 renderTicker(data);
             })
-            .catch(() => {});
+            .catch(() => {}); // 网络失败：保持显示旧缓存，不显示"暂无数据"
     }
 
     fetchTicker();
