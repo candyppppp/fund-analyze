@@ -770,58 +770,9 @@ def get_funds():
                                 logger.error(f'bg refresh failed: {_e}')
                         threading.Thread(target=_bg_refresh, daemon=True).start()
 
-                    # ── 同步修正今日净值 ──────────────────────────────────────
-                    # 如果 Supabase 数据的最新日期不是今天（北京时间），
-                    # 同步拉取今天的净值更新 previous_day_return，不依赖异步后台
-                    from datetime import timezone as _tz3
-                    _bj_today = datetime.now(_tz3(timedelta(hours=8))).strftime('%Y-%m-%d')
-                    _result_rows = list(rows.data)  # copy to modify
-                    _any_stale = any(
-                        (r.get('dates') or [''])[-1] < _bj_today
-                        for r in _result_rows
-                        if r.get('dates')
-                    )
-                    if _any_stale:
-                        logger.info(f'dates stale, fetching today nav for {len(_result_rows)} funds')
-                        def _fetch_today_nav(row):
-                            try:
-                                dates = row.get('dates') or []
-                                if dates and dates[-1] >= _bj_today:
-                                    return  # already today
-                                code = row.get('code')
-                                if not code:
-                                    return
-                                # 轻量接口：只拉最新一条净值，速度快（避免完整历史数据超时）
-                                rt = data_source_manager.get_fund_latest_nav(code)
-                                if not rt:
-                                    return
-                                new_date = rt.get('jzrq')
-                                new_nav  = rt.get('dwjz')
-                                if not new_date or not new_nav:
-                                    return
-                                new_nav = float(new_nav)
-                                if new_date > (dates[-1] if dates else ''):
-                                    prices = list(row.get('prices') or [])
-                                    ret_arr = list(row.get('returns') or [])
-                                    if prices:
-                                        pdr = (new_nav / prices[-1] - 1) * 100
-                                        row['previous_day_return'] = round(pdr, 4)
-                                        prices.append(new_nav)
-                                        ret_arr.append(new_nav / prices[-2] - 1 if len(prices) >= 2 else 0)
-                                        dates.append(new_date)
-                                        row['prices'] = prices
-                                        row['returns'] = ret_arr
-                                        row['dates'] = dates
-                                        row['nav_updated_at'] = _bj_today
-                                        logger.info(f'{code}: updated to {new_date} nav={new_nav} pdr={pdr:.2f}%')
-                            except Exception as _ne:
-                                logger.warning(f'fetch today nav failed for {row.get("code")}: {_ne}')
-
-                        from concurrent.futures import ThreadPoolExecutor as _TPE
-                        with _TPE(max_workers=8) as _ex:
-                            list(_ex.map(_fetch_today_nav, _result_rows))
-
-                    return jsonify(_result_rows)
+                    # 直接返回 Supabase 缓存数据，不做同步修正（防止拉净值超时导致空列表）
+                    # 今日净值更新由后台异步刷新（_bg_refresh）负责，下次打开页面即可看到
+                    return jsonify(rows.data)
             except Exception as _e:
                 logger.warning(f'Supabase cache read failed, falling back: {_e}')
 
@@ -1107,6 +1058,104 @@ def delete_buy_record(record_id):
         return jsonify({'error': str(e)}), 500
 
 
+
+
+@app.route('/api/blogger-signals', methods=['GET'])
+@performance_monitor
+@rate_limit
+def get_blogger_signals():
+    """获取博主信号列表，支持按日期查询"""
+    try:
+        if 'username' not in session:
+            return jsonify({'error': '未登录'}), 401
+        username = session['username']
+        date = request.args.get('date', '')  # 不传则返回最近7天
+
+        from datetime import timezone as _tz, timedelta as _td
+        _bj_today = datetime.now(_tz(_td(hours=8))).strftime('%Y-%m-%d')
+
+        query = supabase.table('blogger_signals').select('*').eq('username', username)
+        if date:
+            query = query.eq('date', date)
+        else:
+            # 默认返回最近7天
+            from datetime import timezone as _tz7, timedelta as _td7
+            _week_ago = (datetime.now(_tz7(_td7(hours=8))) - _td7(days=7)).strftime('%Y-%m-%d')
+            query = query.gte('date', _week_ago)
+
+        resp = query.order('date', desc=True).execute()
+        return jsonify(resp.data or [])
+    except Exception as e:
+        logger.error(f'获取博主信号失败: {e}')
+        return jsonify([])
+
+
+@app.route('/api/blogger-signals', methods=['POST'])
+@performance_monitor
+@rate_limit
+def upload_blogger_signals():
+    """批量上传博主信号（前端解析 xlsx 后发送 JSON 数组）"""
+    try:
+        if 'username' not in session:
+            return jsonify({'error': '未登录'}), 401
+        username = session['username']
+
+        data = request.get_json()
+        if not data or not isinstance(data, list):
+            return jsonify({'error': '数据格式错误，需要 JSON 数组'}), 400
+
+        if len(data) > 500:
+            return jsonify({'error': '单次上传不超过500条'}), 400
+
+        # 校验并补充字段
+        records = []
+        for row in data:
+            fund_code = str(row.get('fund_code', '')).strip()
+            fund_name = str(row.get('fund_name', '')).strip()
+            action    = str(row.get('action', '')).strip()
+            date      = str(row.get('date', '')).strip()
+            blogger   = str(row.get('blogger_name', '')).strip()
+
+            # 必填字段校验
+            if not all([fund_code, fund_name, action, date, blogger]):
+                continue  # 跳过不完整的行
+
+            # action 只接受合法值
+            if action not in ('买入', '卖出', '定投'):
+                continue
+
+            records.append({
+                'username':      username,
+                'date':          date,
+                'blogger_name':  blogger,
+                'fund_code':     fund_code,
+                'fund_name':     fund_name,
+                'action':        action,
+                'amount':        str(row.get('amount', '')).strip(),
+                'topic':         str(row.get('topic', '')).strip(),
+                'yearly_return': str(row.get('yearly_return', '')).strip(),
+            })
+
+        if not records:
+            return jsonify({'error': '没有有效数据（请检查基金代码是否填写）'}), 400
+
+        # upsert：相同 (username, date, blogger_name, fund_code) 的记录直接覆盖
+        if not supabase_admin:
+            return jsonify({'error': '服务端写入权限不足'}), 500
+
+        resp = supabase_admin.table('blogger_signals').upsert(
+            records,
+            on_conflict='username,date,blogger_name,fund_code'
+        ).execute()
+
+        inserted = len(resp.data) if resp.data else len(records)
+        logger.info(f'blogger_signals: {username} 上传 {inserted} 条，日期={records[0]["date"] if records else "?"}')
+        return jsonify({'success': True, 'inserted': inserted, 'total': len(data)})
+
+    except Exception as e:
+        logger.error(f'上传博主信号失败: {e}')
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/funds/<int:fund_id>', methods=['DELETE'])
 @performance_monitor
 @rate_limit
@@ -1313,6 +1362,28 @@ def get_investment_advice():
             logger.warning(f'读取持仓记录失败: {_e}')
             _holding_map = {}
 
+        # ── 查询7天内的博主信号，用于 blogger_hint 标注 ─────────────────────
+        _blogger_map = {}  # fund_code -> {'buy': N, 'sell': N, 'bloggers': [...]}
+        try:
+            from datetime import timezone as _btz, timedelta as _btd
+            _7d_ago = (datetime.now(_btz(_btd(hours=8))) - _btd(days=7)).strftime('%Y-%m-%d')
+            _bsig = supabase.table('blogger_signals')                 .select('fund_code,action,blogger_name')                 .eq('username', username)                 .gte('date', _7d_ago)                 .execute()
+            for _r in (_bsig.data or []):
+                _fc = _r.get('fund_code', '')
+                if not _fc:
+                    continue
+                if _fc not in _blogger_map:
+                    _blogger_map[_fc] = {'buy': 0, 'sell': 0, 'bloggers': []}
+                if _r.get('action') in ('买入', '定投'):
+                    _blogger_map[_fc]['buy'] += 1
+                elif _r.get('action') == '卖出':
+                    _blogger_map[_fc]['sell'] += 1
+                _bn = _r.get('blogger_name', '')
+                if _bn and _bn not in _blogger_map[_fc]['bloggers']:
+                    _blogger_map[_fc]['bloggers'].append(_bn)
+        except Exception as _be:
+            logger.warning(f'查询博主信号失败（不影响主流程）: {_be}')
+
         holdingsAdvice = []
         for fund in funds:
             pr = getattr(fund, 'predicted_return', 0)
@@ -1324,7 +1395,7 @@ def get_investment_advice():
             est_nav_add = round(nav * (1 + gszzl), 4) if gszzl is not None and nav else nav
 
             # ── 多维度综合决策（替代单日涨跌判断）─────────────────────────────
-            action, suggest_amount = _calc_action(fund, pr, market_data, investment_level)
+            action, suggest_amount = _calc_action(fund, pr, market_data, investment_level, _blogger_map.get(fund.code))
 
             # ── 建仓逻辑：关注但无净持仓的基金，看多信号改为"建仓" ──────────
             net_holding = _holding_map.get(fund.code, 0)
@@ -1360,6 +1431,18 @@ def get_investment_advice():
                 est_return = round(pr * 100, 2)
                 est_nav = round(prices[-1] * (1 + pr), 4)
 
+            # 博主实盘提示
+            _bm = _blogger_map.get(fund.code, {})
+            _blogger_hint = ''
+            if _bm:
+                _parts = []
+                if _bm['buy'] > 0:
+                    _parts.append(f"{_bm['buy']}位博主买入")
+                if _bm['sell'] > 0:
+                    _parts.append(f"{_bm['sell']}位博主卖出")
+                if _parts:
+                    _blogger_hint = '、'.join(_parts) + '（近7天）'
+
             holdingsAdvice.append({
                 'fundName': fund.name,
                 'fundCode': fund.code,
@@ -1367,6 +1450,7 @@ def get_investment_advice():
                 'suggest_amount': suggest_amount,
                 'est_nav_add': round(est_nav_add, 4) if est_nav_add else None,
                 'reason': reason,
+                'blogger_hint': _blogger_hint,
                 'indicators': {
                     # 行1
                     'nav': round(prices[-1], 4) if prices else None,
@@ -1474,6 +1558,28 @@ def get_recommended_funds_api():
         recommended = get_recommended_funds_engine(market_snapshot=market_data, top_per_tier=10)
         logger.info(f'recommended funds: got {len(recommended)} funds')
 
+        # 追加博主信号（7天内买入的推荐基金标注博主动向）
+        try:
+            from datetime import timezone as _rtz, timedelta as _rtd
+            _r7ago = (datetime.now(_rtz(_rtd(hours=8))) - _rtd(days=7)).strftime('%Y-%m-%d')
+            _rbsig = supabase.table('blogger_signals')                 .select('fund_code,action,blogger_name')                 .eq('username', username)                 .gte('date', _r7ago)                 .execute()
+            _rmap = {}
+            for _rr in (_rbsig.data or []):
+                _fc = _rr.get('fund_code', '')
+                if not _fc: continue
+                if _fc not in _rmap: _rmap[_fc] = {'buy': 0, 'sell': 0}
+                if _rr.get('action') in ('买入', '定投'): _rmap[_fc]['buy'] += 1
+                elif _rr.get('action') == '卖出': _rmap[_fc]['sell'] += 1
+            # 给每条推荐基金加 blogger_hint
+            for _rf in recommended:
+                _bm2 = _rmap.get(_rf.get('code', ''), {})
+                _hint_parts = []
+                if _bm2.get('buy'): _hint_parts.append(f"{_bm2['buy']}位博主买入")
+                if _bm2.get('sell'): _hint_parts.append(f"{_bm2['sell']}位博主卖出")
+                _rf['blogger_hint'] = '、'.join(_hint_parts) + '（近7天）' if _hint_parts else ''
+        except Exception as _rbe:
+            logger.warning(f'推荐基金博主信号查询失败: {_rbe}')
+
         result = {'recommendedFunds': recommended}
 
         # ── 3. Write to recommended_funds_cache ───────────────────────────────
@@ -1501,7 +1607,7 @@ def get_recommended_funds_api():
         return jsonify({'recommendedFunds': []})
 
 
-def _calc_action(fund, pr: float, market_data: dict, investment_level: str = 'small') -> tuple:
+def _calc_action(fund, pr: float, market_data: dict, investment_level: str = 'small', blogger_signals: dict = None) -> tuple:
     # 技术面多维度综合决策引擎
     #
     # 设计原则：决策以技术指标为主，实时估值仅作辅助参考（权重与其他指标相同）
@@ -1592,7 +1698,23 @@ def _calc_action(fund, pr: float, market_data: dict, investment_level: str = 'sm
             elif avg_market > 0.02:
                 score += 1
 
-    # ── 6. 决策输出 ──────────────────────────────────────────────────────────
+    # ── 6. 博主信号加权（辅助维度，上限 ±2 分，不单独触发操作建议）──────────
+    # blogger_signals: {'buy': N, 'sell': N} 来自调用方预查询的7天数据
+    if blogger_signals:
+        _b_buy  = blogger_signals.get('buy', 0)
+        _b_sell = blogger_signals.get('sell', 0)
+        _b_score = 0
+        if _b_buy >= 3:
+            _b_score += 2   # 3位及以上博主买入，强信号
+        elif _b_buy >= 1:
+            _b_score += 1   # 1-2位博主买入，弱信号
+        if _b_sell >= 3:
+            _b_score -= 2
+        elif _b_sell >= 1:
+            _b_score -= 1
+        score += max(-2, min(2, _b_score))  # 限制在 ±2 以内
+
+    # ── 7. 决策输出 ──────────────────────────────────────────────────────────
     AMOUNT_TABLE = {
         'small':  [100, 200, 300, 500],
         'medium': [300, 500, 800, 1000],
@@ -1754,17 +1876,36 @@ def generate_holding_reason(fund, action: str, market_data: dict) -> str:
     return '；'.join(parts) + '。'
 
 
+# 服务端内存缓存（同一 Vercel 实例内有效，60秒）
+_market_cache = {'data': None, 'ts': 0}
+MARKET_CACHE_SEC = 60
+
 @app.route('/api/market-data', methods=['GET'])
 @performance_monitor
 @rate_limit
 def get_market_data_api():
     """获取市场数据，包括主要大盘指数和行业板块的实时数据"""
     try:
+        import time as _time
+        global _market_cache
+        now_ts = _time.time()
+        # 60秒内直接返回缓存，不重复调东方财富
+        if _market_cache['data'] and now_ts - _market_cache['ts'] < MARKET_CACHE_SEC:
+            logger.debug('market-data: 服务端内存缓存命中')
+            return jsonify(_market_cache['data'])
+
         logger.info('获取市场数据')
         market_data = get_market_data()
+        # 有数据才更新缓存（失败时保留旧缓存）
+        if market_data and market_data.get('indices'):
+            _market_cache = {'data': market_data, 'ts': now_ts}
+        elif _market_cache['data']:
+            return jsonify(_market_cache['data'])  # 失败时返回旧缓存
         return jsonify(market_data)
     except Exception as e:
         logger.error(f'获取市场数据失败: {e}')
+        if _market_cache.get('data'):
+            return jsonify(_market_cache['data'])
         return jsonify({'indices': {}, 'sectors': {}})
 
 
