@@ -101,7 +101,7 @@ class BloggerTracker {
             + '.bt-tg{display:grid;gap:4px}'
             + '.bt-tr{display:grid;grid-template-columns:28px 1fr 44px 44px 44px 36px;gap:6px;align-items:center;padding:7px 10px;border-radius:7px;transition:background .1s}'
             + '.bt-tr:hover{background:#1a1a1a}'
-            + '.bt-ti{font-size:20px;color:#333;text-align:right;font-variant-numeric:tabular-nums}'
+            + '.bt-ti{font-size:16px;color:#333;text-align:right;font-variant-numeric:tabular-nums}'
             + '.bt-r1{color:#ffc107}.bt-r2{color:#888}.bt-r3{color:#cd7f32}'
             + '.bt-tn{overflow:hidden}'
             + '.bt-tf{font-size:12px;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
@@ -594,17 +594,30 @@ class BloggerTracker {
             const action=String(row[ci.action]??'').trim();
             const blogger=String(row[ci.bn]??'').trim();
             if(!blogger||!VALID.has(action))continue;
-            // 优先用行内 date 列，格式统一为 YYYY-MM-DD
+            // 优先用行内 date/日期 列，格式统一为 YYYY-MM-DD
             let rowDate = fileDate;
-            if(ci.date!==undefined && row[ci.date]){
+            if(ci.date!==undefined && row[ci.date]!=null && row[ci.date]!==''){
                 const dv = String(row[ci.date]).trim();
-                // 支持 2026/04/01 或 2026-04-01 或 Excel 日期数字
-                if(/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(dv)){
-                    rowDate = dv.replace(/\//g,'-').split('-').map((p,i)=>i>0?p.padStart(2,'0'):p).join('-');
-                } else if(/^\d{5}$/.test(dv)) {
-                    // Excel 序列数 → 日期
-                    const d = new Date(Math.round((parseFloat(dv)-25569)*86400*1000));
-                    rowDate = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+                // 1. YYYY/MM/DD 或 YYYY-MM-DD
+                const m1 = dv.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                if(m1){
+                    rowDate = m1[1]+'-'+m1[2].padStart(2,'0')+'-'+m1[3].padStart(2,'0');
+                }
+                // 2. Excel Timestamp 字符串：2026-04-21T00:00:00 或 Mon Apr 21 2026 ...
+                else if(dv.includes('T') || dv.includes('Apr') || dv.includes('202')){
+                    try{
+                        const d = new Date(dv);
+                        if(!isNaN(d)){
+                            // 用 UTC 日期避免时区偏移
+                            rowDate = d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+                        }
+                    }catch(_){}
+                }
+                // 3. Excel 序列数（4-6位纯数字，如 46133 = 2026-04-21）
+                else if(/^\d{4,6}$/.test(dv)){
+                    const serial = parseFloat(dv);
+                    const d = new Date(Math.round((serial - 25569) * 86400 * 1000));
+                    rowDate = d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
                 }
             }
             recs.push({date:rowDate,blogger_name:blogger,fund_code:fc,fund_name:fn,action,amount:String(row[ci.amount]??'').trim(),topic:ct,yearly_return:String(row[ci.yr]??'').trim()});
