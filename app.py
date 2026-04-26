@@ -1139,18 +1139,29 @@ def upload_blogger_signals():
         if not records:
             return jsonify({'error': '没有有效数据（请检查基金代码是否填写）'}), 400
 
-        # upsert：相同 (username, date, blogger_name, fund_code) 的记录直接覆盖
         if not supabase_admin:
             return jsonify({'error': '服务端写入权限不足'}), 500
 
-        resp = supabase_admin.table('blogger_signals').upsert(
-            records,
-            on_conflict='username,date,blogger_name,fund_code'
-        ).execute()
+        # 前端已去重，但后端再做一次保险：按唯一键去重，相同 key 保留最后一条
+        seen = {}
+        for r in records:
+            key = (r['date'], r['blogger_name'], r['fund_code'])
+            seen[key] = r  # 同 key 后覆盖前
+        unique_records = list(seen.values())
 
-        inserted = len(resp.data) if resp.data else len(records)
-        logger.info(f'blogger_signals: {username} 上传 {inserted} 条，日期={records[0]["date"] if records else "?"}')
-        return jsonify({'success': True, 'inserted': inserted, 'total': len(data)})
+        # 逐条 upsert，避免批量提交时同批次内有重复 key 报错
+        inserted = 0
+        for r in unique_records:
+            try:
+                supabase_admin.table('blogger_signals').upsert(
+                    r, on_conflict='username,date,blogger_name,fund_code'
+                ).execute()
+                inserted += 1
+            except Exception as _ue:
+                logger.warning(f'blogger_signals upsert 跳过: {_ue}')
+
+        logger.info(f'blogger_signals: {username} 上传 {inserted}/{len(unique_records)} 条，日期={records[0]["date"] if records else "?"}')
+        return jsonify({'success': True, 'inserted': inserted, 'total': len(data), 'unique': len(unique_records)})
 
     except Exception as e:
         logger.error(f'上传博主信号失败: {e}')
