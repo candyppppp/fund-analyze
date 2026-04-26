@@ -17,7 +17,7 @@ class BloggerTracker {
         const sb = document.querySelector('.search-container');
         if (sb) sb.style.display = 'none';
         // 直接写 loading，同步，无中间状态
-        const r = this._currentRange, a = this._currentAction;
+        const r = this._currentRange;
         container.innerHTML = '<div id="bt-root"><style>'
             + '#bt-root{font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#e0e0e0}'
             + '.bt-spin{width:20px;height:20px;border:2px solid #252525;border-top-color:#007bff;border-radius:50%;animation:btspin .8s linear infinite}'
@@ -60,7 +60,7 @@ class BloggerTracker {
     _loadAndRender() { this._fetchAndRender(document.getElementById('funds-container')); }
 
     _renderShell(container) {
-        const r = this._currentRange, a = this._currentAction;
+        const r = this._currentRange;
         container.innerHTML = '<div id="bt-root">'
             + '<style>'
             + '#bt-root{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;color:#e0e0e0;padding:0}'
