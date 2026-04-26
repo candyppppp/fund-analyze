@@ -89,19 +89,19 @@ class BloggerTracker {
             + '.bt-sec{padding:0 20px;margin-bottom:16px}'
             + '.bt-sh{font-size:11px;font-weight:600;color:#444;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}'
             + '.bt-sh::after{content:"";flex:1;height:0.5px;background:#1a1a1a}'
-            + '.bt-donuts{display:flex;gap:10px;flex-wrap:wrap}'
-            + '.bt-dc{flex:1;min-width:150px;background:#141414;border:0.5px solid #1e1e1e;border-radius:10px;padding:14px}'
+            + '.bt-donuts{display:grid;grid-template-columns:1fr 1fr;gap:12px}'
+            + '.bt-dc{background:#141414;border:0.5px solid #1e1e1e;border-radius:10px;padding:16px}'
             + '.bt-dh{font-size:11px;font-weight:500;margin-bottom:10px}'
-            + '.bt-di{display:flex;align-items:center;gap:12px}'
-            + '.bt-dl{flex:1;overflow:hidden}'
-            + '.bt-li{display:flex;align-items:center;gap:5px;margin-bottom:3px;overflow:hidden}'
+            + '.bt-di{display:flex;flex-direction:column;align-items:center;gap:10px}'
+            + '.bt-dl{width:100%;overflow:hidden}'
+            + '.bt-li{display:flex;align-items:center;gap:5px;margin-bottom:4px;overflow:hidden}'
             + '.bt-ld{width:7px;height:7px;border-radius:50%;flex-shrink:0}'
             + '.bt-ln{font-size:10px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}'
             + '.bt-lv{font-size:10px;color:#444;margin-left:auto;flex-shrink:0}'
             + '.bt-tg{display:grid;gap:4px}'
             + '.bt-tr{display:grid;grid-template-columns:28px 1fr 44px 44px 44px 36px;gap:6px;align-items:center;padding:7px 10px;border-radius:7px;transition:background .1s}'
             + '.bt-tr:hover{background:#1a1a1a}'
-            + '.bt-ti{font-size:16px;color:#333;text-align:right;font-variant-numeric:tabular-nums}'
+            + '.bt-ti{font-size:20px;color:#333;text-align:right;font-variant-numeric:tabular-nums}'
             + '.bt-r1{color:#ffc107}.bt-r2{color:#888}.bt-r3{color:#cd7f32}'
             + '.bt-tn{overflow:hidden}'
             + '.bt-tf{font-size:12px;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
@@ -262,7 +262,7 @@ class BloggerTracker {
             if (!filtered.length) return '';
             const total = filtered.reduce((s,[,v])=>s+v[field],0);
             // 使用正方形 viewBox 确保是正圆
-            const R=42,cx=52,cy=52,sw=14,circ=2*Math.PI*R;
+            const R=52,cx=64,cy=64,sw=16,circ=2*Math.PI*R;
             let off=0, slices='';
             filtered.forEach(([t,st],i) => {
                 const d=(st[field]/total)*circ;
@@ -271,20 +271,22 @@ class BloggerTracker {
                     + ' stroke-dashoffset="'+(-(off/total)*circ).toFixed(2)+'" transform="rotate(-90 '+cx+' '+cy+')"/>';
                 off+=st[field];
             });
-            const legend = filtered.slice(0,6).map(([t,st],i) => {
+            // 图例改为两列网格
+            const legend = filtered.slice(0,8).map(([t,st],i) => {
                 const pct = (st[field]/total*100).toFixed(1);
                 return '<div class="bt-li"><div class="bt-ld" style="background:'+COLORS[i%10]+'"></div>'
                     +'<span class="bt-ln">'+t+'</span>'
                     +'<span class="bt-lv" style="color:#555">'+st[field]+'</span>'
-                    +'<span style="font-size:9px;color:#333;margin-left:3px;flex-shrink:0">('+pct+'%)</span></div>';
+                    +'<span style="font-size:9px;color:#2a2a2a;margin-left:2px;flex-shrink:0">('+pct+'%)</span></div>';
             }).join('');
             return '<div class="bt-dc"><div class="bt-dh" style="color:'+color+'">'+title+'</div>'
-                +'<div class="bt-di"><svg viewBox="0 0 104 104" style="width:84px;height:84px;flex-shrink:0">'
+                +'<div class="bt-di"><svg viewBox="0 0 128 128" style="width:110px;height:110px">'
                 +'<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="#1a1a1a" stroke-width="'+sw+'"/>'
                 +slices
-                +'<text x="'+cx+'" y="'+(cy-6)+'" text-anchor="middle" dominant-baseline="middle" fill="#666" font-size="14" font-weight="700">'+total+'</text>'
-                +'<text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" dominant-baseline="middle" fill="#333" font-size="9">操作</text>'
-                +'</svg><div class="bt-dl">'+legend+'</div></div></div>';
+                +'<text x="'+cx+'" y="'+(cy-7)+'" text-anchor="middle" dominant-baseline="middle" fill="#666" font-size="16" font-weight="700">'+total+'</text>'
+                +'<text x="'+cx+'" y="'+(cy+11)+'" text-anchor="middle" dominant-baseline="middle" fill="#333" font-size="10">操作</text>'
+                +'</svg>'
+                +'<div class="bt-dl" style="display:grid;grid-template-columns:1fr 1fr;gap:2px 8px">'+legend+'</div></div></div>';
         };
 
         // TOP20 行
