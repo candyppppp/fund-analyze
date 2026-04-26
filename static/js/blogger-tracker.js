@@ -1,209 +1,28 @@
-// blogger-tracker.js — 博主追踪模块（3.0）
-// 职责：解析 xlsx、上传博主信号、展示博主操作汇总
+// blogger-tracker.js — 博主追踪模块 v2
+// 修复：每次 show() 都重建 DOM，防止其他 tab 切换后挂载点丢失
+// 新增：1D/3D/7D 切换、主题圆环图、TOP20基金
 
 class BloggerTracker {
     constructor() {
-        this._signals = [];       // 当前展示的信号数据
-        this._myFundCodes = [];   // 用户自选基金代码列表
-        this._rendered = false;
-        this._currentDate = '';
+        this._signals     = [];
+        this._myFundCodes = [];
+        this._currentRange  = '7D';
+        this._currentAction = '';
     }
 
-    // ── 入口：切换到博主追踪 tab 时调用 ────────────────────────────────────
     show() {
         const container = document.getElementById('funds-container');
+        if (!container) return;
         const header    = document.getElementById('fund-list-header');
         const searchBar = document.querySelector('.search-container');
         if (searchBar) searchBar.style.display = 'none';
         if (header)    header.style.display    = 'none';
-
-        // 第一次进入时渲染骨架
-        if (!this._rendered) {
-            this._renderShell(container);
-            this._rendered = true;
-        }
-
-        // 拉取用户自选基金代码（用于高亮重合）
+        // 每次都重建 DOM，防止其他 tab 覆盖后挂载点丢失
+        this._renderShell(container);
         this._loadMyFundCodes();
-
-        // 如果已有上传过的数据，自动加载最近一天
-        this._loadLatest();
+        this._loadAndRender();
     }
 
-    // ── 从设置弹窗调用的上传（带弹窗提示）──────────────────────────────
-    _parseAndUploadFromSettings(file, msgEl) {
-        const setMsg = (text, color='#888') => {
-            if (msgEl) { msgEl.textContent = text; msgEl.style.color = color; }
-        };
-        setMsg('正在解析文件...');
-        const reader = new FileReader();
-        reader.onload = e => {
-            try {
-                const wb = XLSX.read(e.target.result, { type: 'array' });
-                const ws = wb.Sheets[wb.SheetNames[0]];
-                const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-                // 复用解析逻辑
-                const result = this._parseRawRows(raw, file.name);
-                if (!result.ok) { setMsg('❌ ' + result.error, '#dc3545'); return; }
-                setMsg(`已解析 ${result.records.length} 条，上传中...`);
-                fetch('/api/blogger-signals', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(result.records),
-                })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.success) {
-                        const bj = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Shanghai'}));
-                        const ts = `${bj.getFullYear()}-${String(bj.getMonth()+1).padStart(2,'0')}-${String(bj.getDate()).padStart(2,'0')} ${String(bj.getHours()).padStart(2,'0')}:${String(bj.getMinutes()).padStart(2,'0')}`;
-                        const dupInfo2 = result.originalCount > res.unique ? `，${result.originalCount - res.unique}条重复已合并` : '';
-                        setMsg(`✅ 上传成功 ${res.inserted} 条${dupInfo2}｜Supabase 更新于 ${ts}`, '#28a745');
-                        // 刷新全局信号数据
-                        this._refreshGlobalSignals();
-                    } else {
-                        setMsg('❌ ' + res.error, '#dc3545');
-                    }
-                })
-                .catch(() => setMsg('❌ 网络错误', '#dc3545'));
-            } catch(err) {
-                setMsg('❌ 解析失败：' + err.message, '#dc3545');
-            }
-        };
-        reader.readAsArrayBuffer(file);
-    }
-
-    // ── 把解析逻辑抽取为独立方法，供两个上传入口复用 ──────────────────────
-    _parseRawRows(raw, fileName) {
-        // ── 自动检测表头行（找到包含"博主"和"操作"的那一行）────────────────
-        let headerRowIdx = -1;
-        for (let i = 0; i < Math.min(raw.length, 5); i++) {
-            const row = raw[i] || [];
-            const rowStr = row.map(c => String(c)).join('');
-            if (rowStr.includes('博主') && rowStr.includes('操作')) {
-                headerRowIdx = i;
-                break;
-            }
-        }
-        if (headerRowIdx === -1)
-            return { ok: false, error: '未找到表头行，请确认文件包含"博主"和"操作"列' };
-
-        const headerRow = raw[headerRowIdx];
-        const colIdx = {};
-        headerRow.forEach((h, i) => {
-            const k = String(h).trim();
-            if (k.includes('主题'))                             colIdx.topic         = i;
-            if (k.includes('博主'))                             colIdx.blogger_name  = i;
-            if (k.includes('近一年'))                           colIdx.yearly_return = i;
-            if (k.includes('操作'))                             colIdx.action        = i;
-            if (k.includes('金额'))                             colIdx.amount        = i;
-            if (k.includes('修正后名称') || k.includes('基金名称')) colIdx.fund_name  = i;
-            if (k.includes('基金代码') || k.includes('fund_code')) colIdx.fund_code  = i;
-        });
-        // 如果同时有"修正后名称"和"基金名称"，优先用修正后名称
-        headerRow.forEach((h, i) => {
-            if (String(h).trim().includes('修正后名称')) colIdx.fund_name = i;
-        });
-
-        if (colIdx.fund_code === undefined)
-            return { ok: false, error: '文件里没有"基金代码"列，请新增后重试' };
-
-        // ── 推算日期：从文件名或表头上方的标题行中提取 ──────────────────────
-        let fileDate = '';
-        // 先扫描表头行之前的行找日期
-        for (let i = 0; i < headerRowIdx; i++) {
-            const titleText = String(raw[i]?.[0] || '') + String(raw[i]?.[1] || '');
-            const m = titleText.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
-            if (m) { fileDate = `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`; break; }
-        }
-        if (!fileDate) {
-            // 从文件名提取日期
-            // 优先找 M_DD 或 MM_DD 短格式（如 4_21_v3.xlsx），避免误识别时间戳（20260426_151258）
-            const _fn = (fileName || '').replace(/\.xlsx?$/i, '');
-            const m3 = _fn.match(/^(\d{1,2})[_\-](\d{1,2})/);  // 开头的 M_DD
-            if (m3) {
-                fileDate = `${new Date().getFullYear()}-${m3[1].padStart(2,'0')}-${m3[2].padStart(2,'0')}`;
-            } else {
-                // 降级：找 YYYYMMDD 格式
-                const m2 = _fn.match(/(\d{4})(\d{2})(\d{2})/);
-                if (m2) {
-                    fileDate = `${m2[1]}-${m2[2]}-${m2[3]}`;
-                } else {
-                    // 默认今天
-                    const bj = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Shanghai'}));
-                    fileDate = `${bj.getFullYear()}-${String(bj.getMonth()+1).padStart(2,'0')}-${String(bj.getDate()).padStart(2,'0')}`;
-                }
-            }
-        }
-
-        // ── 解析数据行 ──────────────────────────────────────────────────────
-        const records = [];
-        let currentTopic = '';
-        const VALID_ACTIONS = new Set(['买入','卖出','定投']);
-
-        for (let i = headerRowIdx + 1; i < raw.length; i++) {
-            const row = raw[i];
-            if (!row || row.every(c => c === '' || c === null || c === undefined)) continue;
-
-            // 主题列（可能是合并单元格，有值就更新当前主题）
-            const topicVal = String(row[colIdx.topic] ?? '').trim().replace(/[​ ‌]/g,'').trim();
-            if (topicVal && topicVal !== 'undefined') currentTopic = topicVal;
-
-            const fund_code_raw = row[colIdx.fund_code];
-            const fund_code = fund_code_raw != null && String(fund_code_raw).trim() !== '' && String(fund_code_raw) !== 'NaN'
-                ? String(Math.floor(Number(fund_code_raw))).padStart(6, '0')  // 数字型代码补零
-                : '';
-            if (!fund_code) continue;  // 无代码（failed/all_rejected）跳过
-
-            // fund_name 优先修正后名称，降级原始名称
-            const fund_name_raw = colIdx.fund_name !== undefined ? String(row[colIdx.fund_name] ?? '').trim() : '';
-            const fund_name = fund_name_raw && fund_name_raw !== 'NaN' ? fund_name_raw
-                : String(row[headerRow.indexOf('基金名称')] ?? '').trim();
-            if (!fund_name) continue;
-
-            const action  = String(row[colIdx.action] ?? '').trim();
-            const blogger = String(row[colIdx.blogger_name] ?? '').trim();
-            if (!blogger || !VALID_ACTIONS.has(action)) continue;
-
-            records.push({
-                date:          fileDate,
-                blogger_name:  blogger,
-                fund_code,
-                fund_name,
-                action,
-                amount:        String(row[colIdx.amount] ?? '').trim(),
-                topic:         currentTopic,
-                yearly_return: String(row[colIdx.yearly_return] ?? '').trim(),
-            });
-        }
-
-        if (records.length === 0)
-            return { ok: false, error: `没有解析到有效数据（表头在第${headerRowIdx+1}行，共扫描${raw.length - headerRowIdx - 1}行，需要：有效基金代码 + 买入/卖出/定投）` };
-
-        // 去重：同一博主同一天同一基金有多条时，合并金额（累加），保留一条
-        const dedup = {};
-        for (const r of records) {
-            const key = `${r.blogger_name}||${r.fund_code}||${r.action}`;
-            if (!dedup[key]) {
-                dedup[key] = { ...r };
-            } else {
-                // 金额累加（如 1K + 3K → 4K），直接拼接标注
-                dedup[key].amount = [dedup[key].amount, r.amount].filter(Boolean).join('+');
-            }
-        }
-        const dedupRecords = Object.values(dedup);
-
-        return { ok: true, records: dedupRecords, fileDate, originalCount: records.length };
-    }
-
-    // ── 刷新全局信号数据（供基金列表标签使用）───────────────────────────
-    _refreshGlobalSignals() {
-        fetch('/api/blogger-signals')
-            .then(r => r.ok ? r.json() : [])
-            .then(data => { window._bloggerSignals = data || []; })
-            .catch(() => {});
-    }
-
-    // ── 隐藏（切换到其他 tab 时恢复搜索框）────────────────────────────────
     hide() {
         const searchBar = document.querySelector('.search-container');
         const header    = document.getElementById('fund-list-header');
@@ -211,278 +30,386 @@ class BloggerTracker {
         if (header)    header.style.display    = '';
     }
 
-    // ── 加载用户自选基金代码 ─────────────────────────────────────────────
     _loadMyFundCodes() {
         fetch('/api/funds?basic_only=1')
             .then(r => r.ok ? r.json() : [])
-            .then(funds => {
-                this._myFundCodes = (funds || []).map(f => String(f.code));
-            })
-            .catch(() => {});
+            .then(funds => { this._myFundCodes = (funds||[]).map(f=>String(f.code)); })
+            .catch(()=>{});
     }
 
-    // ── 加载最近一次上传的数据 ──────────────────────────────────────────
-    _loadLatest() {
-        fetch('/api/blogger-signals')
+    _loadAndRender() {
+        const wrap = document.getElementById('bt-table-wrap');
+        if (wrap) wrap.innerHTML = '<div style="color:#555;font-size:12px;padding:20px 0;text-align:center">加载中...</div>';
+        const days = this._currentRange==='1D'?1:this._currentRange==='3D'?3:7;
+        fetch('/api/blogger-signals?days='+days)
             .then(r => r.ok ? r.json() : [])
             .then(data => {
-                if (data && data.length > 0) {
-                    this._signals = data;
-                    // 找最新日期
-                    const dates = [...new Set(data.map(d => d.date))].sort().reverse();
-                    this._currentDate = dates[0];
-                    this._updateDateSelector(dates);
-                    this._renderTable(data.filter(d => d.date === this._currentDate));
+                this._signals = data||[];
+                window._bloggerSignals = this._signals;
+                if (this._signals.length > 0) {
+                    this._renderAll();
                 } else {
-                    this._renderEmpty();
+                    const w = document.getElementById('bt-table-wrap');
+                    if (w) w.innerHTML = '<div style="color:#555;font-size:12px;padding:30px 0;text-align:center">暂无数据，请上传博主实盘 xlsx 文件</div>';
                 }
             })
-            .catch(() => this._renderEmpty());
+            .catch(()=>{
+                const w = document.getElementById('bt-table-wrap');
+                if (w) w.innerHTML = '<div style="color:#dc3545;font-size:12px;padding:20px 0;text-align:center">加载失败，请刷新重试</div>';
+            });
     }
 
-    // ── 渲染主骨架（上传区 + 日期选择 + 表格区）───────────────────────────
+    _renderAll() {
+        const data = this._currentAction
+            ? this._signals.filter(r=>r.action===this._currentAction)
+            : this._signals;
+        const countEl = document.getElementById('bt-count');
+        if (countEl) countEl.textContent = data.length+' 条';
+        this._renderCharts(data);
+        this._renderTop20(data);
+        this._renderTable(data);
+    }
+
     _renderShell(container) {
+        const rangeHTML = ['1D','3D','7D'].map(r=>`
+            <button class="bt-btn${r===this._currentRange?' bt-btn-active':''}" data-range="${r}"
+                style="background:${r===this._currentRange?'#007bff':'#2a2a2a'};
+                color:${r===this._currentRange?'#fff':'#888'};
+                border:0.5px solid ${r===this._currentRange?'#007bff':'#333'};
+                border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer">${r}</button>`).join('');
+        const actionHTML = [['','全部'],['买入','买入'],['卖出','卖出'],['定投','定投']].map(([v,l])=>`
+            <button class="bt-btn${v===this._currentAction?' bt-btn-active':''}" data-action="${v}"
+                style="background:${v===this._currentAction?'#444':'#2a2a2a'};
+                color:${v===this._currentAction?'#fff':'#888'};
+                border:0.5px solid #333;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer">${l}</button>`).join('');
+
         container.innerHTML = `
-<div id="bt-wrap" style="padding:0 4px">
-  <!-- 上传区 -->
-  <div id="bt-upload-area" style="
-    border:1.5px dashed #333333;
-    border-radius:12px;padding:28px 20px;text-align:center;
-    margin-bottom:16px;cursor:pointer;transition:border-color .15s;
-  " onclick="document.getElementById('bt-file-input').click()">
-    <div style="font-size:13px;color:#aaaaaa;margin-bottom:8px">
-      点击上传博主实盘 xlsx 文件
-    </div>
-    <div style="font-size:11px;color:#666666">
-      需包含：主题、博主、近一年、操作、金额、基金名称、基金代码
-    </div>
+<div id="bt-wrap" style="padding:0 4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <div id="bt-upload-area" style="border:1.5px dashed #333;border-radius:10px;padding:12px 16px;
+    margin-bottom:12px;cursor:pointer;display:flex;align-items:center;gap:10px"
+    onclick="document.getElementById('bt-file-input').click()">
+    <span style="font-size:18px">📂</span>
+    <div style="font-size:12px;color:#888">点击上传博主实盘 xlsx（主题/博主/操作/金额/基金名称/基金代码）</div>
     <input type="file" id="bt-file-input" accept=".xlsx,.xls" style="display:none">
   </div>
+  <div id="bt-upload-msg" style="display:none;font-size:12px;padding:6px 10px;background:#2a2a2a;border-radius:6px;margin-bottom:10px"></div>
 
-  <!-- 上传进度提示 -->
-  <div id="bt-upload-msg" style="display:none;font-size:12px;color:#aaaaaa;
-    margin-bottom:12px;padding:8px 12px;background:#2a2a2a;
-    border-radius:8px;"></div>
-
-  <!-- 日期选择 -->
-  <div id="bt-date-row" style="display:none;align-items:center;gap:10px;margin-bottom:12px">
-    <span style="font-size:12px;color:#666666">日期</span>
-    <select id="bt-date-sel" style="
-      background:#2a2a2a;color:#e0e0e0;
-      border:0.5px solid #333333;border-radius:6px;
-      padding:4px 10px;font-size:12px;cursor:pointer;
-    "></select>
-    <span id="bt-count" style="font-size:11px;color:#666666"></span>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+    <div style="display:flex;gap:4px">${rangeHTML}</div>
+    <div style="width:1px;height:14px;background:#333"></div>
+    <div style="display:flex;gap:4px">${actionHTML}</div>
+    <span id="bt-count" style="font-size:11px;color:#444;margin-left:auto"></span>
   </div>
 
-  <!-- 操作筛选 -->
-  <div id="bt-filter-row" style="display:none;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-    <button class="bt-filter-btn active" data-action="">全部</button>
-    <button class="bt-filter-btn" data-action="买入">买入</button>
-    <button class="bt-filter-btn" data-action="卖出">卖出</button>
-    <button class="bt-filter-btn" data-action="定投">定投</button>
-  </div>
-
-  <!-- 表格 -->
+  <div id="bt-charts" style="margin-bottom:16px"></div>
+  <div id="bt-top20" style="margin-bottom:16px"></div>
   <div id="bt-table-wrap"></div>
 </div>
-
 <style>
-#bt-wrap { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-.bt-filter-btn {
-  background: #2a2a2a;
-  color: #aaaaaa;
-  border: 0.5px solid #2a2a2a;
-  border-radius: 6px; padding: 4px 12px;
-  font-size: 12px; cursor: pointer; transition: all .15s;
-}
-.bt-filter-btn.active {
-  background: #007bff; color: #fff; border-color: #007bff;
-}
-.bt-row { display:grid; grid-template-columns: 80px 90px 80px 1fr 70px 60px; gap:8px;
-  align-items:center; padding:9px 10px; border-radius:8px;
-  border-bottom: 0.5px solid #2a2a2a; font-size:12px; }
-.bt-row:hover { background: #2a2a2a; }
-.bt-hd { font-weight:500; color:#666666; font-size:11px;
-  padding:6px 10px; letter-spacing:.4px; }
-.bt-buy  { color: #dc3545; font-weight:500; }
-.bt-sell { color: #28a745; font-weight:500; }
-.bt-dip  { color: #ffc107; font-weight:500; }
-.bt-mine { background: rgba(0,123,255,.06); border-left: 2px solid #007bff !important; }
-.bt-tag { display:inline-block; font-size:10px; padding:1px 6px; border-radius:4px;
-  background:rgba(0,123,255,.12); color:#4a9eff; margin-left:4px; }
-.bt-topic { font-size:11px; color:#666666; }
+.bt-btn:hover{opacity:.8}
+.bt-row{display:grid;grid-template-columns:90px 50px 65px 1fr 62px 50px;gap:6px;
+  align-items:center;padding:7px 10px;border-radius:6px;border-bottom:0.5px solid #1e1e1e;font-size:12px}
+.bt-row:hover{background:#242424}
+.bt-buy{color:#dc3545;font-weight:500}.bt-sell{color:#28a745;font-weight:500}.bt-dip{color:#ffc107;font-weight:500}
+.bt-mine{border-left:2px solid #007bff!important}
+.bt-self{display:inline-block;font-size:10px;padding:0 4px;border-radius:3px;background:rgba(0,123,255,.15);color:#4a9eff;margin-left:3px}
 </style>`;
 
-        // 绑定文件上传
-        document.getElementById('bt-file-input').addEventListener('change', e => {
-            const file = e.target.files[0];
-            if (file) this._parseAndUpload(file);
-            e.target.value = ''; // 允许重复上传同一文件
+        document.getElementById('bt-file-input').addEventListener('change', e=>{
+            const f=e.target.files[0]; if(f)this._parseAndUpload(f); e.target.value='';
         });
-
-        // 拖拽上传
         const area = document.getElementById('bt-upload-area');
-        area.addEventListener('dragover', e => { e.preventDefault(); area.style.borderColor='#007bff'; });
-        area.addEventListener('dragleave', () => { area.style.borderColor=''; });
-        area.addEventListener('drop', e => {
-            e.preventDefault(); area.style.borderColor='';
-            const file = e.dataTransfer.files[0];
-            if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
-                this._parseAndUpload(file);
-            }
+        area.addEventListener('dragover', e=>{e.preventDefault();area.style.borderColor='#007bff';});
+        area.addEventListener('dragleave', ()=>{area.style.borderColor='#333';});
+        area.addEventListener('drop', e=>{
+            e.preventDefault();area.style.borderColor='#333';
+            const f=e.dataTransfer.files[0]; if(f)this._parseAndUpload(f);
         });
-
-        // 日期切换
-        document.getElementById('bt-date-sel').addEventListener('change', e => {
-            this._currentDate = e.target.value;
-            const filtered = this._signals.filter(d => d.date === this._currentDate);
-            this._renderTable(filtered);
-        });
-
-        // 操作筛选
-        document.getElementById('bt-filter-row').addEventListener('click', e => {
-            const btn = e.target.closest('.bt-filter-btn');
-            if (!btn) return;
-            document.querySelectorAll('.bt-filter-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            const action = btn.dataset.action;
-            let filtered = this._signals.filter(d => d.date === this._currentDate);
-            if (action) filtered = filtered.filter(d => d.action === action);
-            this._renderTable(filtered);
+        document.getElementById('bt-wrap').addEventListener('click', e=>{
+            const rb=e.target.closest('[data-range]');
+            if(rb&&!rb.dataset.action){this._currentRange=rb.dataset.range;this.show();return;}
+            const ab=e.target.closest('[data-action]');
+            if(ab){this._currentAction=ab.dataset.action;this._renderAll();}
         });
     }
 
-    // ── 解析 xlsx 并上传（博主追踪 tab 内调用）─────────────────────────────
+    _renderCharts(data) {
+        const el=document.getElementById('bt-charts'); if(!el)return;
+        if(!data.length){el.innerHTML='';return;}
+        const COLORS=['#007bff','#dc3545','#ffc107','#28a745','#6f42c1','#fd7e14','#20c997','#e83e8c'];
+        const topicStats={};
+        data.forEach(r=>{
+            const t=r.topic||'其他';
+            if(!topicStats[t])topicStats[t]={买入:0,卖出:0,定投:0};
+            if(r.action in topicStats[t])topicStats[t][r.action]++;
+        });
+        const sorted=Object.entries(topicStats).sort((a,b)=>(b[1].买入+b[1].卖出+b[1].定投)-(a[1].买入+a[1].卖出+a[1].定投)).slice(0,8);
+
+        const donut=(field,color)=>{
+            const items=sorted.map(([t,s])=>({t,v:s[field]||0})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+            if(!items.length)return'';
+            const total=items.reduce((s,x)=>s+x.v,0);
+            const r=38,cx=50,cy=50,sw=14,circ=2*Math.PI*r;
+            let off=0,slices='';
+            items.forEach((item,i)=>{
+                const d=(item.v/total)*circ;
+                slices+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${COLORS[i%8]}"
+                    stroke-width="${sw}" stroke-dasharray="${d.toFixed(1)} ${(circ-d).toFixed(1)}"
+                    stroke-dashoffset="${(-off*circ/total).toFixed(1)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+                off+=item.v;
+            });
+            const legend=items.slice(0,5).map((item,i)=>`
+                <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
+                    <div style="width:7px;height:7px;border-radius:50%;background:${COLORS[i%8]};flex-shrink:0"></div>
+                    <span style="font-size:10px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:72px">${item.t}</span>
+                    <span style="font-size:10px;color:#555;margin-left:auto">${item.v}</span>
+                </div>`).join('');
+            return`<div style="flex:1;min-width:130px;background:#1e1e1e;border-radius:10px;padding:10px;border:0.5px solid #2a2a2a">
+                <div style="font-size:11px;font-weight:500;color:${color};margin-bottom:8px;text-align:center">${field}</div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <svg viewBox="0 0 100 100" style="width:65px;height:65px;flex-shrink:0">
+                        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#2a2a2a" stroke-width="${sw}"/>
+                        ${slices}
+                        <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle"
+                            style="font-size:13px;fill:#888;font-weight:500">${total}</text>
+                    </svg>
+                    <div style="flex:1;overflow:hidden">${legend}</div>
+                </div>
+            </div>`;
+        };
+
+        el.innerHTML=`
+        <div style="font-size:11px;color:#444;letter-spacing:.5px;margin-bottom:8px">主题分布</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${donut('买入','#dc3545')}${donut('卖出','#28a745')}${donut('定投','#ffc107')}
+        </div>`;
+    }
+
+    _renderTop20(data) {
+        const el=document.getElementById('bt-top20'); if(!el)return;
+        if(!data.length){el.innerHTML='';return;}
+        const fm={};
+        data.forEach(r=>{
+            if(!fm[r.fund_code])fm[r.fund_code]={code:r.fund_code,name:r.fund_name,topic:r.topic,buy:0,sell:0,dip:0,bl:new Set()};
+            if(r.action==='买入')fm[r.fund_code].buy++;
+            else if(r.action==='卖出')fm[r.fund_code].sell++;
+            else fm[r.fund_code].dip++;
+            fm[r.fund_code].bl.add(r.blogger_name);
+        });
+        const funds=Object.values(fm).map(f=>({...f,bl:f.bl.size,tot:f.buy+f.sell+f.dip}))
+            .sort((a,b)=>b.buy-a.buy||b.tot-a.tot).slice(0,20);
+        const maxBuy=funds[0]?.buy||1;
+        const rows=funds.map((f,i)=>{
+            const mine=this._myFundCodes.includes(String(f.code));
+            const bw=Math.max(2,Math.round(f.buy/maxBuy*60));
+            return`<div style="display:grid;grid-template-columns:22px 1fr 45px 45px 45px 38px;gap:5px;
+                align-items:center;padding:5px 8px;border-radius:5px;font-size:12px;
+                ${mine?'background:rgba(0,123,255,.06);border-left:2px solid #007bff;':''}" >
+                <span style="color:#444;font-size:10px;text-align:right">${i+1}</span>
+                <div style="overflow:hidden">
+                    <div style="color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                        ${f.name}${mine?'<span class="bt-self">自选</span>':''}
+                    </div>
+                    <div style="display:flex;align-items:center;gap:5px;margin-top:1px">
+                        <span style="font-size:10px;color:#444;font-family:monospace">${f.code}</span>
+                        <div style="height:3px;width:${bw}px;background:#dc3545;border-radius:2px;opacity:.7"></div>
+                    </div>
+                </div>
+                <span style="color:#dc3545;font-size:11px;text-align:center">${f.buy?f.buy+'买':''}</span>
+                <span style="color:#28a745;font-size:11px;text-align:center">${f.sell?f.sell+'卖':''}</span>
+                <span style="color:#ffc107;font-size:11px;text-align:center">${f.dip?f.dip+'投':''}</span>
+                <span style="color:#444;font-size:11px;text-align:center">${f.bl}人</span>
+            </div>`;
+        }).join('');
+        el.innerHTML=`
+        <div style="font-size:11px;color:#444;letter-spacing:.5px;margin-bottom:8px">博主买入 TOP${funds.length} 基金</div>
+        <div style="background:#1e1e1e;border-radius:10px;padding:8px;border:0.5px solid #2a2a2a">
+            <div style="display:grid;grid-template-columns:22px 1fr 45px 45px 45px 38px;gap:5px;
+                padding:3px 8px;margin-bottom:3px;font-size:10px;color:#444">
+                <span>#</span><span>基金</span>
+                <span style="text-align:center">买入</span><span style="text-align:center">卖出</span>
+                <span style="text-align:center">定投</span><span style="text-align:center">博主</span>
+            </div>${rows}
+        </div>`;
+    }
+
+    _renderTable(data) {
+        const wrap=document.getElementById('bt-table-wrap'); if(!wrap)return;
+        if(!data.length){
+            wrap.innerHTML='<div style="color:#444;font-size:12px;padding:16px 0;text-align:center">无符合条件的数据</div>';
+            return;
+        }
+        const byDate={};
+        data.forEach(r=>{
+            const d=r.date||'未知';
+            if(!byDate[d])byDate[d]={};
+            const t=r.topic||'其他';
+            if(!byDate[d][t])byDate[d][t]=[];
+            byDate[d][t].push(r);
+        });
+        let html='';
+        Object.keys(byDate).sort().reverse().forEach(date=>{
+            html+=`<div style="font-size:12px;font-weight:500;color:#007bff;padding:12px 0 6px;border-bottom:0.5px solid #222;margin-bottom:4px">${date}</div>`;
+            Object.entries(byDate[date]).forEach(([topic,items])=>{
+                html+=`<div style="font-size:10px;color:#444;padding:6px 0 3px;letter-spacing:.4px">${topic}</div>`;
+                html+=`<div class="bt-row" style="font-size:10px;color:#444;border-bottom:none;padding:3px 10px">
+                    <span>博主</span><span>操作</span><span>金额</span><span>基金名称</span><span>代码</span><span>近一年</span></div>`;
+                items.forEach(r=>{
+                    const mine=this._myFundCodes.includes(String(r.fund_code));
+                    const ac=r.action==='买入'?'bt-buy':r.action==='卖出'?'bt-sell':'bt-dip';
+                    const yr=r.yearly_return?`+${(parseFloat(r.yearly_return)*100||0).toFixed(0)}%`:'--';
+                    html+=`<div class="bt-row${mine?' bt-mine':''}">
+                        <span style="color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.blogger_name}</span>
+                        <span class="${ac}">${r.action}</span>
+                        <span style="color:#777">${r.amount||'--'}</span>
+                        <span style="color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.fund_name}${mine?'<span class="bt-self">自选</span>':''}</span>
+                        <span style="color:#444;font-family:monospace;font-size:11px">${r.fund_code}</span>
+                        <span style="color:#555">${yr}</span>
+                    </div>`;
+                });
+                html+='<div style="margin-bottom:10px"></div>';
+            });
+        });
+        wrap.innerHTML=html;
+    }
+
     _parseAndUpload(file) {
-        const msg = document.getElementById('bt-upload-msg');
-        msg.style.display = 'block';
-        msg.textContent = '正在解析文件...';
-        msg.style.color = '';
-        const reader = new FileReader();
-        reader.onload = e => {
-            try {
-                const wb = XLSX.read(e.target.result, { type: 'array' });
-                const ws = wb.Sheets[wb.SheetNames[0]];
-                const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-                const result = this._parseRawRows(raw, file.name);
-                if (!result.ok) {
-                    msg.textContent = '❌ ' + result.error;
-                    msg.style.color = '#dc3545';
-                    return;
-                }
-                msg.textContent = `已解析 ${result.records.length} 条，正在上传...`;
-                fetch('/api/blogger-signals', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(result.records),
-                })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.success) {
-                        const dupInfo = result.originalCount > res.unique ? `（含${result.originalCount - res.unique}条重复已合并）` : '';
-                        msg.textContent = `✅ 上传成功：${res.inserted} 条${dupInfo}`;
-                        this._refreshGlobalSignals();
-                        this._loadLatest();
-                    } else {
-                        msg.textContent = '❌ 上传失败：' + res.error;
-                        msg.style.color = '#dc3545';
-                    }
-                })
-                .catch(() => { msg.textContent = '❌ 网络错误'; });
-            } catch (err) {
-                msg.textContent = '❌ 解析失败：' + err.message;
-                msg.style.color = '#dc3545';
-            }
+        const msg=document.getElementById('bt-upload-msg');
+        msg.style.display='block'; msg.style.color='#aaa'; msg.textContent='正在解析...';
+        const reader=new FileReader();
+        reader.onload=e=>{
+            try{
+                const wb=XLSX.read(e.target.result,{type:'array'});
+                const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+                const res=this._parseRawRows(raw,file.name);
+                if(!res.ok){msg.textContent='❌ '+res.error;msg.style.color='#dc3545';return;}
+                msg.textContent=`已解析 ${res.records.length} 条，上传中...`;
+                this._doUpload(res,msg,null);
+            }catch(err){msg.textContent='❌ '+err.message;msg.style.color='#dc3545';}
         };
         reader.readAsArrayBuffer(file);
     }
 
-    // ── 更新日期选择器 ──────────────────────────────────────────────────
-    _updateDateSelector(dates) {
-        const sel = document.getElementById('bt-date-sel');
-        const row = document.getElementById('bt-date-row');
-        const filterRow = document.getElementById('bt-filter-row');
-        if (!sel) return;
-
-        sel.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
-        row.style.display = 'flex';
-        filterRow.style.display = 'flex';
+    _parseAndUploadFromSettings(file,msgEl) {
+        const sm=(t,c='#888')=>{if(msgEl){msgEl.textContent=t;msgEl.style.color=c;}};
+        sm('正在解析...');
+        const reader=new FileReader();
+        reader.onload=e=>{
+            try{
+                const wb=XLSX.read(e.target.result,{type:'array'});
+                const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+                const res=this._parseRawRows(raw,file.name);
+                if(!res.ok){sm('❌ '+res.error,'#dc3545');return;}
+                sm(`已解析 ${res.records.length} 条，上传中...`);
+                this._doUpload(res,null,sm);
+            }catch(err){sm('❌ '+err.message,'#dc3545');}
+        };
+        reader.readAsArrayBuffer(file);
     }
 
-    // ── 渲染表格 ────────────────────────────────────────────────────────
-    _renderTable(rows) {
-        const wrap = document.getElementById('bt-table-wrap');
-        const countEl = document.getElementById('bt-count');
-        if (!wrap) return;
-
-        if (countEl) countEl.textContent = `${rows.length} 条`;
-
-        if (rows.length === 0) {
-            wrap.innerHTML = '<div style="color:#666666;font-size:12px;padding:20px 0">暂无数据</div>';
-            return;
-        }
-
-        // 按主题分组
-        const grouped = {};
-        rows.forEach(r => {
-            const t = r.topic || '其他';
-            if (!grouped[t]) grouped[t] = [];
-            grouped[t].push(r);
+    _doUpload(result,msgEl,setMsg) {
+        fetch('/api/blogger-signals',{
+            method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify(result.records),
+        })
+        .then(r=>r.json())
+        .then(res=>{
+            const bj=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Shanghai'}));
+            const ts=`${bj.getFullYear()}-${String(bj.getMonth()+1).padStart(2,'0')}-${String(bj.getDate()).padStart(2,'0')} ${String(bj.getHours()).padStart(2,'0')}:${String(bj.getMinutes()).padStart(2,'0')}`;
+            const dup=result.originalCount>(res.unique||res.inserted)?`，${result.originalCount-(res.unique||res.inserted)}条重复已合并`:'';
+            const txt=res.success?`✅ 成功 ${res.inserted} 条${dup} | ${ts}`:`❌ ${res.error}`;
+            const c=res.success?'#28a745':'#dc3545';
+            if(msgEl){msgEl.textContent=txt;msgEl.style.color=c;}
+            if(setMsg)setMsg(txt,c);
+            if(res.success){this._refreshGlobalSignals();if(window.activeTab==='blogger-tracker')this._loadAndRender();}
+        })
+        .catch(()=>{
+            if(msgEl){msgEl.textContent='❌ 网络错误';msgEl.style.color='#dc3545';}
+            if(setMsg)setMsg('❌ 网络错误','#dc3545');
         });
-
-        let html = '';
-        for (const [topic, items] of Object.entries(grouped)) {
-            html += `<div style="font-size:11px;font-weight:500;color:#666666;
-                letter-spacing:.5px;padding:12px 0 6px;border-bottom:0.5px solid #2a2a2a;
-                margin-bottom:4px">${topic}</div>`;
-
-            // 表头
-            html += `<div class="bt-row bt-hd" style="border-bottom:none">
-                <span>博主</span><span>操作</span><span>金额</span>
-                <span>基金名称</span><span>代码</span><span>近一年</span>
-            </div>`;
-
-            items.forEach(r => {
-                const isMine = this._myFundCodes.includes(String(r.fund_code));
-                const actionCls = r.action === '买入' ? 'bt-buy' : r.action === '卖出' ? 'bt-sell' : 'bt-dip';
-                const mineTag = isMine ? '<span class="bt-tag">自选</span>' : '';
-                const yr = r.yearly_return ? `+${(parseFloat(r.yearly_return)*100||0).toFixed(0)}%` : '';
-
-                html += `<div class="bt-row${isMine ? ' bt-mine' : ''}">
-                    <span style="color:#e0e0e0">${r.blogger_name}</span>
-                    <span class="${actionCls}">${r.action}</span>
-                    <span style="color:#aaaaaa">${r.amount || '--'}</span>
-                    <span style="color:#e0e0e0">${r.fund_name}${mineTag}</span>
-                    <span style="color:#666666;font-family:"SF Mono", "Fira Code", monospace;font-size:11px">${r.fund_code}</span>
-                    <span style="color:#aaaaaa">${yr}</span>
-                </div>`;
-            });
-
-            html += '<div style="margin-bottom:16px"></div>';
-        }
-
-        wrap.innerHTML = html;
     }
 
-    // ── 空状态 ──────────────────────────────────────────────────────────
-    _renderEmpty() {
-        const wrap = document.getElementById('bt-table-wrap');
-        if (wrap) wrap.innerHTML = `
-            <div style="color:#666666;font-size:12px;padding:30px 0;text-align:center">
-                暂无数据，请上传博主实盘 xlsx 文件
-            </div>`;
+    _parseRawRows(raw,fileName) {
+        let hi=-1;
+        for(let i=0;i<Math.min(raw.length,5);i++){
+            const s=(raw[i]||[]).map(c=>String(c)).join('');
+            if(s.includes('博主')&&s.includes('操作')){hi=i;break;}
+        }
+        if(hi===-1)return{ok:false,error:'未找到表头行（需包含"博主"和"操作"列）'};
+        const hr=raw[hi],ci={};
+        hr.forEach((h,i)=>{
+            const k=String(h).trim();
+            if(k.includes('主题'))ci.topic=i;
+            if(k.includes('博主'))ci.bn=i;
+            if(k.includes('近一年'))ci.yr=i;
+            if(k.includes('操作'))ci.action=i;
+            if(k.includes('金额'))ci.amount=i;
+            if(k.includes('基金名'))ci.fn=i;
+            if(k.includes('基金代码')||k.includes('fund_code'))ci.fc=i;
+        });
+        hr.forEach((h,i)=>{if(String(h).trim().includes('修正后名称'))ci.fn=i;});
+        if(ci.fc===undefined)return{ok:false,error:'文件里没有"基金代码"列，请新增后重试'};
+
+        let fileDate='';
+        for(let i=0;i<hi;i++){
+            const m=String((raw[i]||[]).join('')).match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+            if(m){fileDate=`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;break;}
+        }
+        if(!fileDate){
+            const fn=(fileName||'').replace(/\.xlsx?$/i,'');
+            const m3=fn.match(/^(\d{1,2})[_\-](\d{1,2})/);
+            if(m3)fileDate=`${new Date().getFullYear()}-${m3[1].padStart(2,'0')}-${m3[2].padStart(2,'0')}`;
+            else{const m2=fn.match(/(\d{4})(\d{2})(\d{2})/);
+                if(m2)fileDate=`${m2[1]}-${m2[2]}-${m2[3]}`;
+                else{const bj=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Shanghai'}));
+                    fileDate=`${bj.getFullYear()}-${String(bj.getMonth()+1).padStart(2,'0')}-${String(bj.getDate()).padStart(2,'0')}`;}}
+        }
+
+        const recs=[],VALID=new Set(['买入','卖出','定投']);
+        let ct='';
+        for(let i=hi+1;i<raw.length;i++){
+            const row=raw[i];
+            if(!row||row.every(c=>c===''||c===null||c===undefined))continue;
+            const tv=String(row[ci.topic]??'').trim().replace(/[\u200b\u00a0\u200c]/g,'');
+            if(tv&&tv!=='undefined'&&tv!=='nan')ct=tv;
+            const fcR=row[ci.fc];
+            if(fcR==null||String(fcR) in {'':'','nan':'','undefined':''})continue;
+            let fc;try{fc=String(Math.floor(Number(String(fcR)))).padStart(6,'0');}catch{continue;}
+            if(!fc||fc==='000000'||fc.includes('NaN'))continue;
+            const fn=ci.fn!==undefined?String(row[ci.fn]??'').trim():'';
+            if(!fn||fn==='nan')continue;
+            const action=String(row[ci.action]??'').trim();
+            const blogger=String(row[ci.bn]??'').trim();
+            if(!blogger||!VALID.has(action))continue;
+            recs.push({date:fileDate,blogger_name:blogger,fund_code:fc,fund_name:fn,action,
+                amount:String(row[ci.amount]??'').trim(),topic:ct,
+                yearly_return:String(row[ci.yr]??'').trim()});
+        }
+        if(!recs.length)return{ok:false,error:`未解析到有效数据（表头第${hi+1}行，共${raw.length-hi-1}行）`};
+        const dd={};
+        recs.forEach(r=>{
+            const k=`${r.blogger_name}||${r.fund_code}||${r.action}`;
+            if(!dd[k])dd[k]={...r};
+            else dd[k].amount=[dd[k].amount,r.amount].filter(Boolean).join('+');
+        });
+        return{ok:true,records:Object.values(dd),fileDate,originalCount:recs.length};
+    }
+
+    _refreshGlobalSignals() {
+        fetch('/api/blogger-signals')
+            .then(r=>r.ok?r.json():[])
+            .then(data=>{
+                window._bloggerSignals=data||[];
+                if(window.activeTab!=='blogger-tracker'){
+                    try{
+                        const cached=cacheManager.get('fundsList');
+                        if(cached&&typeof renderFunds==='function')renderFunds(cached);
+                    }catch(_){}
+                }
+            }).catch(()=>{});
     }
 }
 
-// 初始化并挂载到全局
 const bloggerTracker = new BloggerTracker();
 window.bloggerTracker = bloggerTracker;
-
-// 页面加载后静默预拉博主信号，供基金列表标签显示
 bloggerTracker._refreshGlobalSignals();
-
-// 监听其他 tab 切换时隐藏博主追踪界面
-window.addEventListener('updateFundList', () => {
-    if (window.activeTab !== 'blogger-tracker') bloggerTracker.hide();
-});
