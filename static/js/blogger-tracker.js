@@ -5,91 +5,59 @@ class BloggerTracker {
         this._signals     = [];
         this._myFundCodes = [];
         this._currentRange  = '7D';
-        this._currentAction = '';
         this._cache = {};
     }
 
     show() {
+        if (window.activeTab !== 'blogger-tracker') return;
         const container = document.getElementById('funds-container');
         if (!container) return;
-        ['fund-list-header','fund-list-subheader'].forEach(id => {
-            const el = document.getElementById(id); if (el) el.style.display = 'none';
-        });
-        const searchBar = document.querySelector('.search-container');
-        if (searchBar) searchBar.style.display = 'none';
-        this._renderShell(container);
-        this._loadMyFundCodes();
-        this._loadAndRender();
+        const header = document.getElementById('fund-list-header');
+        if (header) header.style.display = 'none';
+        const sb = document.querySelector('.search-container');
+        if (sb) sb.style.display = 'none';
+        // 直接写 loading，同步，无中间状态
+        const r = this._currentRange, a = this._currentAction;
+        container.innerHTML = '<div id="bt-root"><style>'
+            + '#bt-root{font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#e0e0e0}'
+            + '.bt-spin{width:20px;height:20px;border:2px solid #252525;border-top-color:#007bff;border-radius:50%;animation:btspin .8s linear infinite}'
+            + '@keyframes btspin{to{transform:rotate(360deg)}}'
+            + '</style>'
+            + '<div style="padding:16px 20px 8px;font-size:18px;font-weight:600;color:#fff">博主追踪 · 分析报告</div>'
+            + '<div style="padding:0 20px;font-size:11px;color:#444;margin-bottom:12px">加载中...</div>'
+            + '<div style="display:flex;align-items:center;gap:12px;padding:60px 20px">'
+            + '<div class="bt-spin"></div>'
+            + '<div><div style="font-size:13px;color:#555">正在读取数据...</div>'
+            + '<div style="font-size:11px;color:#333;margin-top:4px">通常 1-2 秒</div></div>'
+            + '</div></div>';
+        this._fetchAndRender(container);
     }
 
-    hide() {
-        const searchBar = document.querySelector('.search-container');
-        if (searchBar) searchBar.style.display = '';
-        ['fund-list-header','fund-list-subheader'].forEach(id => {
-            const el = document.getElementById(id); if (el) el.style.display = '';
-        });
-    }
-
-    _loadMyFundCodes() {
-        fetch('/api/funds?basic=true')
-            .then(r => r.ok ? r.json() : [])
-            .then(funds => { this._myFundCodes = (funds||[]).map(f => String(f.code)); })
-            .catch(() => {});
-    }
-
-    _loadAndRender() {
+    _fetchAndRender(container) {
         const days = this._currentRange === '1D' ? 1 : this._currentRange === '3D' ? 3 : 7;
-        const cacheKey = 'bt_' + days;
-        const cached = this._cache[cacheKey];
-        // 有缓存（5分钟内）直接渲染，后台静默刷新
-        if (cached && (Date.now() - cached.ts) < 5 * 60 * 1000) {
-            this._signals = cached.data;
+        const key  = 'bt_' + days;
+        const cached = this._cache[key];
+
+        const done = (data) => {
+            if (window.activeTab !== 'blogger-tracker') return;
+            this._signals = Array.isArray(data) ? data : [];
             window._bloggerSignals = this._signals;
-            const cl = document.getElementById('bt-loading');
-            const cm = document.getElementById('bt-main');
-            if (cl) cl.style.display = 'none';
-            if (cm) cm.style.display = 'block';
+            this._renderShell(container);
+            const main = document.getElementById('bt-main');
+            if (!main) { console.error('[bt] bt-main not found after renderShell'); return; }
             try { this._signals.length > 0 ? this._renderReport() : this._renderEmpty(); }
-            catch(e) { console.error('[bt] render error:', e); this._renderErrorState(e); }
-            return;
-        }
-
-        // 每次都用 getElementById 避免闭包持有旧 DOM 引用
-        const show = () => {
-            const l = document.getElementById('bt-loading');
-            const m = document.getElementById('bt-main');
-            if (l) l.style.display = 'none';
-            if (m) m.style.display = 'block';
+            catch(e) { console.error('[bt] render error:', e); main.innerHTML = '<div style="padding:30px 20px;color:#555;font-size:12px;text-align:center">渲染出错: '+(e&&e.message||'unknown')+'</div>'; }
         };
-        const loading = document.getElementById('bt-loading');
-        if (loading) loading.style.display = 'flex';
-        const m0 = document.getElementById('bt-main');
-        if (m0) m0.style.display = 'none';
 
-        // 更新加载提示
-        setTimeout(() => {
-            const lt = document.getElementById('bt-loading-txt');
-            const ls = document.getElementById('bt-loading-sub');
-            if (lt) lt.textContent = '正在处理数据...';
-            if (ls) ls.textContent = '数据已接收，渲染中';
-        }, 900);
+        if (cached && (Date.now() - cached.ts) < 5*60*1000) { done(cached.data); return; }
 
         fetch('/api/blogger-signals?days=' + days)
             .then(r => r.ok ? r.json() : [])
-            .then(data => {
-                this._signals = data || [];
-                window._bloggerSignals = this._signals;
-                this._cache[cacheKey] = { data: this._signals, ts: Date.now() };
-                show();
-                try { this._signals.length > 0 ? this._renderReport() : this._renderEmpty(); }
-                catch(e) { console.error('[bt] render error:', e); this._renderErrorState(e); }
-            })
-            .catch(e => {
-                console.error('[bt] fetch error:', e);
-                show();
-                this._renderEmpty();
-            });
+            .then(data => { this._cache[key] = {data: data||[], ts: Date.now()}; done(data||[]); })
+            .catch(e => { console.error('[bt] fetch error:', e); done([]); });
     }
+
+    _loadAndRender() { this._fetchAndRender(document.getElementById('funds-container')); }
 
     _renderShell(container) {
         const r = this._currentRange, a = this._currentAction;
@@ -104,9 +72,6 @@ class BloggerTracker {
             + '.bt-seg{display:flex;background:#1a1a1a;border-radius:7px;padding:2px;gap:1px;border:0.5px solid #252525}'
             + '.bt-seg-btn{padding:4px 12px;border-radius:5px;font-size:11px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#555;transition:all .15s}'
             + '.bt-seg-btn.on{background:#2a2a2a;color:#e0e0e0}'
-            + '.bt-aseg{display:flex;gap:4px}'
-            + '.bt-abtn{padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;border:0.5px solid #252525;background:#141414;color:#555;transition:all .15s}'
-            + '.bt-abtn.on{background:#2a2a2a;color:#ddd;border-color:#333}'
             + '.bt-ubar{margin:0 20px 12px;padding:10px 14px;background:#141414;border:0.5px dashed #252525;border-radius:8px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .15s}'
             + '.bt-ubar:hover{border-color:#333}'
             + '.bt-umsg{font-size:11px;padding:6px 14px;margin:0 20px 10px;background:#1a1a1a;border-radius:6px;display:none}'
@@ -161,6 +126,9 @@ class BloggerTracker {
             + '.bt-trend-col{flex:1;display:flex;flex-direction:column;gap:1px;align-items:center}'
             + '.bt-trend-bar{width:100%;border-radius:2px 2px 0 0;min-height:2px}'
             + '.bt-trend-lbl{font-size:9px;color:#333;margin-top:3px;white-space:nowrap}'
+            + '.bt-collapse-hd:hover{background:#1a1a1a!important}'
+            + '.bt-lv{font-size:10px;color:#555;margin-left:3px;flex-shrink:0}'
+            + '.bt-lpct{font-size:9px;color:#2a2a2a;margin-left:2px;flex-shrink:0}'
             + '</style>'
 
             + '<div class="bt-hdr"><div>'
@@ -171,11 +139,6 @@ class BloggerTracker {
             + '<button class="bt-seg-btn' + (r==='1D'?' on':'') + '" data-range="1D">1D</button>'
             + '<button class="bt-seg-btn' + (r==='3D'?' on':'') + '" data-range="3D">3D</button>'
             + '<button class="bt-seg-btn' + (r==='7D'?' on':'') + '" data-range="7D">7D</button>'
-            + '</div><div class="bt-aseg">'
-            + '<button class="bt-abtn' + (a===''?' on':'') + '" data-action="">全部</button>'
-            + '<button class="bt-abtn' + (a==='买入'?' on':'') + '" data-action="买入">买入</button>'
-            + '<button class="bt-abtn' + (a==='卖出'?' on':'') + '" data-action="卖出">卖出</button>'
-            + '<button class="bt-abtn' + (a==='定投'?' on':'') + '" data-action="定投">定投</button>'
             + '</div></div></div>'
 
             + '<div class="bt-ubar" id="bt-ubar">'
@@ -210,8 +173,7 @@ class BloggerTracker {
         document.getElementById('bt-root').addEventListener('click', e => {
             const rb = e.target.closest('.bt-seg-btn');
             if (rb) { this._currentRange = rb.dataset.range; this.show(); return; }
-            const ab = e.target.closest('.bt-abtn');
-            if (ab) { this._currentAction = ab.dataset.action; this._renderReport(); }
+            // 操作筛选按钮已移除
         });
     }
 
@@ -230,7 +192,7 @@ class BloggerTracker {
     _renderReport() {
         const main = document.getElementById('bt-main');
         if (!main) return;
-        const data = this._currentAction ? this._signals.filter(r => r.action === this._currentAction) : this._signals;
+        const data = this._signals; // 不再按操作类型筛选，显示全部
         const COLORS = ['#3b82f6','#ef4444','#f59e0b','#10b981','#8b5cf6','#f97316','#06b6d4','#ec4899','#84cc16','#6366f1'];
 
         const totalBuy  = data.filter(r => r.action === '买入').length;
@@ -287,29 +249,34 @@ class BloggerTracker {
         const dateTrend = Object.entries(dateMap).sort((a,b)=>a[0].localeCompare(b[0]));
         const maxDay = dateTrend.reduce((m,[,v])=>Math.max(m,v.buy+v.sell+v.dip),1);
 
-        // donut SVG（纯字符串拼接，不用模板字符串）
+        // 圆环图：正圆，图例含百分比
         const donut = (items, field, color, title) => {
             const filtered = items.filter(([,s])=>s[field]>0).slice(0,8);
             if (!filtered.length) return '';
             const total = filtered.reduce((s,[,v])=>s+v[field],0);
-            const R=36,cx=40,cy=40,sw=12,circ=2*Math.PI*R;
+            // 使用正方形 viewBox 确保是正圆
+            const R=42,cx=52,cy=52,sw=14,circ=2*Math.PI*R;
             let off=0, slices='';
-            filtered.forEach(([t,s],i) => {
-                const d=(s[field]/total)*circ;
+            filtered.forEach(([t,st],i) => {
+                const d=(st[field]/total)*circ;
                 slices += '<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="'+COLORS[i%10]+'"'
-                    + ' stroke-width="'+sw+'" stroke-dasharray="'+d.toFixed(1)+' '+(circ-d).toFixed(1)+'"'
-                    + ' stroke-dashoffset="'+(-(off/total)*circ).toFixed(1)+'" transform="rotate(-90 '+cx+' '+cy+')"/>';
-                off+=s[field];
+                    + ' stroke-width="'+sw+'" stroke-dasharray="'+d.toFixed(2)+' '+(circ-d).toFixed(2)+'"'
+                    + ' stroke-dashoffset="'+(-(off/total)*circ).toFixed(2)+'" transform="rotate(-90 '+cx+' '+cy+')"/>';
+                off+=st[field];
             });
-            const legend = filtered.slice(0,6).map(([t,s],i) =>
-                '<div class="bt-li"><div class="bt-ld" style="background:'+COLORS[i%10]+'"></div>'
-                +'<span class="bt-ln">'+t+'</span><span class="bt-lv">'+s[field]+'</span></div>'
-            ).join('');
+            const legend = filtered.slice(0,6).map(([t,st],i) => {
+                const pct = (st[field]/total*100).toFixed(1);
+                return '<div class="bt-li"><div class="bt-ld" style="background:'+COLORS[i%10]+'"></div>'
+                    +'<span class="bt-ln">'+t+'</span>'
+                    +'<span class="bt-lv" style="color:#555">'+st[field]+'</span>'
+                    +'<span style="font-size:9px;color:#333;margin-left:3px;flex-shrink:0">('+pct+'%)</span></div>';
+            }).join('');
             return '<div class="bt-dc"><div class="bt-dh" style="color:'+color+'">'+title+'</div>'
-                +'<div class="bt-di"><svg viewBox="0 0 80 80" style="width:70px;height:70px;flex-shrink:0">'
-                +'<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="#111" stroke-width="'+sw+'"/>'
+                +'<div class="bt-di"><svg viewBox="0 0 104 104" style="width:84px;height:84px;flex-shrink:0">'
+                +'<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="#1a1a1a" stroke-width="'+sw+'"/>'
                 +slices
-                +'<text x="'+cx+'" y="'+cy+'" text-anchor="middle" dominant-baseline="middle" fill="#555" font-size="11" font-weight="600">'+total+'</text>'
+                +'<text x="'+cx+'" y="'+(cy-6)+'" text-anchor="middle" dominant-baseline="middle" fill="#666" font-size="14" font-weight="700">'+total+'</text>'
+                +'<text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" dominant-baseline="middle" fill="#333" font-size="9">操作</text>'
                 +'</svg><div class="bt-dl">'+legend+'</div></div></div>';
         };
 
@@ -364,8 +331,29 @@ class BloggerTracker {
             byDate[d][t].push(r);
         });
         let detail = '';
-        Object.keys(byDate).sort().reverse().forEach(date => {
-            detail += '<div class="bt-ddate">'+date+'</div>';
+        const dateKeys = Object.keys(byDate).sort().reverse();
+        dateKeys.forEach((date, di) => {
+            // 统计当天数量
+            const dayTotal = Object.values(byDate[date]).reduce((s,arr)=>s+arr.length, 0);
+            const dayBuy  = Object.values(byDate[date]).reduce((s,arr)=>s+arr.filter(r=>r.action==='买入').length, 0);
+            const daySell = Object.values(byDate[date]).reduce((s,arr)=>s+arr.filter(r=>r.action==='卖出').length, 0);
+            const dayDip  = dayTotal - dayBuy - daySell;
+            const isFirst = di === 0; // 最新日期默认展开
+            const colId = 'btd-'+date.replace(/-/g,'');
+            detail += '<div style="border:0.5px solid #1e1e1e;border-radius:8px;margin-bottom:8px;overflow:hidden">'
+                // 折叠头部
+                +'<div data-btcol="'+colId+'" onclick="window._btToggle(this.dataset.btcol)" '
+                +'style="display:flex;align-items:center;padding:10px 14px;cursor:pointer;background:#141414;user-select:none">'
+                +'<span style="font-size:12px;font-weight:600;color:#007bff;flex:1">'+date+'</span>'
+                +'<span style="font-size:10px;color:#444;display:flex;gap:8px;margin-right:10px">'
+                +(dayBuy?'<span style="color:#dc3545">'+dayBuy+'买</span>':'')
+                +(daySell?'<span style="color:#28a745">'+daySell+'卖</span>':'')
+                +(dayDip?'<span style="color:#f59e0b">'+dayDip+'投</span>':'')
+                +'</span>'
+                +'<span class="bt-arrow" style="color:#333;font-size:12px;transition:transform .2s;transform:'+(isFirst?'rotate(90deg)':'rotate(0deg)')+'">▶</span>'
+                +'</div>'
+                // 内容区
+                +'<div id="'+colId+'" style="display:'+(isFirst?'block':'none')+';padding:0 10px 8px">';
             Object.entries(byDate[date]).forEach(([topic,items]) => {
                 detail += '<div class="bt-dtopic">'+topic+'</div>'
                     +'<div class="bt-dhd"><span>博主</span><span>操作</span><span>金额</span><span>基金名称</span><span>代码</span><span>近一年</span></div>';
@@ -375,13 +363,13 @@ class BloggerTracker {
                     const yr=r.yearly_return?'+'+((parseFloat(r.yearly_return)*100)||0).toFixed(0)+'%':'--';
                     detail += '<div class="bt-drow'+(mine?' bt-dmine':'')+'"><span style="color:#bbb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.blogger_name+'</span>'
                         +'<span class="'+ac+'">'+r.action+'</span>'
-                        +'<span style="color:#666">'+( r.amount||'--')+'</span>'
+                        +'<span style="color:#666">'+(r.amount||'--')+'</span>'
                         +'<span style="color:#bbb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.fund_name+(mine?'<span class="bt-mt">自选</span>':'')+'</span>'
                         +'<span style="color:#333;font-family:monospace;font-size:10px">'+r.fund_code+'</span>'
                         +'<span style="color:#555">'+yr+'</span></div>';
                 });
             });
-            detail += '<div style="margin-bottom:14px"></div>';
+            detail += '</div></div>';
         });
 
         // 组装
@@ -407,6 +395,70 @@ class BloggerTracker {
             +donut(topicSorted,'sell','#28a745','卖出主题')
             +donut(topicSorted,'dip','#f59e0b','定投主题')
             +'</div></div>';
+
+        // 折线图：各日期 Top5 主题的买入趋势
+        if (dateTrend.length > 1) {
+            // 找买入 Top5 主题
+            const top5Topics = topicSorted.slice(0,5).map(([t])=>t);
+            // 按日期×主题统计买入数
+            const topicByDate = {};
+            data.forEach(r => {
+                if (r.action !== '买入') return;
+                if (!topicByDate[r.date]) topicByDate[r.date] = {};
+                const t = r.topic||'其他';
+                topicByDate[r.date][t] = (topicByDate[r.date][t]||0)+1;
+            });
+            const lineW = 520, lineH = 120, padL = 28, padB = 20, padT = 10, padR = 10;
+            const chartW = lineW - padL - padR, chartH = lineH - padT - padB;
+            const dates = dateTrend.map(([d])=>d);
+            const maxVal = Math.max(...dates.flatMap(d => top5Topics.map(t => topicByDate[d]&&topicByDate[d][t]||0)), 1);
+            const xStep = chartW / Math.max(dates.length-1, 1);
+            // Y轴刻度
+            const yTicks = [0, Math.round(maxVal/2), maxVal];
+            let yAxis = '';
+            yTicks.forEach(v => {
+                const y = padT + chartH - (v/maxVal)*chartH;
+                yAxis += '<line x1="'+(padL-4)+'" y1="'+y.toFixed(1)+'" x2="'+(padL+chartW)+'" y2="'+y.toFixed(1)+'" stroke="#1a1a1a" stroke-width="0.5"/>'
+                    +'<text x="'+(padL-6)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" fill="#333" font-size="8">'+v+'</text>';
+            });
+            // 各主题折线
+            let lines = '', dots = '';
+            top5Topics.forEach((topic, ti) => {
+                const pts = dates.map((d,i) => {
+                    const v = topicByDate[d]&&topicByDate[d][topic]||0;
+                    const x = padL + i*xStep;
+                    const y = padT + chartH - (v/maxVal)*chartH;
+                    return {x, y, v};
+                });
+                const path = pts.map((p,i)=>(i===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+                lines += '<path d="'+path+'" fill="none" stroke="'+COLORS[ti%10]+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>';
+                pts.forEach((p,i) => {
+                    if (p.v > 0) {
+                        dots += '<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3" fill="'+COLORS[ti%10]+'" stroke="#141414" stroke-width="1.5"/>';
+                    }
+                });
+            });
+            // X轴日期标签
+            let xLabels = '';
+            dates.forEach((d,i) => {
+                const x = padL + i*xStep;
+                xLabels += '<text x="'+x.toFixed(1)+'" y="'+(lineH-4)+'" text-anchor="middle" fill="#333" font-size="8">'+d.slice(5)+'</text>';
+            });
+            // 图例
+            const legendItems = top5Topics.map((t,i)=>
+                '<span style="display:inline-flex;align-items:center;gap:3px;margin-right:10px;font-size:10px;color:#888">'
+                +'<span style="width:16px;height:2px;background:'+COLORS[i%10]+';border-radius:1px;display:inline-block"></span>'
+                +t+'</span>'
+            ).join('');
+
+            html += '<div class="bt-sec"><div class="bt-sh">买入主题趋势（近'+this._currentRange+'）</div>'
+                +'<div style="background:#141414;border:0.5px solid #1e1e1e;border-radius:10px;padding:14px">'
+                +'<div style="margin-bottom:10px">'+legendItems+'</div>'
+                +'<div style="overflow-x:auto"><svg viewBox="0 0 '+lineW+' '+lineH+'" style="width:100%;min-width:260px;height:'+lineH+'px">'
+                +yAxis+lines+dots+xLabels
+                +'</svg></div>'
+                +'</div></div>';
+        }
 
         html += '<div class="bt-sec"><div class="bt-sh">博主买入 TOP'+Math.min(20,fundsSorted.length)+' 基金</div>'
             +'<div style="background:#141414;border:0.5px solid #1e1e1e;border-radius:10px;padding:8px">'
@@ -526,3 +578,14 @@ class BloggerTracker {
 const bloggerTracker = new BloggerTracker();
 window.bloggerTracker = bloggerTracker;
 bloggerTracker._refreshGlobalSignals();
+
+// 明细折叠切换（全局函数，避免 onclick 里的引号冲突）
+window._btToggle = function(colId) {
+    const c = document.getElementById(colId);
+    const hd = document.querySelector('[data-btcol="'+colId+'"]');
+    if (!c || !hd) return;
+    const open = c.style.display !== 'none';
+    c.style.display = open ? 'none' : 'block';
+    const arrow = hd.querySelector('.bt-arrow');
+    if (arrow) arrow.style.transform = open ? 'rotate(0deg)' : 'rotate(90deg)';
+};
