@@ -105,7 +105,7 @@ class BloggerTracker {
             + '.bt-r1{color:#ffc107}.bt-r2{color:#888}.bt-r3{color:#cd7f32}'
             + '.bt-tn{overflow:hidden}'
             + '.bt-tf{font-size:12px;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
-            + '.bt-tc{font-size:10px;color:#333;font-family:monospace;margin-top:1px}'
+            + '.bt-tc{font-size:12px;color:#504a4a;font-family:monospace;margin-top:1px}'
             + '.bt-bw{position:relative;height:3px;background:#1a1a1a;border-radius:2px;margin-top:3px}'
             + '.bt-bb{height:100%;border-radius:2px;background:linear-gradient(90deg,#dc3545,#ff6b6b)}'
             + '.bt-ts{font-size:11px;text-align:center;font-variant-numeric:tabular-nums}'
@@ -277,14 +277,14 @@ class BloggerTracker {
                 return '<div class="bt-li"><div class="bt-ld" style="background:'+COLORS[i%10]+'"></div>'
                     +'<span class="bt-ln">'+t+'</span>'
                     +'<span class="bt-lv" style="color:#555">'+st[field]+'</span>'
-                    +'<span style="font-size:9px;color:#2a2a2a;margin-left:2px;flex-shrink:0">('+pct+'%)</span></div>';
+                    +'<span style="font-size:11px;color:#4e4c4c;margin-left:2px;flex-shrink:0">('+pct+'%)</span></div>';
             }).join('');
             return '<div class="bt-dc"><div class="bt-dh" style="color:'+color+'">'+title+'</div>'
                 +'<div class="bt-di"><svg viewBox="0 0 128 128" style="width:110px;height:110px">'
                 +'<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="#1a1a1a" stroke-width="'+sw+'"/>'
                 +slices
                 +'<text x="'+cx+'" y="'+(cy-7)+'" text-anchor="middle" dominant-baseline="middle" fill="#666" font-size="16" font-weight="700">'+total+'</text>'
-                +'<text x="'+cx+'" y="'+(cy+11)+'" text-anchor="middle" dominant-baseline="middle" fill="#333" font-size="10">操作</text>'
+                +'<text x="'+cx+'" y="'+(cy+11)+'" text-anchor="middle" dominant-baseline="middle" fill="#4e4c4c" font-size="12">操作</text>'
                 +'</svg>'
                 +'<div class="bt-dl" style="display:grid;grid-template-columns:1fr 1fr;gap:2px 8px">'+legend+'</div></div></div>';
         };
@@ -297,7 +297,7 @@ class BloggerTracker {
             const rCls = i===0?' bt-r1':i===1?' bt-r2':i===2?' bt-r3':'';
             return '<div class="bt-tr'+(mine?' bt-mr':'')+'" style="grid-template-columns:28px 1fr 38px 38px 38px 38px 32px"><span class="bt-ti'+rCls+'">'+medal+'</span>'
                 +'<div class="bt-tn"><div class="bt-tf">'+f.name+(mine?'<span class="bt-mt">自选</span>':'')+'</div>'
-                +'<div class="bt-tc">'+f.code+(f.topic?' · <span style="color:#2a2a2a">'+f.topic+'</span>':'')+'</div>'
+                +'<div class="bt-tc">'+f.code+(f.topic?' · <span style="color:#504a4a">'+f.topic+'</span>':'')+'</div>'
                 +'<div class="bt-bw"><div class="bt-bb" style="width:'+bw+'%"></div></div></div>'
                 +'<span class="bt-ts bt-bc">'+(f.buy?f.buy+'买':'')+'</span>'
                 +'<span class="bt-ts bt-sc2">'+(f.sell?f.sell+'卖':'')+'</span>'
@@ -398,7 +398,7 @@ class BloggerTracker {
         if (dateTrend.length > 1) {
             html += '<div class="bt-sec"><div class="bt-sh">操作趋势</div>'
                 +'<div style="background:#141414;border:0.5px solid #1e1e1e;border-radius:10px;padding:14px 14px 8px">'
-                +'<div style="display:flex;gap:12px;font-size:10px;color:#444;margin-bottom:8px">'
+                +'<div style="display:flex;gap:12px;font-size:10px;color:#444;margin-bottom:20px">'
                 +'<span><span style="color:#dc3545">■</span> 买入</span>'
                 +'<span><span style="color:#28a745">■</span> 卖出</span>'
                 +'<span><span style="color:#f59e0b">■</span> 定投</span></div>'
