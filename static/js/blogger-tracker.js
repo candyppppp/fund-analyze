@@ -23,7 +23,7 @@ class BloggerTracker {
             + '.bt-spin{width:20px;height:20px;border:2px solid #252525;border-top-color:#007bff;border-radius:50%;animation:btspin .8s linear infinite}'
             + '@keyframes btspin{to{transform:rotate(360deg)}}'
             + '</style>'
-            + '<div style="padding:16px 20px 8px;font-size:18px;font-weight:600;color:#fff">博主追踪 · 分析报告</div>'
+            + '<div style="padding:16px 20px 8px;font-size:18px;font-weight:600;color:#fff">博主分析报告</div>'
             + '<div style="padding:0 20px;font-size:11px;color:#444;margin-bottom:12px">加载中...</div>'
             + '<div style="display:flex;align-items:center;gap:12px;padding:60px 20px">'
             + '<div class="bt-spin"></div>'
@@ -87,7 +87,7 @@ class BloggerTracker {
             + '.bt-sl{font-size:11px;color:#444;margin-top:4px}'
             + '.bt-ss{font-size:11px;color:#555;margin-top:2px}'
             + '.bt-sec{padding:0 20px;margin-bottom:16px}'
-            + '.bt-sh{font-size:11px;font-weight:600;color:#444;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}'
+            + '.bt-sh{font-size:13px;font-weight:600;color:#cdcaca;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}'
             + '.bt-sh::after{content:"";flex:1;height:0.5px;background:#1a1a1a}'
             + '.bt-donuts{display:flex;gap:10px;flex-wrap:wrap}'
             + '.bt-dc{flex:1;min-width:150px;background:#141414;border:0.5px solid #1e1e1e;border-radius:10px;padding:14px}'
@@ -272,7 +272,7 @@ class BloggerTracker {
                 return '<div class="bt-li"><div class="bt-ld" style="background:'+COLORS[i%10]+'"></div>'
                     +'<span class="bt-ln">'+t+'</span>'
                     +'<span class="bt-lv" style="color:#555">'+st[field]+'</span>'
-                    +'<span style="font-size:9px;color:#333;margin-left:3px;flex-shrink:0">('+pct+'%)</span></div>';
+                    +'<span style="font-size:9px;color:#565252;margin-left:3px;flex-shrink:0">('+pct+'%)</span></div>';
             }).join('');
             return '<div class="bt-dc"><div class="bt-dh" style="color:'+color+'">'+title+'</div>'
                 +'<div class="bt-di"><svg viewBox="0 0 104 104" style="width:84px;height:84px;flex-shrink:0">'
