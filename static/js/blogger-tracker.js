@@ -45,6 +45,7 @@ class BloggerTracker {
             this._renderShell(container);
             const main = document.getElementById('bt-main');
             if (!main) { console.error('[bt] bt-main not found after renderShell'); return; }
+            main.style.display = 'block';
             try { this._signals.length > 0 ? this._renderReport() : this._renderEmpty(); }
             catch(e) { console.error('[bt] render error:', e); main.innerHTML = '<div style="padding:30px 20px;color:#555;font-size:12px;text-align:center">渲染出错: '+(e&&e.message||'unknown')+'</div>'; }
         };
