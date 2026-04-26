@@ -46,6 +46,8 @@ class BloggerTracker {
             const main = document.getElementById('bt-main');
             if (!main) { console.error('[bt] bt-main not found after renderShell'); return; }
             main.style.display = 'block';
+            const btLoad = document.getElementById('bt-loading');
+            if (btLoad) btLoad.style.display = 'none';
             try { this._signals.length > 0 ? this._renderReport() : this._renderEmpty(); }
             catch(e) { console.error('[bt] render error:', e); main.innerHTML = '<div style="padding:30px 20px;color:#555;font-size:12px;text-align:center">渲染出错: '+(e&&e.message||'unknown')+'</div>'; }
         };
@@ -397,8 +399,8 @@ class BloggerTracker {
             +donut(topicSorted,'dip','#f59e0b','定投主题')
             +'</div></div>';
 
-        // 折线图：各日期 Top5 主题的买入趋势
-        if (dateTrend.length > 1) {
+        // 主题趋势图：多天用折线，单天用柱状
+        if (dateTrend.length >= 1) {
             // 找买入 Top5 主题
             const top5Topics = topicSorted.slice(0,5).map(([t])=>t);
             // 按日期×主题统计买入数
@@ -409,6 +411,29 @@ class BloggerTracker {
                 const t = r.topic||'其他';
                 topicByDate[r.date][t] = (topicByDate[r.date][t]||0)+1;
             });
+            // 单天时用水平柱状图，多天时用折线图
+            if (dateTrend.length === 1) {
+                const maxTopic = Math.max(...top5Topics.map(t => {
+                    const d = dateTrend[0][0];
+                    return topicByDate[d]&&topicByDate[d][t]||0;
+                }), 1);
+                const bars = top5Topics.map((t,i) => {
+                    const d = dateTrend[0][0];
+                    const v = topicByDate[d]&&topicByDate[d][t]||0;
+                    if (!v) return '';
+                    const w = Math.round(v/maxTopic*100);
+                    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+                        +'<span style="font-size:11px;color:#888;width:80px;text-align:right;flex-shrink:0">'+t+'</span>'
+                        +'<div style="flex:1;height:18px;background:#1a1a1a;border-radius:3px;overflow:hidden">'
+                        +'<div style="height:100%;width:'+w+'%;background:'+COLORS[i%10]+';border-radius:3px;display:flex;align-items:center;padding-left:6px">'
+                        +'<span style="font-size:10px;color:rgba(255,255,255,.8);font-weight:600">'+v+'</span>'
+                        +'</div></div></div>';
+                }).join('');
+                html += '<div class="bt-sec"><div class="bt-sh">主题买入分布（'+dateTrend[0][0]+'）</div>'
+                    +'<div style="background:#141414;border:0.5px solid #1e1e1e;border-radius:10px;padding:14px">'
+                    +bars+'</div></div>';
+                // 跳过折线图代码
+            } else {
             const lineW = 520, lineH = 120, padL = 28, padB = 20, padT = 10, padR = 10;
             const chartW = lineW - padL - padR, chartH = lineH - padT - padB;
             const dates = dateTrend.map(([d])=>d);
@@ -459,6 +484,7 @@ class BloggerTracker {
                 +yAxis+lines+dots+xLabels
                 +'</svg></div>'
                 +'</div></div>';
+            } // end else (多天折线图)
         }
 
         html += '<div class="bt-sec"><div class="bt-sh">博主买入 TOP'+Math.min(20,fundsSorted.length)+' 基金</div>'
