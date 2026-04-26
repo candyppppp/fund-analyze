@@ -87,7 +87,7 @@ class BloggerTracker {
             + '.bt-sl{font-size:11px;color:#444;margin-top:4px}'
             + '.bt-ss{font-size:11px;color:#555;margin-top:2px}'
             + '.bt-sec{padding:0 20px;margin-bottom:16px}'
-            + '.bt-sh{font-size:11px;font-weight:600;color:#444;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}'
+            + '.bt-sh{font-size:13px;font-weight:600;color:#756f6f;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}'
             + '.bt-sh::after{content:"";flex:1;height:0.5px;background:#1a1a1a}'
             + '.bt-donuts{display:grid;grid-template-columns:1fr 1fr;gap:12px}'
             + '.bt-dc{background:#141414;border:0.5px solid #1e1e1e;border-radius:10px;padding:16px}'
@@ -131,7 +131,7 @@ class BloggerTracker {
             + '.bt-trend-lbl{font-size:9px;color:#333;margin-top:3px;white-space:nowrap}'
             + '.bt-collapse-hd:hover{background:#1a1a1a!important}'
             + '.bt-lv{font-size:10px;color:#555;margin-left:3px;flex-shrink:0}'
-            + '.bt-lpct{font-size:9px;color:#2a2a2a;margin-left:2px;flex-shrink:0}'
+            + '.bt-lpct{font-size:10px;color:#6d6565;margin-left:2px;flex-shrink:0}'
             + '</style>'
 
             + '<div class="bt-hdr"><div>'
@@ -458,7 +458,7 @@ class BloggerTracker {
             yTicks.forEach(v => {
                 const y = padT + chartH - (v/maxVal)*chartH;
                 yAxis += '<line x1="'+(padL-4)+'" y1="'+y.toFixed(1)+'" x2="'+(padL+chartW)+'" y2="'+y.toFixed(1)+'" stroke="#1a1a1a" stroke-width="0.5"/>'
-                    +'<text x="'+(padL-6)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" fill="#333" font-size="8">'+v+'</text>';
+                    +'<text x="'+(padL-6)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" fill="#333" font-size="10">'+v+'</text>';
             });
             // 各主题折线
             let lines = '', dots = '';
@@ -481,7 +481,7 @@ class BloggerTracker {
             let xLabels = '';
             dates.forEach((d,i) => {
                 const x = padL + i*xStep;
-                xLabels += '<text x="'+x.toFixed(1)+'" y="'+(lineH-4)+'" text-anchor="middle" fill="#333" font-size="8">'+d.slice(5)+'</text>';
+                xLabels += '<text x="'+x.toFixed(1)+'" y="'+(lineH-4)+'" text-anchor="middle" fill="#333" font-size="10">'+d.slice(5)+'</text>';
             });
             // 图例
             const legendItems = top5Topics.map((t,i)=>
@@ -502,7 +502,7 @@ class BloggerTracker {
 
         html += '<div class="bt-sec"><div class="bt-sh">博主买入 TOP'+Math.min(20,fundsSorted.length)+' 基金</div>'
             +'<div style="background:#141414;border:0.5px solid #1e1e1e;border-radius:10px;padding:8px">'
-            +'<div class="bt-tr" style="font-size:10px;color:#333;padding:3px 10px;margin-bottom:2px;grid-template-columns:28px 1fr 38px 38px 38px 38px 32px"><span></span><span></span>'
+            +'<div class="bt-tr" style="font-size:12px;color:#333;padding:3px 10px;margin-bottom:2px;grid-template-columns:28px 1fr 38px 38px 38px 38px 32px"><span></span><span></span>'
             +'<span style="text-align:center">买入</span><span style="text-align:center">卖出</span><span style="text-align:center">定投</span><span style="text-align:center">清仓</span><span style="text-align:center">博主</span></div>'
             +'<div class="bt-tg">'+top20+'</div></div></div>';
 
