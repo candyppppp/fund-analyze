@@ -73,61 +73,111 @@ class BloggerTracker {
 
     // ── 把解析逻辑抽取为独立方法，供两个上传入口复用 ──────────────────────
     _parseRawRows(raw, fileName) {
-        const headerRow = raw[1] || raw[0];
+        // ── 自动检测表头行（找到包含"博主"和"操作"的那一行）────────────────
+        let headerRowIdx = -1;
+        for (let i = 0; i < Math.min(raw.length, 5); i++) {
+            const row = raw[i] || [];
+            const rowStr = row.map(c => String(c)).join('');
+            if (rowStr.includes('博主') && rowStr.includes('操作')) {
+                headerRowIdx = i;
+                break;
+            }
+        }
+        if (headerRowIdx === -1)
+            return { ok: false, error: '未找到表头行，请确认文件包含"博主"和"操作"列' };
+
+        const headerRow = raw[headerRowIdx];
         const colIdx = {};
         headerRow.forEach((h, i) => {
             const k = String(h).trim();
-            if (k.includes('主题'))   colIdx.topic         = i;
-            if (k.includes('博主'))   colIdx.blogger_name  = i;
-            if (k.includes('近一年')) colIdx.yearly_return = i;
-            if (k.includes('操作'))   colIdx.action        = i;
-            if (k.includes('金额'))   colIdx.amount        = i;
-            if (k.includes('基金名')) colIdx.fund_name     = i;
-            if (k.includes('代码') || k.includes('fund_code')) colIdx.fund_code = i;
+            if (k.includes('主题'))                             colIdx.topic         = i;
+            if (k.includes('博主'))                             colIdx.blogger_name  = i;
+            if (k.includes('近一年'))                           colIdx.yearly_return = i;
+            if (k.includes('操作'))                             colIdx.action        = i;
+            if (k.includes('金额'))                             colIdx.amount        = i;
+            if (k.includes('修正后名称') || k.includes('基金名称')) colIdx.fund_name  = i;
+            if (k.includes('基金代码') || k.includes('fund_code')) colIdx.fund_code  = i;
         });
+        // 如果同时有"修正后名称"和"基金名称"，优先用修正后名称
+        headerRow.forEach((h, i) => {
+            if (String(h).trim().includes('修正后名称')) colIdx.fund_name = i;
+        });
+
         if (colIdx.fund_code === undefined)
             return { ok: false, error: '文件里没有"基金代码"列，请新增后重试' };
 
-        // 推算日期
+        // ── 推算日期：从文件名或表头上方的标题行中提取 ──────────────────────
         let fileDate = '';
-        const titleText = String(raw[0]?.[0] || '');
-        const m1 = titleText.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
-        if (m1) {
-            fileDate = `${m1[1]}-${m1[2].padStart(2,'0')}-${m1[3].padStart(2,'0')}`;
-        } else {
-            const m2 = (fileName||'').match(/(\d{1,2})[_\-](\d{1,2})/);
-            if (m2) {
-                fileDate = `${new Date().getFullYear()}-${m2[1].padStart(2,'0')}-${m2[2].padStart(2,'0')}`;
+        // 先扫描表头行之前的行找日期
+        for (let i = 0; i < headerRowIdx; i++) {
+            const titleText = String(raw[i]?.[0] || '') + String(raw[i]?.[1] || '');
+            const m = titleText.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+            if (m) { fileDate = `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`; break; }
+        }
+        if (!fileDate) {
+            // 从文件名提取日期
+            // 优先找 M_DD 或 MM_DD 短格式（如 4_21_v3.xlsx），避免误识别时间戳（20260426_151258）
+            const _fn = (fileName || '').replace(/\.xlsx?$/i, '');
+            const m3 = _fn.match(/^(\d{1,2})[_\-](\d{1,2})/);  // 开头的 M_DD
+            if (m3) {
+                fileDate = `${new Date().getFullYear()}-${m3[1].padStart(2,'0')}-${m3[2].padStart(2,'0')}`;
             } else {
-                const bj = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Shanghai'}));
-                fileDate = `${bj.getFullYear()}-${String(bj.getMonth()+1).padStart(2,'0')}-${String(bj.getDate()).padStart(2,'0')}`;
+                // 降级：找 YYYYMMDD 格式
+                const m2 = _fn.match(/(\d{4})(\d{2})(\d{2})/);
+                if (m2) {
+                    fileDate = `${m2[1]}-${m2[2]}-${m2[3]}`;
+                } else {
+                    // 默认今天
+                    const bj = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Shanghai'}));
+                    fileDate = `${bj.getFullYear()}-${String(bj.getMonth()+1).padStart(2,'0')}-${String(bj.getDate()).padStart(2,'0')}`;
+                }
             }
         }
 
+        // ── 解析数据行 ──────────────────────────────────────────────────────
         const records = [];
         let currentTopic = '';
-        for (let i = 2; i < raw.length; i++) {
+        const VALID_ACTIONS = new Set(['买入','卖出','定投']);
+
+        for (let i = headerRowIdx + 1; i < raw.length; i++) {
             const row = raw[i];
-            if (!row || row.every(c => c === '')) continue;
-            const topicVal = String(row[colIdx.topic] ?? '').trim().replace(/[​ ​]/g,'').trim();
-            if (topicVal) currentTopic = topicVal;
-            const fund_code = String(row[colIdx.fund_code] ?? '').trim();
-            const fund_name = String(row[colIdx.fund_name] ?? '').trim();
-            const action    = String(row[colIdx.action]    ?? '').trim();
-            const blogger   = String(row[colIdx.blogger_name] ?? '').trim();
-            if (!fund_code || !fund_name || !action || !blogger) continue;
-            if (!['买入','卖出','定投'].includes(action)) continue;
+            if (!row || row.every(c => c === '' || c === null || c === undefined)) continue;
+
+            // 主题列（可能是合并单元格，有值就更新当前主题）
+            const topicVal = String(row[colIdx.topic] ?? '').trim().replace(/[​ ‌]/g,'').trim();
+            if (topicVal && topicVal !== 'undefined') currentTopic = topicVal;
+
+            const fund_code_raw = row[colIdx.fund_code];
+            const fund_code = fund_code_raw != null && String(fund_code_raw).trim() !== '' && String(fund_code_raw) !== 'NaN'
+                ? String(Math.floor(Number(fund_code_raw))).padStart(6, '0')  // 数字型代码补零
+                : '';
+            if (!fund_code) continue;  // 无代码（failed/all_rejected）跳过
+
+            // fund_name 优先修正后名称，降级原始名称
+            const fund_name_raw = colIdx.fund_name !== undefined ? String(row[colIdx.fund_name] ?? '').trim() : '';
+            const fund_name = fund_name_raw && fund_name_raw !== 'NaN' ? fund_name_raw
+                : String(row[headerRow.indexOf('基金名称')] ?? '').trim();
+            if (!fund_name) continue;
+
+            const action  = String(row[colIdx.action] ?? '').trim();
+            const blogger = String(row[colIdx.blogger_name] ?? '').trim();
+            if (!blogger || !VALID_ACTIONS.has(action)) continue;
+
             records.push({
-                date: fileDate, blogger_name: blogger,
-                fund_code, fund_name, action,
-                amount:        String(row[colIdx.amount]        ?? '').trim(),
+                date:          fileDate,
+                blogger_name:  blogger,
+                fund_code,
+                fund_name,
+                action,
+                amount:        String(row[colIdx.amount] ?? '').trim(),
                 topic:         currentTopic,
                 yearly_return: String(row[colIdx.yearly_return] ?? '').trim(),
             });
         }
+
         if (records.length === 0)
-            return { ok: false, error: '没有有效数据，请检查基金代码列是否填写' };
-        return { ok: true, records };
+            return { ok: false, error: `没有解析到有效数据（表头在第${headerRowIdx+1}行，共扫描${raw.length - headerRowIdx - 1}行，需要：有效基金代码 + 买入/卖出/定投）` };
+        return { ok: true, records, fileDate };
     }
 
     // ── 刷新全局信号数据（供基金列表标签使用）───────────────────────────
@@ -181,33 +231,33 @@ class BloggerTracker {
 <div id="bt-wrap" style="padding:0 4px">
   <!-- 上传区 -->
   <div id="bt-upload-area" style="
-    border:1.5px dashed var(--color-border-secondary);
+    border:1.5px dashed #333333;
     border-radius:12px;padding:28px 20px;text-align:center;
     margin-bottom:16px;cursor:pointer;transition:border-color .15s;
   " onclick="document.getElementById('bt-file-input').click()">
-    <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:8px">
+    <div style="font-size:13px;color:#aaaaaa;margin-bottom:8px">
       点击上传博主实盘 xlsx 文件
     </div>
-    <div style="font-size:11px;color:var(--color-text-tertiary)">
+    <div style="font-size:11px;color:#666666">
       需包含：主题、博主、近一年、操作、金额、基金名称、基金代码
     </div>
     <input type="file" id="bt-file-input" accept=".xlsx,.xls" style="display:none">
   </div>
 
   <!-- 上传进度提示 -->
-  <div id="bt-upload-msg" style="display:none;font-size:12px;color:var(--color-text-secondary);
-    margin-bottom:12px;padding:8px 12px;background:var(--color-background-secondary);
+  <div id="bt-upload-msg" style="display:none;font-size:12px;color:#aaaaaa;
+    margin-bottom:12px;padding:8px 12px;background:#2a2a2a;
     border-radius:8px;"></div>
 
   <!-- 日期选择 -->
   <div id="bt-date-row" style="display:none;align-items:center;gap:10px;margin-bottom:12px">
-    <span style="font-size:12px;color:var(--color-text-tertiary)">日期</span>
+    <span style="font-size:12px;color:#666666">日期</span>
     <select id="bt-date-sel" style="
-      background:var(--color-background-secondary);color:var(--color-text-primary);
-      border:0.5px solid var(--color-border-secondary);border-radius:6px;
+      background:#2a2a2a;color:#e0e0e0;
+      border:0.5px solid #333333;border-radius:6px;
       padding:4px 10px;font-size:12px;cursor:pointer;
     "></select>
-    <span id="bt-count" style="font-size:11px;color:var(--color-text-tertiary)"></span>
+    <span id="bt-count" style="font-size:11px;color:#666666"></span>
   </div>
 
   <!-- 操作筛选 -->
@@ -223,11 +273,11 @@ class BloggerTracker {
 </div>
 
 <style>
-#bt-wrap { font-family: var(--font-sans); }
+#bt-wrap { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .bt-filter-btn {
-  background: var(--color-background-secondary);
-  color: var(--color-text-secondary);
-  border: 0.5px solid var(--color-border-tertiary);
+  background: #2a2a2a;
+  color: #aaaaaa;
+  border: 0.5px solid #2a2a2a;
   border-radius: 6px; padding: 4px 12px;
   font-size: 12px; cursor: pointer; transition: all .15s;
 }
@@ -236,9 +286,9 @@ class BloggerTracker {
 }
 .bt-row { display:grid; grid-template-columns: 80px 90px 80px 1fr 70px 60px; gap:8px;
   align-items:center; padding:9px 10px; border-radius:8px;
-  border-bottom: 0.5px solid var(--color-border-tertiary); font-size:12px; }
-.bt-row:hover { background: var(--color-background-secondary); }
-.bt-hd { font-weight:500; color:var(--color-text-tertiary); font-size:11px;
+  border-bottom: 0.5px solid #2a2a2a; font-size:12px; }
+.bt-row:hover { background: #2a2a2a; }
+.bt-hd { font-weight:500; color:#666666; font-size:11px;
   padding:6px 10px; letter-spacing:.4px; }
 .bt-buy  { color: #dc3545; font-weight:500; }
 .bt-sell { color: #28a745; font-weight:500; }
@@ -246,7 +296,7 @@ class BloggerTracker {
 .bt-mine { background: rgba(0,123,255,.06); border-left: 2px solid #007bff !important; }
 .bt-tag { display:inline-block; font-size:10px; padding:1px 6px; border-radius:4px;
   background:rgba(0,123,255,.12); color:#4a9eff; margin-left:4px; }
-.bt-topic { font-size:11px; color:var(--color-text-tertiary); }
+.bt-topic { font-size:11px; color:#666666; }
 </style>`;
 
         // 绑定文件上传
@@ -303,7 +353,7 @@ class BloggerTracker {
                 const result = this._parseRawRows(raw, file.name);
                 if (!result.ok) {
                     msg.textContent = '❌ ' + result.error;
-                    msg.style.color = 'var(--color-text-danger)';
+                    msg.style.color = '#dc3545';
                     return;
                 }
                 msg.textContent = `已解析 ${result.records.length} 条，正在上传...`;
@@ -320,13 +370,13 @@ class BloggerTracker {
                         this._loadLatest();
                     } else {
                         msg.textContent = '❌ 上传失败：' + res.error;
-                        msg.style.color = 'var(--color-text-danger)';
+                        msg.style.color = '#dc3545';
                     }
                 })
                 .catch(() => { msg.textContent = '❌ 网络错误'; });
             } catch (err) {
                 msg.textContent = '❌ 解析失败：' + err.message;
-                msg.style.color = 'var(--color-text-danger)';
+                msg.style.color = '#dc3545';
             }
         };
         reader.readAsArrayBuffer(file);
@@ -353,7 +403,7 @@ class BloggerTracker {
         if (countEl) countEl.textContent = `${rows.length} 条`;
 
         if (rows.length === 0) {
-            wrap.innerHTML = '<div style="color:var(--color-text-tertiary);font-size:12px;padding:20px 0">暂无数据</div>';
+            wrap.innerHTML = '<div style="color:#666666;font-size:12px;padding:20px 0">暂无数据</div>';
             return;
         }
 
@@ -367,8 +417,8 @@ class BloggerTracker {
 
         let html = '';
         for (const [topic, items] of Object.entries(grouped)) {
-            html += `<div style="font-size:11px;font-weight:500;color:var(--color-text-tertiary);
-                letter-spacing:.5px;padding:12px 0 6px;border-bottom:0.5px solid var(--color-border-tertiary);
+            html += `<div style="font-size:11px;font-weight:500;color:#666666;
+                letter-spacing:.5px;padding:12px 0 6px;border-bottom:0.5px solid #2a2a2a;
                 margin-bottom:4px">${topic}</div>`;
 
             // 表头
@@ -384,12 +434,12 @@ class BloggerTracker {
                 const yr = r.yearly_return ? `+${(parseFloat(r.yearly_return)*100||0).toFixed(0)}%` : '';
 
                 html += `<div class="bt-row${isMine ? ' bt-mine' : ''}">
-                    <span style="color:var(--color-text-primary)">${r.blogger_name}</span>
+                    <span style="color:#e0e0e0">${r.blogger_name}</span>
                     <span class="${actionCls}">${r.action}</span>
-                    <span style="color:var(--color-text-secondary)">${r.amount || '--'}</span>
-                    <span style="color:var(--color-text-primary)">${r.fund_name}${mineTag}</span>
-                    <span style="color:var(--color-text-tertiary);font-family:var(--font-mono);font-size:11px">${r.fund_code}</span>
-                    <span style="color:var(--color-text-secondary)">${yr}</span>
+                    <span style="color:#aaaaaa">${r.amount || '--'}</span>
+                    <span style="color:#e0e0e0">${r.fund_name}${mineTag}</span>
+                    <span style="color:#666666;font-family:"SF Mono", "Fira Code", monospace;font-size:11px">${r.fund_code}</span>
+                    <span style="color:#aaaaaa">${yr}</span>
                 </div>`;
             });
 
@@ -403,7 +453,7 @@ class BloggerTracker {
     _renderEmpty() {
         const wrap = document.getElementById('bt-table-wrap');
         if (wrap) wrap.innerHTML = `
-            <div style="color:var(--color-text-tertiary);font-size:12px;padding:30px 0;text-align:center">
+            <div style="color:#666666;font-size:12px;padding:30px 0;text-align:center">
                 暂无数据，请上传博主实盘 xlsx 文件
             </div>`;
     }
