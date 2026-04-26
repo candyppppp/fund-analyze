@@ -101,7 +101,7 @@ class BloggerTracker {
             + '.bt-tg{display:grid;gap:4px}'
             + '.bt-tr{display:grid;grid-template-columns:28px 1fr 44px 44px 44px 36px;gap:6px;align-items:center;padding:7px 10px;border-radius:7px;transition:background .1s}'
             + '.bt-tr:hover{background:#1a1a1a}'
-            + '.bt-ti{font-size:20px;color:#333;text-align:right;font-variant-numeric:tabular-nums}'
+            + '.bt-ti{font-size:11px;color:#333;text-align:right;font-variant-numeric:tabular-nums}'
             + '.bt-r1{color:#ffc107}.bt-r2{color:#888}.bt-r3{color:#cd7f32}'
             + '.bt-tn{overflow:hidden}'
             + '.bt-tf{font-size:12px;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
@@ -135,7 +135,7 @@ class BloggerTracker {
             + '</style>'
 
             + '<div class="bt-hdr"><div>'
-            + '<div class="bt-title">博主追踪报告</div>'
+            + '<div class="bt-title">博主追踪 · 分析报告</div>'
             + '<div class="bt-meta-info" id="bt-meta-info">加载中...</div>'
             + '</div><div class="bt-controls">'
             + '<div class="bt-seg">'
@@ -565,6 +565,7 @@ class BloggerTracker {
             if(k.includes('金额'))ci.amount=i;
             if(k.includes('基金名'))ci.fn=i;
             if(k.includes('基金代码')||k.includes('fund_code'))ci.fc=i;
+            if(k==='date'||k==='日期'||k==='Date')ci.date=i;
         });
         hr.forEach((h,i)=>{if(String(h).trim().includes('修正后名称'))ci.fn=i;});
         if(ci.fc===undefined) return {ok:false,error:'文件里没有"基金代码"列，请新增后重试'};
@@ -593,7 +594,20 @@ class BloggerTracker {
             const action=String(row[ci.action]??'').trim();
             const blogger=String(row[ci.bn]??'').trim();
             if(!blogger||!VALID.has(action))continue;
-            recs.push({date:fileDate,blogger_name:blogger,fund_code:fc,fund_name:fn,action,amount:String(row[ci.amount]??'').trim(),topic:ct,yearly_return:String(row[ci.yr]??'').trim()});
+            // 优先用行内 date 列，格式统一为 YYYY-MM-DD
+            let rowDate = fileDate;
+            if(ci.date!==undefined && row[ci.date]){
+                const dv = String(row[ci.date]).trim();
+                // 支持 2026/04/01 或 2026-04-01 或 Excel 日期数字
+                if(/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(dv)){
+                    rowDate = dv.replace(/\//g,'-').split('-').map((p,i)=>i>0?p.padStart(2,'0'):p).join('-');
+                } else if(/^\d{5}$/.test(dv)) {
+                    // Excel 序列数 → 日期
+                    const d = new Date(Math.round((parseFloat(dv)-25569)*86400*1000));
+                    rowDate = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+                }
+            }
+            recs.push({date:rowDate,blogger_name:blogger,fund_code:fc,fund_name:fn,action,amount:String(row[ci.amount]??'').trim(),topic:ct,yearly_return:String(row[ci.yr]??'').trim()});
         }
         if(!recs.length)return{ok:false,error:'未解析到有效数据（表头第'+(hi+1)+'行）'};
         const dd={};
