@@ -1074,14 +1074,16 @@ def get_blogger_signals():
         from datetime import timezone as _tz, timedelta as _td
         _bj_today = datetime.now(_tz(_td(hours=8))).strftime('%Y-%m-%d')
 
+        days = int(request.args.get('days', 7))  # 支持 1D/3D/7D，默认7天
+        days = max(1, min(days, 30))  # 限制范围
+
         query = supabase.table('blogger_signals').select('*').eq('username', username)
         if date:
             query = query.eq('date', date)
         else:
-            # 默认返回最近7天
             from datetime import timezone as _tz7, timedelta as _td7
-            _week_ago = (datetime.now(_tz7(_td7(hours=8))) - _td7(days=7)).strftime('%Y-%m-%d')
-            query = query.gte('date', _week_ago)
+            _cutoff = (datetime.now(_tz7(_td7(hours=8))) - _td7(days=days)).strftime('%Y-%m-%d')
+            query = query.gte('date', _cutoff)
 
         resp = query.order('date', desc=True).execute()
         return jsonify(resp.data or [])
