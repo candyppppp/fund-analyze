@@ -1086,7 +1086,14 @@ def get_blogger_signals():
             query = query.gte('date', _cutoff)
 
         resp = query.order('date', desc=True).execute()
-        return jsonify(resp.data or [])
+        result = resp.data or []
+        # 如果空，再查一次不带 username 过滤，看表里是否有数据
+        if not result:
+            all_resp = supabase.table('blogger_signals').select('id,username,date').limit(5).execute()
+            logger.warning(f'blogger_signals 查询空: username={username!r}, days={days}, cutoff={_cutoff if not date else date!r}, count=0. 表里前5条: {all_resp.data}')
+        else:
+            logger.info(f'get_blogger_signals: username={username!r}, count={len(result)}')
+        return jsonify(result)
     except Exception as e:
         logger.error(f'获取博主信号失败: {e}')
         return jsonify([])
@@ -1123,7 +1130,7 @@ def upload_blogger_signals():
                 continue  # 跳过不完整的行
 
             # action 只接受合法值
-            if action not in ('买入', '卖出', '定投'):
+            if action not in ('买入', '卖出', '定投', '清仓'):
                 continue
 
             records.append({
