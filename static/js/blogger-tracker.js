@@ -56,7 +56,8 @@ class BloggerTracker {
                     if (res.success) {
                         const bj = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Shanghai'}));
                         const ts = `${bj.getFullYear()}-${String(bj.getMonth()+1).padStart(2,'0')}-${String(bj.getDate()).padStart(2,'0')} ${String(bj.getHours()).padStart(2,'0')}:${String(bj.getMinutes()).padStart(2,'0')}`;
-                        setMsg(`✅ 上传成功 ${res.inserted} 条｜Supabase 更新于 ${ts}`, '#28a745');
+                        const dupInfo2 = result.originalCount > res.unique ? `，${result.originalCount - res.unique}条重复已合并` : '';
+                        setMsg(`✅ 上传成功 ${res.inserted} 条${dupInfo2}｜Supabase 更新于 ${ts}`, '#28a745');
                         // 刷新全局信号数据
                         this._refreshGlobalSignals();
                     } else {
@@ -177,7 +178,21 @@ class BloggerTracker {
 
         if (records.length === 0)
             return { ok: false, error: `没有解析到有效数据（表头在第${headerRowIdx+1}行，共扫描${raw.length - headerRowIdx - 1}行，需要：有效基金代码 + 买入/卖出/定投）` };
-        return { ok: true, records, fileDate };
+
+        // 去重：同一博主同一天同一基金有多条时，合并金额（累加），保留一条
+        const dedup = {};
+        for (const r of records) {
+            const key = `${r.blogger_name}||${r.fund_code}||${r.action}`;
+            if (!dedup[key]) {
+                dedup[key] = { ...r };
+            } else {
+                // 金额累加（如 1K + 3K → 4K），直接拼接标注
+                dedup[key].amount = [dedup[key].amount, r.amount].filter(Boolean).join('+');
+            }
+        }
+        const dedupRecords = Object.values(dedup);
+
+        return { ok: true, records: dedupRecords, fileDate, originalCount: records.length };
     }
 
     // ── 刷新全局信号数据（供基金列表标签使用）───────────────────────────
@@ -365,7 +380,8 @@ class BloggerTracker {
                 .then(r => r.json())
                 .then(res => {
                     if (res.success) {
-                        msg.textContent = `✅ 上传成功：${res.inserted} 条`;
+                        const dupInfo = result.originalCount > res.unique ? `（含${result.originalCount - res.unique}条重复已合并）` : '';
+                        msg.textContent = `✅ 上传成功：${res.inserted} 条${dupInfo}`;
                         this._refreshGlobalSignals();
                         this._loadLatest();
                     } else {
