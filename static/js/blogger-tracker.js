@@ -101,7 +101,7 @@ class BloggerTracker {
             + '.bt-tg{display:grid;gap:4px}'
             + '.bt-tr{display:grid;grid-template-columns:28px 1fr 44px 44px 44px 36px;gap:6px;align-items:center;padding:7px 10px;border-radius:7px;transition:background .1s}'
             + '.bt-tr:hover{background:#1a1a1a}'
-            + '.bt-ti{font-size:11px;color:#333;text-align:right;font-variant-numeric:tabular-nums}'
+            + '.bt-ti{font-size:20px;color:#333;text-align:right;font-variant-numeric:tabular-nums}'
             + '.bt-r1{color:#ffc107}.bt-r2{color:#888}.bt-r3{color:#cd7f32}'
             + '.bt-tn{overflow:hidden}'
             + '.bt-tf{font-size:12px;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
@@ -135,7 +135,7 @@ class BloggerTracker {
             + '</style>'
 
             + '<div class="bt-hdr"><div>'
-            + '<div class="bt-title">博主追踪 · 分析报告</div>'
+            + '<div class="bt-title">博主追踪报告</div>'
             + '<div class="bt-meta-info" id="bt-meta-info">加载中...</div>'
             + '</div><div class="bt-controls">'
             + '<div class="bt-seg">'
