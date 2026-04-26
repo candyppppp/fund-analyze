@@ -41,22 +41,38 @@ class BloggerTracker {
         const days = this._currentRange === '1D' ? 1 : this._currentRange === '3D' ? 3 : 7;
         const cacheKey = 'bt_' + days;
         const cached = this._cache[cacheKey];
-        const el   = document.getElementById('bt-loading');
-        const main = document.getElementById('bt-main');
-
         // 有缓存（5分钟内）直接渲染，后台静默刷新
         if (cached && (Date.now() - cached.ts) < 5 * 60 * 1000) {
             this._signals = cached.data;
             window._bloggerSignals = this._signals;
-            if (el) el.style.display = 'none';
-            if (main) main.style.display = 'block';
+            const cl = document.getElementById('bt-loading');
+            const cm = document.getElementById('bt-main');
+            if (cl) cl.style.display = 'none';
+            if (cm) cm.style.display = 'block';
             try { this._signals.length > 0 ? this._renderReport() : this._renderEmpty(); }
-            catch(e) { this._renderErrorState(e); }
+            catch(e) { console.error('[bt] render error:', e); this._renderErrorState(e); }
             return;
         }
 
-        if (el) el.style.display = 'flex';
-        if (main) main.style.display = 'none';
+        // 每次都用 getElementById 避免闭包持有旧 DOM 引用
+        const show = () => {
+            const l = document.getElementById('bt-loading');
+            const m = document.getElementById('bt-main');
+            if (l) l.style.display = 'none';
+            if (m) m.style.display = 'block';
+        };
+        const loading = document.getElementById('bt-loading');
+        if (loading) loading.style.display = 'flex';
+        const m0 = document.getElementById('bt-main');
+        if (m0) m0.style.display = 'none';
+
+        // 更新加载提示
+        setTimeout(() => {
+            const lt = document.getElementById('bt-loading-txt');
+            const ls = document.getElementById('bt-loading-sub');
+            if (lt) lt.textContent = '正在处理数据...';
+            if (ls) ls.textContent = '数据已接收，渲染中';
+        }, 900);
 
         fetch('/api/blogger-signals?days=' + days)
             .then(r => r.ok ? r.json() : [])
@@ -64,15 +80,13 @@ class BloggerTracker {
                 this._signals = data || [];
                 window._bloggerSignals = this._signals;
                 this._cache[cacheKey] = { data: this._signals, ts: Date.now() };
-                if (el) el.style.display = 'none';
-                if (main) main.style.display = 'block';
+                show();
                 try { this._signals.length > 0 ? this._renderReport() : this._renderEmpty(); }
-                catch(e) { this._renderErrorState(e); }
+                catch(e) { console.error('[bt] render error:', e); this._renderErrorState(e); }
             })
             .catch(e => {
-                console.error('[bt]', e);
-                if (el) el.style.display = 'none';
-                if (main) main.style.display = 'block';
+                console.error('[bt] fetch error:', e);
+                show();
                 this._renderEmpty();
             });
     }
@@ -170,7 +184,10 @@ class BloggerTracker {
             + '<input type="file" id="bt-file-main" accept=".xlsx,.xls" style="display:none">'
             + '</div>'
             + '<div class="bt-umsg" id="bt-umsg-main"></div>'
-            + '<div id="bt-loading" style="display:flex"><div class="bt-spin"></div><span style="font-size:12px;color:#444">加载数据中...</span></div>'
+            + '<div id="bt-loading" style="display:flex"><div class="bt-spin"></div><div>'
+            + '<div style="font-size:12px;color:#555" id="bt-loading-txt">正在从数据库读取...</div>'
+            + '<div style="font-size:10px;color:#333;margin-top:3px" id="bt-loading-sub">通常需要 1-2 秒</div>'
+            + '</div></div>'
             + '<div id="bt-main" style="display:none"></div>'
             + '</div>';
 
