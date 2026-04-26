@@ -59,6 +59,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // 登录状态由后端 Flask session 管理，无需前端检查
     // 先注册事件监听，再启动 updateStrategyManager（它会立即 dispatch 事件）
     window.addEventListener('updateFundList', function() {
+        // 博主追踪 tab 时不执行基金列表更新，防止覆盖博主追踪内容
+        if (window.activeTab === 'blogger-tracker') return;
         if (typeof loadFunds === 'function') loadFunds();
     });
     window.addEventListener('updateHoldings', function() {
@@ -780,6 +782,9 @@ function _sortFunds(funds) {
 }
 
 function renderFunds(funds) {
+    // 博主追踪 tab 时不覆盖内容
+    if (window.activeTab === 'blogger-tracker') return;
+
     // 建立 id→code 映射，供 investment-advice.js 止盈计算时查找买入记录
     window._fundIdCodeMap = {};
     funds.forEach(f => { if (f.id && f.code) window._fundIdCodeMap[String(f.id)] = f.code; });
