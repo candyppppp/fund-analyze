@@ -1408,11 +1408,14 @@ def get_investment_advice():
         for fund in funds:
             pr = getattr(fund, 'predicted_return', 0)
 
-            # 预估净值（供前端换算份额用）
-            gszzl = getattr(fund, 'gszzl', None)
+            # 净值（供前端换算份额用）
+            # 优先用 gsz（实时估算净值，交易时间有效）；否则用最新已结算净值 prices[-1]
             _prices = fund.prices or []
             nav = _prices[-1] if _prices else 0
-            est_nav_add = round(nav * (1 + gszzl), 4) if gszzl is not None and nav else nav
+            gsz = getattr(fund, 'gsz', None)   # 实时估算净值（如 4.8838）
+            has_realtime = getattr(fund, 'has_realtime', False)
+            # 交易时间有实时数据时用估算净值，否则用最新真实净值
+            est_nav_add = round(float(gsz), 4) if has_realtime and gsz else nav
 
             # ── 多维度综合决策（替代单日涨跌判断）─────────────────────────────
             action, suggest_amount = _calc_action(fund, pr, market_data, investment_level, _blogger_map.get(fund.code))
