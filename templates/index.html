@@ -93,7 +93,9 @@
         <div class="tabs">
             <button class="tab active">基金自选</button>
             <button class="tab">基金投资</button>
+            {% if not is_mobile %}
             <button class="tab">博主追踪</button>
+            {% endif %}
         </div>
 
         <div class="search-container">
