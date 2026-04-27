@@ -471,6 +471,13 @@ body {
         border-radius: 6px;
     }
 
+    /* 移动端隐藏博主追踪tab */
+@media (max-width: 600px) {
+    .tabs button:nth-child(3) {
+        display: none;
+        }
+    }
+
     .fund-return { font-size: 13px; text-align: center; }
     .fund-return-label { font-size: 9px; text-align: center; white-space: nowrap; }
 
