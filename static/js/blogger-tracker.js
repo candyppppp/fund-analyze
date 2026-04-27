@@ -17,7 +17,6 @@ class BloggerTracker {
         const sb = document.querySelector('.search-container');
         if (sb) sb.style.display = 'none';
         // 直接写 loading，同步，无中间状态
-        const r = this._currentRange;
         container.innerHTML = '<div id="bt-root"><style>'
             + '#bt-root{font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#e0e0e0}'
             + '.bt-spin{width:20px;height:20px;border:2px solid #252525;border-top-color:#007bff;border-radius:50%;animation:btspin .8s linear infinite}'
@@ -312,7 +311,7 @@ class BloggerTracker {
             const sw  = b.total?Math.round(b.sell/b.total*100):0;
             const cw  = b.total?Math.round(b.clear/b.total*100):0;
             const dw  = 100-bw-sw-cw;
-            return '<div class="bt-bcard"><div class="bt-bname" title="'+b.name+'">'+b.name+'</div>'
+            return '<div class="bt-bcard" data-blogger="'+encodeURIComponent(b.name)+'" onclick="window._btBlogger(decodeURIComponent(this.dataset.blogger))" style="cursor:pointer"><div class="bt-bname" title="'+b.name+'">'+b.name+'</div>'
                 +'<div class="bt-bbar">'
                 +(bw?'<div class="bt-bseg" style="width:'+bw+'%;background:#dc3545">'+(bw>15?b.buy+'买':'')+'</div>':'')
                 +(sw?'<div class="bt-bseg" style="width:'+sw+'%;background:#28a745">'+(sw>15?b.sell+'卖':'')+'</div>':'')
@@ -351,7 +350,7 @@ class BloggerTracker {
             const daySell  = Object.values(byDate[date]).reduce((s,arr)=>s+arr.filter(r=>r.action==='卖出').length, 0);
             const dayClear = Object.values(byDate[date]).reduce((s,arr)=>s+arr.filter(r=>r.action==='清仓').length, 0);
             const dayDip   = dayTotal - dayBuy - daySell - dayClear;
-            const isFirst = di === 0; // 最新日期默认展开
+            const isFirst = di === 0; // 只有最新日期（di===0）默认展开，其他折叠
             const colId = 'btd-'+date.replace(/-/g,'');
             detail += '<div style="border:0.5px solid #1e1e1e;border-radius:8px;margin-bottom:8px;overflow:hidden">'
                 // 折叠头部
@@ -506,8 +505,16 @@ class BloggerTracker {
             +'<span style="text-align:center">买入</span><span style="text-align:center">卖出</span><span style="text-align:center">定投</span><span style="text-align:center">清仓</span><span style="text-align:center">博主</span></div>'
             +'<div class="bt-tg">'+top20+'</div></div></div>';
 
+        const _initShow = 24; // 初始显示24个
+        const _moreCount = bloggersSorted.length - _initShow;
+        const _moreBtn = _moreCount > 0
+            ? '<div id="bt-more-btn" onclick="window._btShowMore()" style="text-align:center;padding:10px;font-size:11px;color:#007bff;cursor:pointer;border-top:0.5px solid #1e1e1e;margin-top:4px">查看更多 '+_moreCount+' 位博主 ▼</div>'
+            : '';
         html += '<div class="bt-sec"><div class="bt-sh">博主操作分布（'+bloggersSorted.length+' 位）</div>'
-            +'<div class="bt-bg">'+blogCards+'</div></div>';
+            +'<div style="background:#141414;border:0.5px solid #1e1e1e;border-radius:10px;overflow:hidden">'
+            +'<div class="bt-bg" id="bt-blogger-grid">'+blogCards+'</div>'
+            +_moreBtn
+            +'</div></div>';
 
         html += '<div class="bt-sec"><div class="bt-sh">操作明细</div>'+detail+'</div>';
 
@@ -646,7 +653,116 @@ const bloggerTracker = new BloggerTracker();
 window.bloggerTracker = bloggerTracker;
 bloggerTracker._refreshGlobalSignals();
 
+// 博主弹窗
+window._btBlogger = function(name) {
+    // 从当前信号里筛选该博主的数据
+    const signals = window.bloggerTracker && window.bloggerTracker._signals || [];
+    const items = signals.filter(r => r.blogger_name === name);
+    if (!items.length) return;
+
+    // 按操作分类
+    const buy  = items.filter(r => r.action === '买入');
+    const sell = items.filter(r => r.action === '卖出');
+    const dip  = items.filter(r => r.action === '定投');
+    const clr  = items.filter(r => r.action === '清仓');
+
+    const COLORS = {买入:'#dc3545',卖出:'#28a745',定投:'#f59e0b',清仓:'#8b5cf6'};
+
+    const renderGroup = (title, arr) => {
+        if (!arr.length) return '';
+        return '<div style="margin-bottom:12px">'
+            +'<div style="font-size:10px;font-weight:600;color:'+COLORS[title]+';letter-spacing:.5px;margin-bottom:6px">'+title+' ('+arr.length+')</div>'
+            + arr.map(r =>
+                '<div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;padding:5px 8px;border-radius:5px;background:#1a1a1a;margin-bottom:3px;font-size:11px">'
+                +'<span style="color:#ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.fund_name+'</span>'
+                +'<span style="color:#444;font-family:monospace;font-size:10px">'+r.fund_code+'</span>'
+                +'<span style="color:#555">'+( r.amount||'--')+'</span>'
+                +'</div>'
+            ).join('')
+            +'</div>';
+    };
+
+    const content = renderGroup('买入',buy)+renderGroup('卖出',sell)+renderGroup('定投',dip)+renderGroup('清仓',clr);
+
+    // 创建弹窗
+    const existing = document.getElementById('bt-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'bt-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    modal.innerHTML = '<div style="background:#141414;border:0.5px solid #2a2a2a;border-radius:12px;width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">'
+        +'<div style="display:flex;align-items:center;padding:14px 16px;border-bottom:0.5px solid #1e1e1e;flex-shrink:0">'
+        +'<div style="flex:1">'
+        +'<div style="font-size:14px;font-weight:600;color:#fff">'+name+'</div>'
+        +'<div style="font-size:11px;color:#444;margin-top:2px">近7天共 '+items.length+' 笔操作</div>'
+        +'</div>'
+        +'<button onclick="window._btCloseModal()" style="background:none;border:none;color:#555;font-size:18px;cursor:pointer;padding:4px 8px;line-height:1">×</button>'
+        +'</div>'
+        +'<div style="padding:14px 16px;overflow-y:auto">'+content+'</div>'
+        +'</div>';
+
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
+};
+
+// 查看更多博主
+window._btShowMore = function() {
+    const tracker = window.bloggerTracker;
+    if (!tracker) return;
+    const data = tracker._signals;
+    const COLORS = ['#3b82f6','#ef4444','#f59e0b','#10b981','#8b5cf6','#f97316','#06b6d4','#ec4899','#84cc16','#6366f1'];
+
+    const bloggerMap = {};
+    data.forEach(r => {
+        if (!bloggerMap[r.blogger_name]) bloggerMap[r.blogger_name] = {buy:0,sell:0,dip:0,clear:0,funds:new Set(),total:0};
+        if (r.action==='买入') bloggerMap[r.blogger_name].buy++;
+        else if (r.action==='卖出') bloggerMap[r.blogger_name].sell++;
+        else if (r.action==='清仓') bloggerMap[r.blogger_name].clear++;
+        else bloggerMap[r.blogger_name].dip++;
+        bloggerMap[r.blogger_name].funds.add(r.fund_code);
+        bloggerMap[r.blogger_name].total++;
+    });
+    const all = Object.entries(bloggerMap).map(([n,b])=>({name:n,...b,funds:b.funds.size})).sort((a,b2)=>b2.total-a.total);
+
+    const grid = document.getElementById('bt-blogger-grid');
+    const btn  = document.getElementById('bt-more-btn');
+    if (!grid) return;
+
+    // 获取当前已显示数量，每次多加16个（4行）
+    const current = grid.querySelectorAll('.bt-bcard').length;
+    const next = Math.min(current + 16, all.length);
+    const toAdd = all.slice(current, next);
+
+    toAdd.forEach(b => {
+        const bw = b.total?Math.round(b.buy/b.total*100):0;
+        const sw = b.total?Math.round(b.sell/b.total*100):0;
+        const cw = b.total?Math.round(b.clear/b.total*100):0;
+        const dw = 100-bw-sw-cw;
+        const div = document.createElement('div');
+        div.className = 'bt-bcard';
+        div.style.cursor = 'pointer';
+        div.onclick = () => window._btBlogger(b.name);
+        div.innerHTML = '<div class="bt-bname" title="'+b.name+'">'+b.name+'</div>'
+            +'<div class="bt-bbar">'
+            +(bw?'<div class="bt-bseg" style="width:'+bw+'%;background:#dc3545">'+(bw>15?b.buy+'买':'')+'</div>':'')
+            +(sw?'<div class="bt-bseg" style="width:'+sw+'%;background:#28a745">'+(sw>15?b.sell+'卖':'')+'</div>':'')
+            +(cw?'<div class="bt-bseg" style="width:'+cw+'%;background:#8b5cf6">'+(cw>15?b.clear+'清':'')+'</div>':'')
+            +(dw>0?'<div class="bt-bseg" style="width:'+dw+'%;background:#f59e0b">'+(dw>15?b.dip+'投':'')+'</div>':'')
+            +'</div><div class="bt-bmeta"><span>'+b.total+' 操作</span><span>'+b.funds+' 基金</span></div>';
+        grid.appendChild(div);
+    });
+
+    if (next >= all.length && btn) btn.remove();
+    else if (btn) btn.textContent = '查看更多 '+(all.length-next)+' 位博主 ▼';
+};
+
 // 明细折叠切换（全局函数，避免 onclick 里的引号冲突）
+window._btCloseModal = function() {
+    const m = document.getElementById('bt-modal');
+    if (m) m.remove();
+};
+
 window._btToggle = function(colId) {
     const c = document.getElementById(colId);
     const hd = document.querySelector('[data-btcol="'+colId+'"]');
