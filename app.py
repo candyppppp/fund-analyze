@@ -1130,7 +1130,7 @@ def upload_blogger_signals():
                 continue  # 跳过不完整的行
 
             # action 只接受合法值
-            if action not in ('买入', '卖出', '定投', '清仓'):
+            if action not in ('买入', '卖出', '定投', '清仓', '减仓'):
                 continue
 
             records.append({
