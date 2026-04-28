@@ -80,7 +80,7 @@ class BloggerTracker {
             + '#bt-loading{display:flex;align-items:center;justify-content:center;height:200px;gap:10px}'
             + '.bt-spin{width:20px;height:20px;border:2px solid #252525;border-top-color:#007bff;border-radius:50%;animation:btspin .8s linear infinite}'
             + '@keyframes btspin{to{transform:rotate(360deg)}}'
-            + '.bt-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 20px;margin-bottom:14px}'
+            + '.bt-stats{display:grid;gap:8px;padding:0 20px;margin-bottom:14px}'
             + '.bt-sc{background:#141414;border:0.5px solid #1e1e1e;border-radius:10px;padding:12px 14px}'
             + '.bt-sv{font-size:22px;font-weight:700;letter-spacing:-.5px;line-height:1}'
             + '.bt-sl{font-size:11px;color:#444;margin-top:4px}'
