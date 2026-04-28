@@ -400,7 +400,7 @@ class BloggerTracker {
         });
 
         // 组装
-        const _colCount = 4 + (totalReduce>0?1:0) + (totalClear>0?1:0) + 1;
+        const _colCount = 3 + (totalReduce>0?1:0) + (totalClear>0?1:0) + 1;
         let html = '<div class="bt-stats" style="grid-template-columns:repeat('+_colCount+',1fr)">'
             +'<div class="bt-sc"><div class="bt-sv" style="color:#dc3545">'+totalBuy+'</div><div class="bt-sl">买入</div><div class="bt-ss">'+bloggerSet.size+' 位博主</div></div>'
             +'<div class="bt-sc"><div class="bt-sv" style="color:#28a745">'+totalSell+'</div><div class="bt-sl">卖出</div><div class="bt-ss">'+fundSet.size+' 只基金</div></div>'
