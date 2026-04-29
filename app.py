@@ -1094,8 +1094,17 @@ def get_blogger_signals():
             logger.info(f'blogger_signals: days={days}交易日, cutoff={_cutoff}')
             query = query.gte('date', _cutoff)
 
-        resp = query.order('date', desc=True).limit(5000).execute()  # 突破 Supabase 默认 1000 条限制
-        result = resp.data or []
+        # Supabase postgrest-py 默认每次最多返回 1000 条，用分页拉取全部数据
+        result = []
+        _page_size = 1000
+        _offset = 0
+        while True:
+            _resp = query.order('date', desc=True).range(_offset, _offset + _page_size - 1).execute()
+            _batch = _resp.data or []
+            result.extend(_batch)
+            if len(_batch) < _page_size:
+                break
+            _offset += _page_size
         # 如果空，再查一次不带 username 过滤，看表里是否有数据
         if not result:
             all_resp = supabase.table('blogger_signals').select('id,username,date').limit(5).execute()
