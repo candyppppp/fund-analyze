@@ -1074,15 +1074,24 @@ def get_blogger_signals():
         from datetime import timezone as _tz, timedelta as _td
         _bj_today = datetime.now(_tz(_td(hours=8))).strftime('%Y-%m-%d')
 
-        days = int(request.args.get('days', 7))  # 支持 1D/3D/7D，默认7天
-        days = max(1, min(days, 30))  # 限制范围
+        days = int(request.args.get('days', 7))  # 支持 1D/3D/7D，默认7个交易日
+        days = max(1, min(days, 30))
 
         query = supabase.table('blogger_signals').select('*').eq('username', username)
         if date:
             query = query.eq('date', date)
         else:
+            # 按交易日计算：含今天往前共 N 个交易日
             from datetime import timezone as _tz7, timedelta as _td7
-            _cutoff = (datetime.now(_tz7(_td7(hours=8))) - _td7(days=days)).strftime('%Y-%m-%d')
+            _bj_dt = datetime.now(_tz7(_td7(hours=8))).date()
+            _trading = []
+            _cur = _bj_dt
+            while len(_trading) < days:
+                if _cur.weekday() < 5:
+                    _trading.append(_cur)
+                _cur -= _td7(days=1)
+            _cutoff = _trading[-1].strftime('%Y-%m-%d')
+            logger.info(f'blogger_signals: days={days}交易日, cutoff={_cutoff}')
             query = query.gte('date', _cutoff)
 
         resp = query.order('date', desc=True).execute()
