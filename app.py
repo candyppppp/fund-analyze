@@ -1094,7 +1094,7 @@ def get_blogger_signals():
             logger.info(f'blogger_signals: days={days}交易日, cutoff={_cutoff}')
             query = query.gte('date', _cutoff)
 
-        resp = query.order('date', desc=True).execute()
+        resp = query.order('date', desc=True).limit(5000).execute()  # 突破 Supabase 默认 1000 条限制
         result = resp.data or []
         # 如果空，再查一次不带 username 过滤，看表里是否有数据
         if not result:
