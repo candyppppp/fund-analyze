@@ -32,6 +32,14 @@ class BloggerTracker {
         this._fetchAndRender(container);
     }
 
+    hide() {
+        // 恢复所有被博主追踪隐藏的元素
+        const header = document.getElementById('fund-list-header');
+        if (header) header.style.display = '';
+        const sb = document.querySelector('.search-container');
+        if (sb) sb.style.display = '';
+    }
+
     _fetchAndRender(container) {
         const days = this._currentRange === '1D' ? 1 : this._currentRange === '3D' ? 3 : 7;
         const key  = 'bt_' + days;
@@ -292,7 +300,7 @@ class BloggerTracker {
                 +'<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="#1a1a1a" stroke-width="'+sw+'"/>'
                 +slices
                 +'<text x="'+cx+'" y="'+(cy-7)+'" text-anchor="middle" dominant-baseline="middle" fill="#666" font-size="16" font-weight="700">'+total+'</text>'
-                +'<text x="'+cx+'" y="'+(cy+11)+'" text-anchor="middle" dominant-baseline="middle" fill="#4e4c4c" font-size="12">操作</text>'
+                +'<text x="'+cx+'" y="'+(cy+11)+'" text-anchor="middle" dominant-baseline="middle" fill="#333" font-size="12">操作</text>'
                 +'</svg>'
                 +'<div class="bt-dl" style="display:grid;grid-template-columns:1fr 1fr;gap:2px 8px">'+legend+'</div></div></div>';
         };

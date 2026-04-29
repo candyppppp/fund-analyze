@@ -59,8 +59,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // 登录状态由后端 Flask session 管理，无需前端检查
     // 先注册事件监听，再启动 updateStrategyManager（它会立即 dispatch 事件）
     window.addEventListener('updateFundList', function() {
-        // 博主追踪 tab 时不执行基金列表更新，防止覆盖博主追踪内容
-        if (window.activeTab === 'blogger-tracker') return;
+        // 只在基金自选 tab 才执行列表更新
+        if (window.activeTab !== 'fund-prediction') return;
         if (typeof loadFunds === 'function') loadFunds();
     });
     window.addEventListener('updateHoldings', function() {
@@ -96,6 +96,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 切换标签内容
             if (index === 0) {
+                // 切走时先恢复博主追踪隐藏的元素
+                if (window.bloggerTracker) window.bloggerTracker.hide();
                 // 基金自选标签
                 activeTab = 'fund-prediction';
                 window.activeTab = activeTab;
@@ -107,6 +109,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 loadFunds();
                 updateStrategyManager.switchTab('fund-prediction');
             } else if (index === 1) {
+                // 切走时先恢复博主追踪隐藏的元素
+                if (window.bloggerTracker) window.bloggerTracker.hide();
                 // 基金投资标签
                 activeTab = 'investment-advice';
                 window.activeTab = activeTab;
@@ -782,8 +786,8 @@ function _sortFunds(funds) {
 }
 
 function renderFunds(funds) {
-    // 博主追踪 tab 时不覆盖内容
-    if (window.activeTab === 'blogger-tracker') return;
+    // 只在基金自选 tab 才渲染
+    if (window.activeTab !== 'fund-prediction') return;
 
     // 建立 id→code 映射，供 investment-advice.js 止盈计算时查找买入记录
     window._fundIdCodeMap = {};
@@ -795,6 +799,29 @@ function renderFunds(funds) {
     // 更新 Group Count
     const groupCountElement = document.getElementById('group-count');
     if (groupCountElement) groupCountElement.textContent = funds.length;
+
+    // 计算今日预估总收益（所有基金，正负均计入）
+    (function() {
+        let totalEstimated = 0;
+        let hasPosOrNeg = false;
+        funds.forEach(fund => {
+            const prices = (fund.prices && fund.prices.length > 0) ? fund.prices : [0];
+            const latestNav = prices[prices.length - 1] || 0;
+            const buySettings = getBuySettings(fund.id);
+            if (!buySettings || buySettings.shares <= 0) return;
+            // 统一用 predicted_return 计算预估收益
+            const pr = fund.predicted_return || 0;
+            const est = latestNav * pr * buySettings.shares;
+            totalEstimated += est;
+            hasPosOrNeg = true;
+        });
+        const el = document.getElementById('total-estimated-return');
+        if (!el) return;
+        if (!hasPosOrNeg) { el.textContent = '--'; el.style.color = '#888'; return; }
+        const sign = totalEstimated >= 0 ? '+' : '';
+        el.textContent = sign + totalEstimated.toFixed(2) + '元';
+        el.style.color = totalEstimated >= 0 ? '#dc3545' : '#28a745';
+    })();
 
     if (funds.length === 0) {
         container.innerHTML = '<p style="text-align: center; color: #888; padding: 20px;">No funds in this group. Add one to track.</p>';
