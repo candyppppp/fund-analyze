@@ -886,8 +886,8 @@ function renderFunds(funds) {
                         ${(() => {
                             const _st = getSettings();
                             if (!_st.showTopicTag) return '';
-                            const _t = (window._fundTopicMap||{})[String(fund.code)];
-                            return _t ? '<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(99,102,241,.15);color:#a5b4fc;border:0.5px solid rgba(99,102,241,.3);margin-left:4px">' + _t + '</span>' : '';
+                            const _t = (window._fundTopicMap||{})[String(fund.code)] || '未知';
+                            return '<div class="fund-detail-box" style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3)!important"><span style="color:#a5b4fc">' + _t + '</span></div>';
                         })()}
                         <span class="fund-type-tag">场外</span>
                     </div>

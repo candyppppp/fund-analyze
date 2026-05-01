@@ -22,7 +22,7 @@ class BloggerTracker {
             + '.bt-spin{width:20px;height:20px;border:2px solid #252525;border-top-color:#007bff;border-radius:50%;animation:btspin .8s linear infinite}'
             + '@keyframes btspin{to{transform:rotate(360deg)}}'
             + '</style>'
-            + '<div style="padding:16px 20px 8px;font-size:18px;font-weight:600;color:#fff">博主追踪 · 分析报告</div>'
+            + '<div style="padding:16px 20px 8px;font-size:18px;font-weight:600;color:#fff">博主追踪报告</div>'
             + '<div style="padding:0 20px;font-size:11px;color:#444;margin-bottom:12px">加载中...</div>'
             + '<div style="display:flex;align-items:center;gap:12px;padding:60px 20px">'
             + '<div class="bt-spin"></div>'
