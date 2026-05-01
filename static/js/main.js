@@ -611,63 +611,9 @@ function startFundHoldingsUpdateIntervals(funds) {
     // 非交易时间不需要持仓定时器（持仓数据不变）
     if (!isTradingTime()) return;
 
-    // 为每个基金设置独立的更新定时器（仅交易时间）
-    funds.forEach((fund, index) => {
-        // 持仓股票价格5分钟更新一次（降低请求频率，避免429）
-        const interval = 5 * 60 * 1000;
-
-        // 随机延迟0-5分钟，错开各基金请求时间
-        const randomDelay = Math.floor(Math.random() * 5 * 60 * 1000);
-
-        setTimeout(() => {
-            fundHoldingsUpdateIntervals[fund.code] = setInterval(() => {
-                // 每次触发时再检查交易时间（可能已过收盘）
-                if (!isTradingTime()) {
-                    clearInterval(fundHoldingsUpdateIntervals[fund.code]);
-                    delete fundHoldingsUpdateIntervals[fund.code];
-                    return;
-                }
-                {
-                    // 只获取持仓数据，基金列表通过定期更新获取
-                    fetch(`/api/funds/${fund.code}/holdings`)
-                    .then(response => {
-                        if (response.status === 429) {
-                            // 限流：静默跳过，等下次定时器再试，不抛错不重试
-                            console.warn(`[限流] ${fund.code} holdings 429，跳过本次`);
-                            return null;
-                        }
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(holdings => {
-                        if (!holdings) return; // 429 静默跳过
-                        // 更新缓存（key 包含 code，避免共享）
-                        cacheManager.set('fundHoldings_' + fund.code, holdings);
-
-                        // 更新基金对象（用正确的 cache key: CACHE_KEYS.FUNDS_LIST）
-                        const fundsData = cacheManager.get(CACHE_KEYS.FUNDS_LIST);
-                        if (fundsData) {
-                            const updatedFunds = fundsData.map(f => {
-                                if (f.code === fund.code) {
-                                    return { ...f, stock_holdings: holdings };
-                                }
-                                return f;
-                            });
-                            cacheManager.set(CACHE_KEYS.FUNDS_LIST, updatedFunds, CACHE_EXPIRY.FUNDS_LIST);
-                            renderFunds(updatedFunds);
-                            const fundElement = document.getElementById(`fund-${fund.id}`);
-                            if (fundElement) flashCard(fundElement);
-                        }
-                    })
-                    .catch(error => {
-                        console.error(`更新基金 ${fund.code} 数据失败:`, error);
-                    });
-                }
-            }, interval);
-        }, randomDelay);
-    });
+    // 持仓股票改为按需拉取（展开基金卡片时才请求），不做全量定时刷新
+    // 优势：零并发压力，不受基金数量影响，展开时 setupStockUpdateInterval 负责1分钟刷新
+    // funds.forEach 定时器已移除
 }
 
 // 显示加载状态
@@ -801,6 +747,21 @@ function renderFunds(funds) {
     const groupCountElement = document.getElementById('group-count');
     if (groupCountElement) groupCountElement.textContent = funds.length;
 
+    // 从博主信号推断基金主题（出现次数最多的 topic 作为该基金主题）
+    window._fundTopicMap = window._fundTopicMap || {};
+    if (window._bloggerSignals && window._bloggerSignals.length > 0) {
+        const _topicCount = {};
+        window._bloggerSignals.forEach(r => {
+            if (!r.fund_code || !r.topic) return;
+            const key = r.fund_code;
+            if (!_topicCount[key]) _topicCount[key] = {};
+            _topicCount[key][r.topic] = (_topicCount[key][r.topic] || 0) + 1;
+        });
+        Object.entries(_topicCount).forEach(([code, topics]) => {
+            window._fundTopicMap[code] = Object.entries(topics).sort((a,b)=>b[1]-a[1])[0][0];
+        });
+    }
+
     // 计算今日预估总收益（所有基金，正负均计入）
     (function() {
         let totalEstimated = 0;
@@ -922,6 +883,12 @@ function renderFunds(funds) {
                 <div class="fund-details">
                     <div class="fund-detail">
                         <span class="fund-code">${fund.code}</span>
+                        ${(() => {
+                            const _st = getSettings();
+                            if (!_st.showTopicTag) return '';
+                            const _t = (window._fundTopicMap||{})[String(fund.code)];
+                            return _t ? '<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(99,102,241,.15);color:#a5b4fc;border:0.5px solid rgba(99,102,241,.3);margin-left:4px">' + _t + '</span>' : '';
+                        })()}
                         <span class="fund-type-tag">场外</span>
                     </div>
                     <div class="fund-detail-box">
@@ -933,6 +900,7 @@ function renderFunds(funds) {
                     </div>
                     ${(() => {
                         // 博主实盘标签：直接用 _bloggerSignals 里已有数据（后端已按交易日过滤）
+                        if (!getSettings().showBloggerTag) return '';
                         const _sigs = window._bloggerSignals || [];
                         const _matched = _sigs.filter(r => String(r.fund_code) === String(fund.code));
                         if (_matched.length === 0) return '';
@@ -941,7 +909,7 @@ function renderFunds(funds) {
                         const _tip   = [_buyN ? `${_buyN}买` : '', _sellN ? `${_sellN}卖` : ''].filter(Boolean).join('/');
                         return '<div class="fund-detail-box fund-blogger-tag"><span>博主实盘 ' + _tip + '</span></div>';
                     })()}
-                    ${buySettings.shares <= 0 ? '<div class="fund-detail-box fund-no-holding"><span>暂未买入</span></div>' : ''}
+                    ${(buySettings.shares <= 0 && getSettings().showNoHolding) ? '<div class="fund-detail-box fund-no-holding"><span>暂未买入</span></div>' : ''}
                 </div>
             </div>
             <div class="fund-performance">
@@ -3041,216 +3009,173 @@ function getInvestmentAdvice(fund) {
 }
 
 function showSettings() {
-    // 获取当前设置
     const settings = getSettings();
-
-    // 创建弹框
     const modal = document.createElement('div');
     modal.className = 'modal';
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.8);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-    `;
-    // 移动端：底部抽屉式弹出
-    if (window.innerWidth <= 600) {
-        modal.style.alignItems = 'flex-end';
-    }
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);display:flex;justify-content:center;align-items:center;z-index:1000;';
+    if (window.innerWidth <= 600) modal.style.alignItems = 'flex-end';
 
-    // 弹框内容
-    const modalContent = document.createElement('div');
-    modalContent.className = 'modal-content';
-    modalContent.style.cssText = `
-        background-color: #1e1e1e;
-        padding: 16px;
-        border-radius: 6px;
-        width: 90%;
-        max-width: 600px;
-        max-height: 90vh;
-        overflow-y: auto;
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6);
-        border: 1px solid #333;
-    `;
+    const mc = document.createElement('div');
+    mc.style.cssText = 'background:#1e1e1e;padding:20px;border-radius:8px;width:92%;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.7);border:0.5px solid #2a2a2a;';
 
-    // 弹框HTML
-    modalContent.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h2 style="color: white; margin: 0; font-size: 14px;">设置</h2>
-            <button class="close-btn" style="background-color: #2a2a2a; color: #e0e0e0; border: 1px solid #333; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">关闭</button>
-        </div>
-        
-        <div style="margin-bottom: 16px;">
-            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">显示设置</h3>
-            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
-                <div style="margin-bottom: 8px;">
-                    <label style="font-size: 11px; margin-right: 10px;">字体大小:</label>
-                    <select id="font-size" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 3px 6px; border-radius: 4px; font-size: 10px;">
-                        <option value="small" ${settings.fontSize === 'small' ? 'selected' : ''}>小</option>
-                        <option value="medium" ${settings.fontSize === 'medium' ? 'selected' : ''}>中</option>
-                        <option value="large" ${settings.fontSize === 'large' ? 'selected' : ''}>大</option>
-                    </select>
-                </div>
-                <div style="margin-bottom: 8px;">
-                    <label style="font-size: 11px; margin-right: 10px;">更新频率:</label>
-                    <select id="update-frequency" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 3px 6px; border-radius: 4px; font-size: 10px;">
-                        <option value="1" ${settings.updateFrequency === '1' ? 'selected' : ''}>1分钟</option>
-                        <option value="5" ${settings.updateFrequency === '5' ? 'selected' : ''}>5分钟</option>
-                        <option value="15" ${settings.updateFrequency === '15' ? 'selected' : ''}>15分钟</option>
-                        <option value="30" ${settings.updateFrequency === '30' ? 'selected' : ''}>30分钟</option>
-                        <option value="60" ${settings.updateFrequency === '60' ? 'selected' : ''}>1小时</option>
-                    </select>
-                </div>
-                <div style="margin-bottom: 8px;">
-                    <label style="font-size: 11px; margin-right: 10px;">投资偏好:</label>
-                    <select id="investment-level" style="background-color: #333; color: #e0e0e0; border: 1px solid #444; padding: 3px 6px; border-radius: 4px; font-size: 10px;">
-                        <option value="small"  ${settings.investmentLevel === 'small'  ? 'selected' : ''}>小额（100 / 200 / 300 / 500 元）</option>
-                        <option value="medium" ${settings.investmentLevel === 'medium' ? 'selected' : ''}>中额（300 / 500 / 800 / 1000 元）</option>
-                        <option value="large"  ${settings.investmentLevel === 'large'  ? 'selected' : ''}>大额（800 / 1000 / 1200 / 1500 / 2000 元）</option>
-                    </select>
-                </div>
-                <div style="margin-bottom: 4px;">
-                    <input type="checkbox" id="show-distance" ${settings.showDistance ? 'checked' : ''} style="margin-right: 8px;">
-                    <label for="show-distance" style="font-size: 11px;">显示距高点</label>
-                </div>
-                <div style="margin-bottom: 4px;">
-                    <input type="checkbox" id="show-rsi" ${settings.showRSI ? 'checked' : ''} style="margin-right: 8px;">
-                    <label for="show-rsi" style="font-size: 11px;">显示RSI</label>
-                </div>
-                <div style="margin-bottom: 4px;">
-                    <input type="checkbox" id="show-alerts" ${settings.showAlerts ? 'checked' : ''} style="margin-right: 8px;">
-                    <label for="show-alerts" style="font-size: 11px;">显示风险提示</label>
-                </div>
+    const row = (label, control) =>
+        `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:11px;color:#888;width:90px;flex-shrink:0">${label}</span>
+            ${control}
+        </div>`;
+
+    const sel = (id, opts, cur) =>
+        `<select id="${id}" style="background:#2a2a2a;color:#e0e0e0;border:0.5px solid #333;padding:4px 8px;border-radius:5px;font-size:11px;flex:1;cursor:pointer">
+            ${opts.map(([v,l]) => `<option value="${v}"${cur===v?' selected':''}>${l}</option>`).join('')}
+        </select>`;
+
+    const chk = (id, label, checked) =>
+        `<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#aaa;cursor:pointer;padding:6px 10px;background:#1a1a1a;border:0.5px solid #252525;border-radius:6px;user-select:none">
+            <input type="checkbox" id="${id}" ${checked?'checked':''} style="accent-color:#007bff;width:13px;height:13px">
+            ${label}
+        </label>`;
+
+    mc.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+        <h2 style="color:#fff;margin:0;font-size:15px;font-weight:600">设置</h2>
+        <button class="close-btn" style="background:#2a2a2a;color:#aaa;border:0.5px solid #333;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:11px">关闭</button>
+    </div>
+
+    <!-- 显示设置 -->
+    <div style="margin-bottom:16px">
+        <div style="font-size:11px;font-weight:600;color:#555;letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px">显示设置</div>
+        <div style="background:#141414;border:0.5px solid #1e1e1e;border-radius:8px;padding:14px">
+            ${row('字体大小', sel('font-size', [['medium','中'],['large','大']], settings.fontSize||'medium'))}
+            ${row('基金列表更新', sel('update-frequency', [['3','3分钟（推荐≤30只）'],['5','5分钟（推荐≤50只）'],['10','10分钟（推荐≤100只）']], settings.updateFrequency||'3'))}
+            ${row('持仓股票更新', sel('holdings-frequency', [['1','1分钟'],['3','3分钟'],['5','5分钟']], settings.holdingsFrequency||'1'))}
+            ${row('投资偏好', sel('investment-level', [
+                ['small','小额（100/200/300/500元）'],
+                ['medium','中额（300/500/800/1000元）'],
+                ['large','大额（800/1000/1200/1500/2000元）']
+            ], settings.investmentLevel||'medium'))}
+            <div style="font-size:11px;color:#555;margin-bottom:8px;margin-top:4px">显示内容</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+                ${chk('show-distance','距高点',settings.showDistance!==false)}
+                ${chk('show-rsi','RSI',settings.showRSI!==false)}
+                ${chk('show-no-holding','未买入标签',settings.showNoHolding!==false)}
+                ${chk('show-blogger-tag','博主买卖',settings.showBloggerTag!==false)}
+                ${chk('show-topic-tag','主题标签',settings.showTopicTag!==false)}
+                ${chk('show-alerts','风险提示',settings.showAlerts!==false)}
             </div>
         </div>
-        
-        <!-- 博主实盘数据 -->
-        <div style="margin-bottom: 16px;">
-            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">博主实盘数据</h3>
-            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
-                <div style="font-size: 11px; color: #888; margin-bottom: 10px; line-height: 1.6;">
-                    上传博主实盘 xlsx 文件（需包含基金代码列），有效期 7 天。
-                </div>
-                <input type="file" id="settings-blogger-file" accept=".xlsx,.xls" style="display:none">
-                <button id="settings-blogger-upload-btn" style="
-                    background:#007bff;color:#fff;border:none;
-                    padding:6px 14px;border-radius:4px;font-size:11px;cursor:pointer;
-                    width:100%;margin-bottom:8px;
-                " onclick="document.getElementById('settings-blogger-file').click()">
-                    上传 xlsx 文件
-                </button>
-                <div id="settings-blogger-msg" style="font-size:11px;color:#888;min-height:16px;line-height:1.5;"></div>
-            </div>
-        </div>
+    </div>
 
-        <div style="margin-bottom: 16px;">
-            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">基金管理</h3>
-            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
-                <div id="fund-management" style="max-height: 200px; overflow-y: auto;">
-                    <!-- 基金列表将通过JavaScript动态添加 -->
-                </div>
-            </div>
+    <!-- 博主实盘数据 -->
+    <div style="margin-bottom:16px">
+        <div style="font-size:11px;font-weight:600;color:#555;letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px">博主实盘数据</div>
+        <div style="background:#141414;border:0.5px solid #1e1e1e;border-radius:8px;padding:14px">
+            <div style="font-size:11px;color:#555;margin-bottom:10px">上传博主实盘 xlsx 文件（需包含基金代码列），有效期 7 天。</div>
+            <input type="file" id="settings-blogger-file" accept=".xlsx,.xls" style="display:none">
+            <button id="settings-blogger-upload-btn" style="background:#007bff;color:#fff;border:none;padding:6px 14px;border-radius:5px;font-size:11px;cursor:pointer;width:100%;margin-bottom:8px" onclick="document.getElementById('settings-blogger-file').click()">上传 xlsx 文件</button>
+            <div id="settings-blogger-msg" style="font-size:11px;color:#888;min-height:16px;line-height:1.5"></div>
         </div>
-        
-        <div id="admin-section" style="margin-bottom: 16px; display: none;">
-            <h3 style="color: #e0e0e0; margin-bottom: 8px; font-size: 12px;">账户管理</h3>
-            <div style="background-color: #2a2a2a; border-radius: 4px; padding: 12px; border: 1px solid #333;">
-                <button id="account-management" style="background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; width: 100%;">管理账户</button>
-            </div>
-        </div>
-        
-        <div style="display: flex; justify-content: flex-end; gap: 8px;">
-            <button id="clear-cache" style="background-color: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px;">清除缓存</button>
-            <button id="save-settings" style="background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px;">保存设置</button>
-        </div>
-    `;
+    </div>
 
-    // 添加到页面
-    modal.appendChild(modalContent);
+    <!-- 基金管理 -->
+    <div style="margin-bottom:16px">
+        <div style="font-size:11px;font-weight:600;color:#555;letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px">基金管理</div>
+        <div style="background:#141414;border:0.5px solid #1e1e1e;border-radius:8px;padding:14px">
+            <div id="fund-management" style="max-height:200px;overflow-y:auto"></div>
+        </div>
+    </div>
+
+    <div id="admin-section" style="margin-bottom:16px;display:none">
+        <div style="font-size:11px;font-weight:600;color:#555;letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px">账户管理</div>
+        <div style="background:#141414;border:0.5px solid #1e1e1e;border-radius:8px;padding:14px">
+            <button id="account-management" style="background:#007bff;color:#fff;border:none;padding:6px 12px;border-radius:5px;cursor:pointer;font-size:11px;width:100%">管理账户</button>
+        </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+        <button id="clear-cache" style="background:#2a2a2a;color:#dc3545;border:0.5px solid #dc354540;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:11px">清除缓存</button>
+        <button id="save-settings" style="background:#007bff;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:11px">保存设置</button>
+    </div>`;
+
+    modal.appendChild(mc);
     document.body.appendChild(modal);
 
-    // 关闭按钮
-    modal.querySelector('.close-btn').addEventListener('click', function() {
-        document.body.removeChild(modal);
-    });
+    mc.querySelector('.close-btn').addEventListener('click', () => document.body.removeChild(modal));
 
-    // 加载基金列表
-    loadFundManagement(modal.querySelector('#fund-management'));
-
-    // 保存设置按钮
-    modal.querySelector('#save-settings').addEventListener('click', function() {
-        const newSettings = {
-            fontSize: document.getElementById('font-size').value,
-            updateFrequency: document.getElementById('update-frequency').value,
-            investmentLevel: document.getElementById('investment-level').value,
-            showDistance: document.getElementById('show-distance').checked,
-            showRSI: document.getElementById('show-rsi').checked,
-            showAlerts: document.getElementById('show-alerts').checked
-        };
-
-        localStorage.setItem('fundTrackerSettings', JSON.stringify(newSettings));
-        alert('设置已保存');
-        document.body.removeChild(modal);
-        // 应用设置（更新频率由 updateStrategyManager 统一管理，不在此重启定时器）
-        applySettings(newSettings);
-    });
-
-    // 检查是否为管理员
-    fetch('/api/check-admin')
-        .then(response => response.json())
-        .then(data => {
-            if (data.is_admin) {
-                // 显示账户管理选项
-                modal.querySelector('#admin-section').style.display = 'block';
-
-                // 账户管理按钮点击事件
-                modal.querySelector('#account-management').addEventListener('click', function() {
-                    window.location.href = '/account-management';
-                });
-            }
-        })
-        .catch(error => {
-            console.error('检查管理员权限失败:', error);
+    // 绑定博主上传
+    const _sbf = mc.querySelector('#settings-blogger-file');
+    if (_sbf) {
+        _sbf.addEventListener('change', e => {
+            const f = e.target.files[0];
+            if (f && window.bloggerTracker) window.bloggerTracker._parseAndUploadFromSettings(f, mc.querySelector('#settings-blogger-msg'));
+            e.target.value = '';
         });
+    }
 
-    // 清除缓存按钮
-    modal.querySelector('#clear-cache').addEventListener('click', function() {
+    loadFundManagement(mc.querySelector('#fund-management'));
+
+    mc.querySelector('#save-settings').addEventListener('click', () => {
+        const ns = {
+            fontSize:          document.getElementById('font-size').value,
+            updateFrequency:   document.getElementById('update-frequency').value,
+            holdingsFrequency: document.getElementById('holdings-frequency').value,
+            investmentLevel:   document.getElementById('investment-level').value,
+            showDistance:      document.getElementById('show-distance').checked,
+            showRSI:           document.getElementById('show-rsi').checked,
+            showNoHolding:     document.getElementById('show-no-holding').checked,
+            showBloggerTag:    document.getElementById('show-blogger-tag').checked,
+            showTopicTag:      document.getElementById('show-topic-tag').checked,
+            showAlerts:        document.getElementById('show-alerts').checked,
+        };
+        localStorage.setItem('fundTrackerSettings', JSON.stringify(ns));
+        document.body.removeChild(modal);
+        applySettings(ns);
+        // 应用更新频率
+        if (typeof updateStrategyManager !== 'undefined') {
+            updateStrategyManager._fundListMinutes  = parseInt(ns.updateFrequency);
+            updateStrategyManager._holdingsMinutes  = parseInt(ns.holdingsFrequency);
+            updateStrategyManager.switchTab(window.activeTab || 'fund-prediction');
+        }
+    });
+
+    fetch('/api/check-admin').then(r=>r.json()).then(d => {
+        if (d.is_admin) {
+            mc.querySelector('#admin-section').style.display = 'block';
+            mc.querySelector('#account-management').addEventListener('click', () => { window.location.href = '/account-management'; });
+        }
+    }).catch(()=>{});
+
+    mc.querySelector('#clear-cache').addEventListener('click', () => {
         if (confirm('确定要清除缓存数据吗？买入记录不会被删除。')) {
-            // 只清缓存，保留买入记录和设置
             try { localStorage.removeItem('fundTrackerCache'); } catch(e) {}
             cacheManager.clear();
-            alert('缓存已清除');
             document.body.removeChild(modal);
             location.reload();
         }
     });
+
+    modal.addEventListener('click', e => { if (e.target === modal) document.body.removeChild(modal); });
 }
 
-function getSettings() {
-    const defaultSettings = {
-        fontSize: 'medium',
-        updateFrequency: '5',
-        investmentLevel: 'small',
-        showDistance: true,
-        showRSI: true,
-        showAlerts: true
-    };
 
-    const savedSettings = localStorage.getItem('fundTrackerSettings');
-    return savedSettings ? JSON.parse(savedSettings) : defaultSettings;
+function getSettings() {
+    const def = {
+        fontSize:'medium', updateFrequency:'3', holdingsFrequency:'1',
+        investmentLevel:'medium',
+        showDistance:true, showRSI:true, showNoHolding:true,
+        showBloggerTag:true, showTopicTag:true, showAlerts:true
+    };
+    try {
+        const saved = JSON.parse(localStorage.getItem('fundTrackerSettings') || '{}');
+        return Object.assign({}, def, saved);
+    } catch(e) { return def; }
 }
 
 function applySettings(settings) {
-    // 应用字体大小
-    document.body.style.fontSize = settings.fontSize === 'small' ? '13px' : settings.fontSize === 'large' ? '15px' : '14px';
-
-    // 应用其他设置（这里可以添加更多设置的应用逻辑）
+    // 字体大小
+    document.body.style.fontSize = settings.fontSize === 'large' ? '15px' : '14px';
+    // 重新渲染基金列表（让显示开关立刻生效）
+    const cached = typeof cacheManager !== 'undefined' ? cacheManager.get('fundsList') : null;
+    if (cached && typeof renderFunds === 'function') renderFunds(cached);
 }
 
 function loadFundManagement(container) {

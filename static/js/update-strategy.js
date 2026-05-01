@@ -44,25 +44,21 @@ class UpdateStrategyManager {
         const isAfterMarket = this.isAfterMarketTime();
 
         switch (type) {
-            case 'fundList':
-                // 基金列表更新频率
-                if (isTrading) {
-                    return 3 * 60 * 1000; // 交易时间: 3分钟
-                } else if (isPreMarket || isAfterMarket) {
-                    return 10 * 60 * 1000; // 盘前盘后: 10分钟
-                } else {
-                    return 30 * 60 * 1000; // 非交易时间: 30分钟
-                }
+            case 'fundList': {
+                // 读取用户设置的频率（默认3分钟）
+                const _flMins = parseInt((typeof getSettings === 'function' ? getSettings().updateFrequency : null) || '3');
+                if (isTrading) return _flMins * 60 * 1000;
+                else if (isPreMarket || isAfterMarket) return Math.max(_flMins, 10) * 60 * 1000;
+                else return 30 * 60 * 1000;
+            }
 
-            case 'holdings':
-                // 股票持仓更新频率（持仓数据变化慢，无需高频）
-                if (isTrading) {
-                    return 5 * 60 * 1000; // 交易时间: 5分钟
-                } else if (isPreMarket || isAfterMarket) {
-                    return 10 * 60 * 1000; // 盘前盘后: 10分钟
-                } else {
-                    return 30 * 60 * 1000; // 非交易时间: 30分钟
-                }
+            case 'holdings': {
+                // 持仓股票改为按需拉取，此处仅供展开状态下的刷新参考
+                const _hMins = parseInt((typeof getSettings === 'function' ? getSettings().holdingsFrequency : null) || '1');
+                if (isTrading) return _hMins * 60 * 1000;
+                else if (isPreMarket || isAfterMarket) return 10 * 60 * 1000;
+                else return 30 * 60 * 1000;
+            }
 
             default:
                 return 60 * 1000;
