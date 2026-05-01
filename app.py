@@ -38,10 +38,9 @@ def _is_trading_time_bj():
 def _is_nav_settled_bj():
     from datetime import timezone, timedelta
     bj = datetime.now(timezone(timedelta(hours=8)))
-    day  = bj.weekday()
+    if _is_holiday_bj(bj):
+        return True           # 节假日视为已结算
     mins = bj.hour * 60 + bj.minute
-    if day >= 5:
-        return True           # weekend
     return mins >= 1260 or mins < 570  # after 21:00 or before 9:30
 
 # 配置日志处理器
@@ -1087,7 +1086,7 @@ def get_blogger_signals():
             _trading = []
             _cur = _bj_dt
             while len(_trading) < days:
-                if _cur.weekday() < 5:
+                if _cur.weekday() < 5 and _cur.strftime('%Y-%m-%d') not in _CN_HOLIDAYS:
                     _trading.append(_cur)
                 _cur -= _td7(days=1)
             _cutoff = _trading[-1].strftime('%Y-%m-%d')
@@ -1651,13 +1650,14 @@ def get_recommended_funds_api():
 def _calc_action(fund, pr: float, market_data: dict, investment_level: str = 'small', blogger_signals: dict = None) -> tuple:
     # 技术面多维度综合决策引擎
     #
-    # 设计原则：决策以技术指标为主，实时估值仅作辅助参考（权重与其他指标相同）
-    # 需多项技术指标同向共识才触发操作，避免单一指标误判
+    # 设计原则：纯技术面决策 + 博主实盘参考，不参考当日预估涨跌幅
+    # 避免"今天涨了就建议买"的追高逻辑，只基于中期技术趋势判断
     #
     # 评分结构（满分约 ±8）：
     #   技术主体：5日趋势、20日均线、MACD、RSI、KDJ-J、布林带 各±1（共±6）
-    #   辅助参考：实时估值±1（与技术指标平权，仅作辅助）
-    #   环境修正：大盘涨跌±1（门槛提高至2%）
+    #   博主信号：买入≥5人+2分，≥2人+1分；卖出≥3人-2分，≥1人-1分（上限±2）
+    #   大盘修正：极端行情（跌>3%）才-1分；大涨不加分，避免追高
+    #   实时估值：不参与评分（已移除，防止追高）
     #
     # 决策阈值（需多项技术信号共识）：
     #   补仓 ≥+4，轻仓补入 ≥+3，持有 -2~+2，观望减持 ≤-3，减仓 ≤-4
@@ -1723,37 +1723,37 @@ def _calc_action(fund, pr: float, market_data: dict, investment_level: str = 'sm
         elif bb_pct > 0.7:
             score -= 1
 
-    # ── 4. 实时估值辅助（权重与技术指标相同，不主导决策）──────────────────
-    # 预估值有一定误差，门槛0.3%过滤日内微小噪音
-    has_realtime = getattr(fund, 'has_realtime', False)
-    if has_realtime and abs(pr) > 0.003:
-        score += 1 if pr > 0 else -1
+    # ── 4. 实时估值 ── 已移除 ────────────────────────────────────────────────
+    # 不用当日预估涨跌幅参与评分，避免追高（涨了就建议买、跌了就建议减）
+    # 实时估值仅在前端展示，不干预决策
 
-    # ── 5. 大盘环境修正（门槛提高至2%，避免小幅波动频繁触发）─────────────
+    # ── 5. 大盘环境修正（门槛提高至3%，只在极端行情才影响，避免普通上涨日追高）
+    # 大盘小涨（2%以内）不影响评分，需要明显异动才修正
     if market_data:
         indices = market_data.get('indices', {})
         if indices:
             avg_market = sum(v.get('change_ratio', 0) for v in indices.values()) / len(indices)
-            if avg_market < -0.02:
+            if avg_market < -0.03:    # 大盘大跌 >3%：市场恐慌，减仓倾向
                 score -= 1
-            elif avg_market > 0.02:
-                score += 1
+            elif avg_market > 0.03:   # 大盘大涨 >3%（极少见）：不加分，改为仅记录
+                pass  # 不追涨，大涨时反而要警惕高位风险
 
-    # ── 6. 博主信号加权（辅助维度，上限 ±2 分，不单独触发操作建议）──────────
-    # blogger_signals: {'buy': N, 'sell': N} 来自调用方预查询的7天数据
+    # ── 6. 博主信号加权（辅助维度，上限 ±2 分）──────────────────────────────
+    # 定投/买入 → 看多；减仓/清仓/卖出 → 看空
+    # 博主信号基于持仓行为，不受单日涨跌影响，是真实的价值判断
     if blogger_signals:
-        _b_buy  = blogger_signals.get('buy', 0)
-        _b_sell = blogger_signals.get('sell', 0)
+        _b_buy  = blogger_signals.get('buy', 0)   # 买入+定投
+        _b_sell = blogger_signals.get('sell', 0)  # 卖出+减仓+清仓
         _b_score = 0
-        if _b_buy >= 3:
-            _b_score += 2   # 3位及以上博主买入，强信号
-        elif _b_buy >= 1:
-            _b_score += 1   # 1-2位博主买入，弱信号
+        if _b_buy >= 5:
+            _b_score += 2   # 5位及以上博主买入，强共识信号
+        elif _b_buy >= 2:
+            _b_score += 1   # 2-4位博主买入，弱信号
         if _b_sell >= 3:
             _b_score -= 2
         elif _b_sell >= 1:
             _b_score -= 1
-        score += max(-2, min(2, _b_score))  # 限制在 ±2 以内
+        score += max(-2, min(2, _b_score))
 
     # ── 7. 决策输出 ──────────────────────────────────────────────────────────
     AMOUNT_TABLE = {
