@@ -21,8 +21,9 @@ const CACHE_KEYS = {
 // 非交易时间：30分钟，数据不变，减少重复请求
 function _getFundsListExpiry() {
     const bj = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
-    const day = bj.getDay(), mins = bj.getHours() * 60 + bj.getMinutes();
-    const trading = day >= 1 && day <= 5 && ((mins >= 570 && mins < 690) || (mins >= 780 && mins < 900));
+    const mins = bj.getHours() * 60 + bj.getMinutes();
+    const isWorkday = !_isCNHoliday(bj);
+    const trading = isWorkday && ((mins >= 570 && mins < 690) || (mins >= 780 && mins < 900));
     return trading ? 5 * 60 * 1000 : 30 * 60 * 1000;
 }
 const CACHE_EXPIRY = {
@@ -2078,14 +2079,32 @@ let stockUpdateIntervals = {}; // 存储每个基金的更新定时器
 // ── 净值是否已结算 ────────────────────────────────────────────────────────
 // 规则：非交易时间，且距最后一个交易日收盘（15:00 北京时间）已超过 6 小时
 // 即：工作日 21:00 之后、周末全天 → 认为当日净值已出，显示实际收益而非预估
+// 中国法定节假日（与后端保持一致）
+const _CN_HOLIDAYS_FE = new Set([
+    '2026-01-01',
+    '2026-01-26','2026-01-27','2026-01-28','2026-01-29','2026-01-30','2026-02-02',
+    '2026-04-06',
+    '2026-05-01','2026-05-02','2026-05-03','2026-05-04','2026-05-05',
+    '2026-06-19',
+    '2026-10-01','2026-10-02','2026-10-05','2026-10-06','2026-10-07','2026-10-08',
+]);
+
+function _isCNHoliday(bjDate) {
+    const y = bjDate.getFullYear();
+    const m = String(bjDate.getMonth()+1).padStart(2,'0');
+    const d = String(bjDate.getDate()).padStart(2,'0');
+    const dateStr = `${y}-${m}-${d}`;
+    return bjDate.getDay() === 0 || bjDate.getDay() === 6 || _CN_HOLIDAYS_FE.has(dateStr);
+}
+
 function isNavSettled() {
     const now = new Date();
     const bj = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
     const day  = bj.getDay();   // 0=日 6=六
     const mins = bj.getHours() * 60 + bj.getMinutes();
 
-    // 周末：全天都是"已结算"
-    if (day === 0 || day === 6) return true;
+    // 节假日（含周末）：全天都是"已结算"
+    if (_isCNHoliday(bj)) return true;
 
     // 工作日：21:00（收盘后6小时）之后算已结算
     // 工作日 9:30 前（还未开盘）也算"昨日已结算"——用昨日实际净值展示

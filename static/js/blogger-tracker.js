@@ -470,7 +470,7 @@ class BloggerTracker {
                     +bars+'</div></div>';
                 // 跳过折线图代码
             } else {
-            const lineW = 520, lineH = 120, padL = 28, padB = 20, padT = 10, padR = 10;
+            const lineW = 680, lineH = 130, padL = 24, padB = 20, padT = 10, padR = 6;
             const chartW = lineW - padL - padR, chartH = lineH - padT - padB;
             const dates = dateTrend.map(([d])=>d);
             const maxVal = Math.max(...dates.flatMap(d => top5Topics.map(t => topicByDate[d]&&topicByDate[d][t]||0)), 1);
