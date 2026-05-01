@@ -932,15 +932,12 @@ function renderFunds(funds) {
                         <span class="rsi-emoji">${rsiStatus.emoji}</span>
                     </div>
                     ${(() => {
-                        // 博主实盘标签：7天内有博主操作该基金则显示
+                        // 博主实盘标签：直接用 _bloggerSignals 里已有数据（后端已按交易日过滤）
                         const _sigs = window._bloggerSignals || [];
-                        const _bj = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Shanghai'}));
-                        const _7dAgo = new Date(_bj); _7dAgo.setDate(_7dAgo.getDate() - 7);
-                        const _cutoff = `${_7dAgo.getFullYear()}-${String(_7dAgo.getMonth()+1).padStart(2,'0')}-${String(_7dAgo.getDate()).padStart(2,'0')}`;
-                        const _matched = _sigs.filter(r => String(r.fund_code) === String(fund.code) && r.date >= _cutoff);
+                        const _matched = _sigs.filter(r => String(r.fund_code) === String(fund.code));
                         if (_matched.length === 0) return '';
                         const _buyN  = _matched.filter(r => r.action === '买入' || r.action === '定投').length;
-                        const _sellN = _matched.filter(r => r.action === '卖出').length;
+                        const _sellN = _matched.filter(r => r.action === '卖出' || r.action === '减仓' || r.action === '清仓').length;
                         const _tip   = [_buyN ? `${_buyN}买` : '', _sellN ? `${_sellN}卖` : ''].filter(Boolean).join('/');
                         return '<div class="fund-detail-box fund-blogger-tag"><span>博主实盘 ' + _tip + '</span></div>';
                     })()}
