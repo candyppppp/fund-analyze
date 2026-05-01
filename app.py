@@ -27,12 +27,30 @@ from db import supabase, supabase_admin
 is_vercel = os.environ.get('VERCEL') is not None
 
 
+# 中国法定节假日（2026年）
+_CN_HOLIDAYS = {
+    '2026-01-01',
+    '2026-01-26','2026-01-27','2026-01-28','2026-01-29','2026-01-30','2026-02-02',
+    '2026-04-06',
+    '2026-05-01','2026-05-02','2026-05-03','2026-05-04','2026-05-05',
+    '2026-06-19',
+    '2026-10-01','2026-10-02','2026-10-05','2026-10-06','2026-10-07','2026-10-08',
+}
+
+def _is_holiday_bj(dt=None):
+    from datetime import timezone, timedelta
+    if dt is None:
+        dt = datetime.now(timezone(timedelta(hours=8)))
+    date_str = dt.strftime('%Y-%m-%d')
+    return dt.weekday() >= 5 or date_str in _CN_HOLIDAYS
+
 def _is_trading_time_bj():
     from datetime import timezone, timedelta
     bj = datetime.now(timezone(timedelta(hours=8)))
-    day  = bj.weekday()   # 0=Mon .. 4=Fri
+    if _is_holiday_bj(bj):
+        return False
     mins = bj.hour * 60 + bj.minute
-    return day < 5 and 570 <= mins < 900   # 9:30-15:00
+    return 570 <= mins < 900   # 9:30-15:00
 
 
 def _is_nav_settled_bj():
