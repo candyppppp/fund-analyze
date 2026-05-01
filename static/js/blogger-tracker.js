@@ -662,10 +662,13 @@ class BloggerTracker {
     }
 
     _refreshGlobalSignals() {
-        fetch('/api/blogger-signals')
+        // 和博主追踪报告用同样的 days 参数，确保两处数据一致
+        const days = this._currentRange === '1D' ? 1 : this._currentRange === '3D' ? 3 : 7;
+        fetch('/api/blogger-signals?days=' + days)
             .then(r=>r.ok?r.json():[])
             .then(data=>{
                 window._bloggerSignals=data||[];
+                // 刷新基金列表的博主实盘标签
                 if(window.activeTab!=='blogger-tracker'){
                     try{const c=cacheManager.get('fundsList');if(c&&typeof renderFunds==='function')renderFunds(c);}catch(_){}
                 }
