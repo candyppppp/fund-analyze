@@ -136,6 +136,9 @@ class BloggerTracker {
             + '.bt-trend-col{flex:1;display:flex;flex-direction:column;gap:1px;align-items:center}'
             + '.bt-trend-bar{width:100%;border-radius:2px 2px 0 0;min-height:2px}'
             + '.bt-trend-lbl{font-size:9px;color:#333;margin-top:3px;white-space:nowrap}'
+            + '.bt-follow-btn{font-size:10px;padding:2px 7px;border-radius:4px;cursor:pointer;border:0.5px solid #333;background:#1a1a1a;color:#888;transition:all .15s;white-space:nowrap}'
+            + '.bt-follow-btn:hover{border-color:#007bff;color:#007bff;background:rgba(0,123,255,.08)}'
+            + '.bt-followed{font-size:10px;padding:2px 7px;border-radius:4px;border:0.5px solid rgba(0,123,255,.3);background:rgba(0,123,255,.1);color:#4a9eff;white-space:nowrap}'
             + '.bt-collapse-hd:hover{background:#1a1a1a!important}'
             + '.bt-lv{font-size:10px;color:#555;margin-left:3px;flex-shrink:0}'
             + '.bt-lpct{font-size:10px;color:#6d6565;margin-left:2px;flex-shrink:0}'
@@ -311,7 +314,10 @@ class BloggerTracker {
             const bw = Math.round(f.buy/maxBuy*100);
             const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
             const rCls = i===0?' bt-r1':i===1?' bt-r2':i===2?' bt-r3':'';
-            return '<div class="bt-tr'+(mine?' bt-mr':'')+'" style="grid-template-columns:28px 1fr 36px 36px 36px 36px 36px 30px"><span class="bt-ti'+rCls+'">'+medal+'</span>'
+            const followBtn = mine
+                ? '<span class="bt-followed">✓ 已关注</span>'
+                : '<button class="bt-follow-btn" data-code="'+f.code+'" data-name="'+encodeURIComponent(f.name)+'" onclick="window._btAddFund(this)">+ 关注</button>';
+            return '<div class="bt-tr'+(mine?' bt-mr':'')+'" style="grid-template-columns:28px 1fr 36px 36px 36px 36px 36px 30px 52px"><span class="bt-ti'+rCls+'">'+medal+'</span>'
                 +'<div class="bt-tn"><div class="bt-tf">'+f.name+(mine?'<span class="bt-mt">自选</span>':'')+'</div>'
                 +'<div class="bt-tc">'+f.code+(f.topic?' · <span style="color:#504a4a">'+f.topic+'</span>':'')+'</div>'
                 +'<div class="bt-bw"><div class="bt-bb" style="width:'+bw+'%"></div></div></div>'
@@ -320,7 +326,8 @@ class BloggerTracker {
                 +'<span class="bt-ts bt-dc2">'+(f.dip?f.dip+'投':'')+'</span>'
                 +'<span class="bt-ts bt-rc">'+(f.reduce?f.reduce+'减':'')+'</span>'
                 +'<span class="bt-ts" style="color:#8b5cf6">'+(f.clear?f.clear+'清':'')+'</span>'
-                +'<span class="bt-ts bt-nc">'+f.bl+'人</span></div>';
+                +'<span class="bt-ts bt-nc">'+f.bl+'人</span>'
+                +'<span style="text-align:center;display:flex;align-items:center;justify-content:center">'+followBtn+'</span></div>';
         }).join('');
 
         // 博主热力
@@ -525,8 +532,8 @@ class BloggerTracker {
 
         html += '<div class="bt-sec"><div class="bt-sh">博主买入 TOP'+Math.min(20,fundsSorted.length)+' 基金</div>'
             +'<div style="background:#141414;border:0.5px solid #1e1e1e;border-radius:10px;padding:8px">'
-            +'<div class="bt-tr" style="font-size:12px;color:#333;padding:3px 10px;margin-bottom:2px;grid-template-columns:28px 1fr 36px 36px 36px 36px 36px 30px"><span></span><span></span>'
-            +'<span style="text-align:center">买入</span><span style="text-align:center">卖出</span><span style="text-align:center">定投</span><span style="text-align:center">减仓</span><span style="text-align:center">清仓</span><span style="text-align:center">博主</span></div>'
+            +'<div class="bt-tr" style="font-size:12px;color:#333;padding:3px 10px;margin-bottom:2px;grid-template-columns:28px 1fr 36px 36px 36px 36px 36px 30px 52px"><span></span><span></span>'
+            +'<span style="text-align:center">买入</span><span style="text-align:center">卖出</span><span style="text-align:center">定投</span><span style="text-align:center">减仓</span><span style="text-align:center">清仓</span><span style="text-align:center">博主</span><span style="text-align:center">关注</span></div>'
             +'<div class="bt-tg">'+top20+'</div></div></div>';
 
         const _initShow = 24; // 初始显示24个
@@ -869,6 +876,45 @@ window._btShowFundModal = function(code, name, items) {
 
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
     document.body.appendChild(modal);
+};
+
+// TOP20 加关注
+window._btAddFund = function(btn) {
+    const code = btn.dataset.code;
+    const name = decodeURIComponent(btn.dataset.name);
+    if (!code) return;
+    btn.textContent = '添加中...';
+    btn.disabled = true;
+    fetch('/api/funds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code, name: name })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.id || res.code === code || res.success) {
+            // 成功：替换按钮为已关注状态
+            const span = document.createElement('span');
+            span.className = 'bt-followed';
+            span.textContent = '✓ 已关注';
+            btn.parentNode.replaceChild(span, btn);
+            // 同步更新 _myFundCodes
+            if (window.bloggerTracker && !window.bloggerTracker._myFundCodes.includes(code)) {
+                window.bloggerTracker._myFundCodes.push(code);
+            }
+            // 刷新基金列表
+            if (typeof loadFunds === 'function') loadFunds();
+        } else {
+            btn.textContent = '+ 关注';
+            btn.disabled = false;
+            alert('添加失败：' + (res.error || res.message || '未知错误'));
+        }
+    })
+    .catch(() => {
+        btn.textContent = '+ 关注';
+        btn.disabled = false;
+        alert('网络错误，请重试');
+    });
 };
 
 window._btCloseModal = function() {
