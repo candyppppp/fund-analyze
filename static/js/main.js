@@ -885,7 +885,7 @@ function renderFunds(funds) {
                         <span class="fund-code">${fund.code}</span>
                         ${(() => {
                             const _st = getSettings();
-                            if (!_st.showTopicTag) return '';
+                            if (!_st.showTopicTag || window.innerWidth <= 600) return '';
                             const _t = (window._fundTopicMap||{})[String(fund.code)] || '未知';
                             return '<div class="fund-detail-box" style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3)!important"><span style="color:#a5b4fc">' + _t + '</span></div>';
                         })()}
@@ -3054,10 +3054,10 @@ function showSettings() {
                 ['large','大额（800/1000/1200/1500/2000元）']
             ], settings.investmentLevel||'medium'))}
             <div style="font-size:11px;color:#555;margin-bottom:8px;margin-top:4px">显示内容</div>
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
                 ${chk('show-distance','距高点',settings.showDistance!==false)}
                 ${chk('show-rsi','RSI',settings.showRSI!==false)}
-                ${chk('show-no-holding','未买入标签',settings.showNoHolding!==false)}
+                ${chk('show-no-holding','买入标签',settings.showNoHolding!==false)}
                 ${chk('show-blogger-tag','博主买卖',settings.showBloggerTag!==false)}
                 ${chk('show-topic-tag','主题标签',settings.showTopicTag!==false)}
                 ${chk('show-alerts','风险提示',settings.showAlerts!==false)}
@@ -3065,8 +3065,8 @@ function showSettings() {
         </div>
     </div>
 
-    <!-- 博主实盘数据 -->
-    <div style="margin-bottom:16px">
+    <!-- 博主实盘数据（移动端隐藏） -->
+    <div id="settings-blogger-section" style="margin-bottom:16px">
         <div style="font-size:11px;font-weight:600;color:#555;letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px">博主实盘数据</div>
         <div style="background:#141414;border:0.5px solid #1e1e1e;border-radius:8px;padding:14px">
             <div style="font-size:11px;color:#555;margin-bottom:10px">上传博主实盘 xlsx 文件（需包含基金代码列），有效期 7 天。</div>
@@ -3098,6 +3098,12 @@ function showSettings() {
 
     modal.appendChild(mc);
     document.body.appendChild(modal);
+
+    // 移动端隐藏博主实盘区块
+    if (window.innerWidth <= 600) {
+        const _bs = mc.querySelector('#settings-blogger-section');
+        if (_bs) _bs.style.display = 'none';
+    }
 
     mc.querySelector('.close-btn').addEventListener('click', () => document.body.removeChild(modal));
 
