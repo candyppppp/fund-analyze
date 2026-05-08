@@ -536,18 +536,21 @@ class BloggerTracker {
         const maxAbs = Math.max(...topChanges.map(t => Math.abs(t.delta)), 1);
         const heatHtml = topChanges.length > 1 ? '<div class="bt-sec"><div class="bt-sh">主题热度变化</div>'
             + '<div style="background:#141414;border:0.5px solid #1e1e1e;border-radius:10px;padding:10px 14px">'
-            + '<div style="font-size:10px;color:#555;margin-bottom:8px">近期（后半段）vs 早期（前半段）买入人次变化，正值=资金流入，负值=流出</div>'
+            + '<div style="font-size:10px;color:#555;margin-bottom:8px">近期 vs 早期买入人次变化（红=流入↑，绿=流出↓）</div>'
             + topChanges.map(t => {
                 const isUp = t.delta >= 0;
-                const barW = Math.round(Math.abs(t.delta)/maxAbs*80);
+                const barPct = Math.round(Math.abs(t.delta)/maxAbs*45);
                 return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid #141414">'
                     + '<span style="font-size:11px;color:#aaa;width:80px;flex-shrink:0;text-align:right">' + t.topic + '</span>'
-                    + '<div style="flex:1;height:14px;background:#1a1a1a;border-radius:3px;overflow:hidden;display:flex;align-items:center">'
-                    + '<div style="width:'+barW+'%;height:100%;background:'+(isUp?'#dc3545':'#f97316')+';border-radius:3px;min-width:2px"></div>'
+                    + '<div style="flex:1;height:14px;background:#1a1a1a;border-radius:3px;overflow:hidden;position:relative">'
+                    + '<div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:#333"></div>'
+                    + (isUp
+                        ? '<div style="position:absolute;left:50%;top:0;height:100%;width:'+barPct+'%;background:#dc3545;border-radius:0 3px 3px 0;min-width:2px"></div>'
+                        : '<div style="position:absolute;right:50%;top:0;height:100%;width:'+barPct+'%;background:#28a745;border-radius:3px 0 0 3px;min-width:2px"></div>')
                     + '</div>'
-                    + '<span style="font-size:11px;color:'+(isUp?'#dc3545':'#f97316')+';width:36px;text-align:right;flex-shrink:0">'
+                    + '<span style="font-size:11px;color:'+(isUp?'#dc3545':'#28a745')+';width:40px;text-align:right;flex-shrink:0;font-weight:600">'
                     + (isUp?'+':'')+t.delta+'</span>'
-                    + '<span style="font-size:10px;color:#333;width:30px;flex-shrink:0">' + t.recent + '次</span>'
+                    + '<span style="font-size:10px;color:#444;width:32px;flex-shrink:0;text-align:right">' + t.recent + '次</span>'
                     + '</div>';
             }).join('')
             + '</div></div>' : '';
@@ -579,21 +582,26 @@ class BloggerTracker {
                     const mine = this._myFundCodes.includes(String(f.code));
                     const dayActions = {};
                     data.filter(r => r.fund_code === f.code).forEach(r => {
-                        if (!dayActions[r.date]) dayActions[r.date] = {buy:0,dip:0,reduce:0,clear:0,bloggers:new Set()};
+                        if (!dayActions[r.date]) dayActions[r.date] = {buy:0,dip:0,reduce:0,clear:0,allBloggers:new Set()};
                         if (r.action==='买入') dayActions[r.date].buy++;
                         else if (r.action==='定投') dayActions[r.date].dip++;
                         else if (r.action==='减仓') dayActions[r.date].reduce++;
                         else if (r.action==='清仓') dayActions[r.date].clear++;
-                        dayActions[r.date].bloggers.add(r.blogger_name);
+                        dayActions[r.date].allBloggers.add(r.blogger_name);
                     });
                     const cells = dates_sorted.map(d => {
                         const v = dayActions[d];
                         if (!v) return '<div style="background:#0d0d0d;border-radius:4px;height:32px"></div>';
-                        const total = v.buy+v.dip+v.reduce+v.clear;
-                        const mainAction = v.clear>0?'清仓':v.reduce>0?'减仓':v.buy>v.dip?'买入':'定投';
-                        const intensity = Math.min(1, v.bloggers.size/8);
+                        const buyCount = v.buy + v.dip;
+                        const sellCount = v.reduce + v.clear;
+                        const mainAction = buyCount >= sellCount
+                            ? (v.buy >= v.dip ? '买入' : '定投')
+                            : (v.clear >= v.reduce ? '清仓' : '减仓');
+                        const displayCount = v.allBloggers.size;
+                        const intensity = Math.min(1, displayCount / 10);
                         const baseColor = ACTION_COLOR[mainAction];
-                        return '<div style="background:'+baseColor+';opacity:'+(0.2+intensity*0.8).toFixed(2)+';border-radius:4px;height:32px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:rgba(255,255,255,.9)">'+v.bloggers.size+'</div>';
+                        const border = (buyCount > 0 && sellCount > 0) ? ';box-shadow:inset 0 0 0 2px rgba(255,255,255,.25)' : '';
+                        return '<div style="background:'+baseColor+';opacity:'+(0.2+intensity*0.8).toFixed(2)+';border-radius:4px;height:32px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:rgba(255,255,255,.9)'+border+'">'+displayCount+'</div>';
                     }).join('');
                     return '<div style="font-size:10px;color:'+(mine?'#4a9eff':'#888')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:3px 4px;display:flex;align-items:center;height:32px">'
                         + (mine?'● ':'')+f.name+'</div>' + cells;
